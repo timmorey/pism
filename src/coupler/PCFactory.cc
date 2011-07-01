@@ -29,6 +29,7 @@
 #include "PASLapseRates.hh"
 #include "PASDirectForcing.hh"
 #include "PScalarForcing.hh"
+#include "PODirectForcing.hh"
 
 // Atmosphere
 static void create_pa_constant(IceGrid& g, const NCConfigVariable& conf, PISMAtmosphereModel* &result) {
@@ -79,6 +80,10 @@ static void create_po_constant(IceGrid& g, const NCConfigVariable& conf, PISMOce
   result = new POConstant(g, conf);
 }
 
+static void create_po_given(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
+  result = new PODirectForcing(g, conf);
+}
+
 static void create_po_pik(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
   result = new POConstantPIK(g, conf);
 }
@@ -89,6 +94,7 @@ static void create_po_forcing(IceGrid& g, const NCConfigVariable& conf, PISMOcea
 
 void POFactory::add_standard_types() {
   add_model("constant", &create_po_constant);
+  add_model("given",    &create_po_given);
   add_model("pik",      &create_po_pik);
   set_default("constant");
 
