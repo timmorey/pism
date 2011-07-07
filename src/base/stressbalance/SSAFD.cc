@@ -955,7 +955,7 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
   ierr = thickness->begin_access(); CHKERRQ(ierr);
 
   PetscScalar ssa_enhancement_factor=1.0;
-
+  double n_glen  = ice.exponent();
   if (config.get_flag("do_ssa_enhancement"))
     ssa_enhancement_factor=config.get("ssa_enhancement_factor");
 
@@ -1003,7 +1003,7 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
         result(i,j,o) += epsilon;
 
         // include the SSA enhancement factor; in most cases ssa_enhancement_factor is 1
-        result(i,j,o) /= ssa_enhancement_factor;
+        result(i,j,o) /= pow(ssa_enhancement_factor,1/n_glen);
 
       } // j
     } // i
