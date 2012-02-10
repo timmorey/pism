@@ -280,10 +280,7 @@ PetscErrorCode IceModel::calvingAtThickness() {
 
   ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
-
-  //ierr = vMask.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
-
   return 0;
 }
 
