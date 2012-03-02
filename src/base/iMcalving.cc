@@ -165,10 +165,10 @@ PetscErrorCode IceModel::eigenCalving() {
           vHref(i, j) -= calvrate * dt; // in m
           if(vHref(i, j) < 0.0) { // i.e. partially filled grid cell has completely calved off
             vDiffCalvRate(i, j) =  - vHref(i, j) / dt;// in m/s, means additional ice loss
-          }
-          vHref(i, j) = 0.0;
-          if(N > 0){
-            vDiffCalvRate(i, j) = vDiffCalvRate(i, j) / N;
+            vHref(i, j) = 0.0;
+            if(N > 0){
+              vDiffCalvRate(i, j) = vDiffCalvRate(i, j) / N;
+            }
           }
         }
       }
