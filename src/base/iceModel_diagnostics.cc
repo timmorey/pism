@@ -41,6 +41,7 @@ PetscErrorCode IceModel::init_diagnostics() {
   diagnostics["tempsurf"]         = new IceModel_tempsurf(this, grid, variables);
   diagnostics["new_mask"]         = new IceModel_new_mask(this, grid, variables);
 
+
   // Get diagnostics supported by the stress balance object:
   stress_balance->get_diagnostics(diagnostics);
 
@@ -928,7 +929,6 @@ PetscErrorCode IceModel_new_mask::compute(IceModelVec* &output) {
   }
 
   ierr = result->end_access(); CHKERRQ(ierr);
-
   output = result;
   return 0;
 }

@@ -92,46 +92,47 @@ PetscErrorCode IceModel::eigenCalving() {
       PetscInt M = 0;
 
       // find partially filled or empty grid boxes on the icefree ocean, which
-      // have floating ice neighbors after massContExplicitStep (mask not
-      // updated)
-      bool next_to_floating =
-        ((vH(i + 1, j) > 0.0 && (vbed(i + 1, j) < (sea_level - ice_rho / ocean_rho*vH(i + 1, j)))) ||
-         (vH(i - 1, j) > 0.0 && (vbed(i - 1, j) < (sea_level - ice_rho / ocean_rho*vH(i - 1, j)))) ||
-         (vH(i, j + 1) > 0.0 && (vbed(i, j + 1) < (sea_level - ice_rho / ocean_rho*vH(i, j + 1)))) ||
-         (vH(i, j - 1) > 0.0 && (vbed(i, j - 1) < (sea_level - ice_rho / ocean_rho*vH(i, j - 1)))));
+      // have floating ice neighbors after massContExplicitStep (mask not updated)
 
+      bool floating_e = (vH(i + 1, j) > 0.0 && (vbed(i + 1, j) < (sea_level - ice_rho / ocean_rho*vH(i + 1, j)))), 
+	   floating_w = (vH(i - 1, j) > 0.0 && (vbed(i - 1, j) < (sea_level - ice_rho / ocean_rho*vH(i - 1, j)))),
+           floating_n = (vH(i, j + 1) > 0.0 && (vbed(i, j + 1) < (sea_level - ice_rho / ocean_rho*vH(i, j + 1)))),
+           floating_s = (vH(i, j - 1) > 0.0 && (vbed(i, j - 1) < (sea_level - ice_rho / ocean_rho*vH(i, j - 1))));
+
+      bool next_to_floating = floating_e || floating_w || floating_n || floating_s;
       bool ice_free_ocean = ( vH(i, j) == 0.0 && vbed(i, j) < sea_level );
 
       H_average = 0.0; eigen1 = 0.0; eigen2 = 0.0; M = 0, N = 0;
 
       if (ice_free_ocean && next_to_floating) {
 
-        if ( mask.floating_ice(i + 1, j) ) { N += 1; H_average += vH(i + 1, j); }
-        if ( mask.floating_ice(i - 1, j) ) { N += 1; H_average += vH(i - 1, j); }
-        if ( mask.floating_ice(i, j + 1) ) { N += 1; H_average += vH(i, j + 1); }
-        if ( mask.floating_ice(i, j - 1) ) { N += 1; H_average += vH(i, j - 1); }
+        if ( floating_e ) { N += 1; H_average += vH(i + 1, j); }
+        if ( floating_w ) { N += 1; H_average += vH(i - 1, j); }
+        if ( floating_n ) { N += 1; H_average += vH(i, j + 1); }
+        if ( floating_s ) { N += 1; H_average += vH(i, j - 1); }
+
         if (N > 0)
           H_average /= N;
 
-        if ( mask.floating_ice(i + offset, j) ){
+        if ( mask.floating_ice(i + offset, j) && !mask.ice_margin(i + offset, j)){
           eigen1 += vPrinStrain1(i + offset, j);
           eigen2 += vPrinStrain2(i + offset, j);
           M += 1;
         }
 
-        if ( mask.floating_ice(i - offset, j) ){
+        if ( mask.floating_ice(i - offset, j) && !mask.ice_margin(i - offset, j)){
           eigen1 += vPrinStrain1(i - offset, j);
           eigen2 += vPrinStrain2(i - offset, j);
           M += 1;
         }
 
-        if ( mask.floating_ice(i, j + offset) ){
+        if ( mask.floating_ice(i, j + offset) && !mask.ice_margin(i , j + offset)){
           eigen1 += vPrinStrain1(i, j + offset);
           eigen2 += vPrinStrain2(i, j + offset);
           M += 1;
         }
 
-        if ( mask.floating_ice(i, j - offset) ){
+        if ( mask.floating_ice(i, j - offset) && !mask.ice_margin(i , j - offset)){
           eigen1 += vPrinStrain1(i, j - offset);
           eigen2 += vPrinStrain2(i, j - offset);
           M += 1;
@@ -165,10 +166,10 @@ PetscErrorCode IceModel::eigenCalving() {
           vHref(i, j) -= calvrate * dt; // in m
           if(vHref(i, j) < 0.0) { // i.e. partially filled grid cell has completely calved off
             vDiffCalvRate(i, j) =  - vHref(i, j) / dt;// in m/s, means additional ice loss
-          }
-          vHref(i, j) = 0.0;
-          if(N > 0){
-            vDiffCalvRate(i, j) = vDiffCalvRate(i, j) / N;
+            vHref(i, j) = 0.0;
+            if(N > 0){
+              vDiffCalvRate(i, j) = vDiffCalvRate(i, j) / N;
+            }
           }
         }
       }
@@ -279,10 +280,7 @@ PetscErrorCode IceModel::calvingAtThickness() {
 
   ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
-
-  //ierr = vMask.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
-
   return 0;
 }
 

@@ -80,6 +80,45 @@ class IceModel {
   friend class IceModel_tempicethk;
   friend class IceModel_tempicethk_basal;
   friend class IceModel_new_mask;
+  friend class IceModel_acab_cumulative;
+  friend class IceModel_dHdt;
+  // scalar:
+  friend class IceModel_ivol;
+  friend class IceModel_slvol;
+  friend class IceModel_divoldt;
+  friend class IceModel_iarea;
+  friend class IceModel_imass;
+  friend class IceModel_dimassdt;
+  friend class IceModel_ivoltemp;
+  friend class IceModel_ivoltempf;
+  friend class IceModel_ivolcold;
+  friend class IceModel_ivolcoldf;
+  friend class IceModel_iareatemp;
+  friend class IceModel_iareatempf;
+  friend class IceModel_iareacold;
+  friend class IceModel_iareacoldf;
+  friend class IceModel_ienthalpy;
+  friend class IceModel_iareag;
+  friend class IceModel_iareaf;
+  friend class IceModel_dt;
+  friend class IceModel_max_diffusivity;
+  friend class IceModel_surface_flux;
+  friend class IceModel_cumulative_surface_flux;
+  friend class IceModel_basal_flux;
+  friend class IceModel_cumulative_basal_flux;
+  friend class IceModel_sub_shelf_flux;
+  friend class IceModel_cumulative_sub_shelf_flux;
+  friend class IceModel_nonneg_flux;
+  friend class IceModel_cumulative_nonneg_flux;
+  friend class IceModel_partgrid_loss_flux;
+  friend class IceModel_cumulative_partgrid_loss_flux;
+  friend class IceModel_ocean_kill_flux;
+  friend class IceModel_cumulative_ocean_kill_flux;
+  friend class IceModel_float_kill_flux;
+  friend class IceModel_cumulative_float_kill_flux;
+  friend class IceModel_discharge_flux;
+  friend class IceModel_cumulative_discharge_flux;
+  
 public:
   // see iceModel.cc for implementation of constructor and destructor:
   IceModel(IceGrid &g, NCConfigVariable &config, NCConfigVariable &overrides);
@@ -189,6 +228,12 @@ protected:
 
         vHref,          //!< accumulated mass advected to a partially filled grid cell
         vHresidual,     //!< residual ice mass of a not any longer partially (fully) filled grid cell
+        vHrefGround,          //!< accumulated mass advected to a partially filled grid cell at grounded margins
+        vHresidualGround,     //!< residual ice mass of a not any longer partially (fully) filled at grounded margins
+        vTestVar,       //!< just a variable to save things for writing to netcdf.
+        vGroundCalvHeight, //!< Calve this off from grounded cell from ocean melt.
+        vDiffCalvHeight, //!< Calving height to be redistributed to neighbours.
+        vNoPartGridNeighbour,       //!< just a variable to save things for writing to netcdf.
         vPrinStrain1,   //!< major principal component of horizontal strain-rate tensor
         vPrinStrain2,   //!< minor principal component of horizontal strain-rate tensor
 
@@ -207,7 +252,7 @@ protected:
     vIcebergMask, //!< mask for iceberg identification
 
 	vBCMask; //!< mask to determine Dirichlet boundary locations
- 
+	
   IceModelVec2V vBCvel; //!< Dirichlet boundary velocities
 
 
@@ -226,13 +271,14 @@ protected:
               gDmax,		// global max of the diffusivity
               gmaxu, gmaxv, gmaxw,  // global maximums on 3D grid of abs value of vel components
               gdHdtav,  //!< average value in map-plane (2D) of dH/dt, where there is ice; m s-1
-    total_sub_shelf_ice_flux,
-    total_basal_ice_flux,
-    total_surface_ice_flux,
-    nonneg_rule_flux,
-    ocean_kill_flux,
-    float_kill_flux,
-    dvoldt;  //!< d(total ice volume)/dt; m3 s-1
+              total_sub_shelf_ice_flux,
+              total_basal_ice_flux,
+              total_surface_ice_flux,
+              nonneg_rule_flux,
+              ocean_kill_flux,
+              float_kill_flux,
+              dvoldt;  //!< d(total ice volume)/dt; m3 s-1
+
   PetscInt    skipCountDown;
 
   // physical parameters used frequently enough to make looking up via
@@ -276,6 +322,8 @@ protected:
   // see iMdefaults.cc
   PetscErrorCode setDefaults();
 
+  virtual PetscErrorCode groundedCalving();
+
   // see iMenergy.cc
   virtual PetscErrorCode energyStep();
   virtual PetscErrorCode get_bed_top_temp(IceModelVec2S &result);
@@ -307,6 +355,8 @@ protected:
   virtual PetscErrorCode updateSurfaceElevationAndMask();
   virtual PetscErrorCode update_mask();
   virtual PetscErrorCode update_surface_elevation();
+  virtual PetscErrorCode cell_interface_diffusive_flux(IceModelVec2Stag &Qstag, int i, int j,
+                                                       planeStar<PetscScalar> &Q_output);
   virtual PetscErrorCode massContExplicitStep();
 
   // see iMhydrology.cc
@@ -326,13 +376,19 @@ protected:
   virtual PetscErrorCode regrid_variables(string filename, set<string> regrid_vars, int ndims);
 
   // see iMpartgrid.cc
-  PetscErrorCode cell_interface_velocities(bool do_part_grid,
-                                           int i, int j,
-                                           planeStar<PetscScalar> &vel_output);
+  virtual PetscErrorCode cell_interface_velocities(bool do_part_grid,bool do_part_grid_ground,
+                                                   int i, int j,
+                                                   planeStar<PetscScalar> &vel_output);
   PetscReal get_average_thickness(bool do_redist, planeStar<int> M,
                                   planeStar<PetscScalar> H);
   virtual PetscErrorCode redistResiduals();
   virtual PetscErrorCode calculateRedistResiduals();
+  
+  // see iMpartgridground.cc 
+  PetscReal get_average_thickness_g(planeStar<int> M, planeStar<PetscScalar> H, PetscReal, PetscInt, PetscInt);
+  PetscReal get_average_thickness_fg(planeStar<int> M, planeStar<PetscScalar> H, planeStar<PetscScalar> h, planeStar<PetscScalar> Q, planeStar<PetscScalar> Qssa, PetscReal bed_ij, PetscScalar &sia_ssa_coeff);
+
+  //virtual PetscErrorCode update_mask_forpartgrid();
 
   // see iMreport.cc
   virtual PetscErrorCode volumeArea(

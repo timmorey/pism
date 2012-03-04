@@ -103,9 +103,12 @@ protected:
   bool is_dry_simulation;
 };
 
+// inherits from Mask class privately
 class MaskQuery : private Mask
 {
 public:
+  // this is an initialization list, should call the constructor of Mask, why
+  // don't we need upper case here? 
   MaskQuery(IceModelVec2Int &m) : mask(m) {}
   
   inline bool ocean(int i, int j) { return Mask::ocean(mask.as_int(i, j)); }
@@ -130,6 +133,20 @@ public:
     return icy(i, j) &&
       (ice_free(i + 1, j) || ice_free(i - 1, j) || ice_free(i, j + 1) || ice_free(i, j - 1));
   }
+  
+  //! \brief Grounded Ice margin (ice-filled with at least one of four neighbors ice-free).
+  inline bool grounded_ice_margin(int i, int j)
+  {
+    return grounded_ice(i, j) &&
+      (ice_free(i + 1, j) || ice_free(i - 1, j) || ice_free(i, j + 1) || ice_free(i, j - 1));
+  }
+
+  //! \brief Floating ice margin (ice-filled with at least one of four neighbors ice-free).
+  inline bool floating_ice_margin(int i, int j)
+  {
+    return floating_ice(i, j) &&
+      (ice_free(i + 1, j) || ice_free(i - 1, j) || ice_free(i, j + 1) || ice_free(i, j - 1));
+  }
 
   //! \brief Ice-free margin (ice-free, at least one of four neighbors has ice).
   inline bool next_to_ice(int i, int j)
@@ -150,6 +167,13 @@ public:
   {
     return ice_free(i, j) &&
       (grounded_ice(i + 1, j) || grounded_ice(i - 1, j) || grounded_ice(i, j + 1) || grounded_ice(i, j - 1));
+  }
+  
+  //! \brief belongs to margin of an ice shelf but has ice free land neighbor.
+  inline bool floating_ice_next_to_icefree_land(int i, int j)
+  {
+    return floating_ice(i, j) &&
+      (ice_free_land(i + 1, j) || ice_free_land(i - 1, j) || ice_free_land(i, j + 1) || ice_free_land(i, j - 1));
   }
 
   inline PetscErrorCode fill_where_grounded(IceModelVec2S &result, const PetscScalar fillval) {

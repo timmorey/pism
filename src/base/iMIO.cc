@@ -362,6 +362,22 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
       ierr = vHref.set(0.0); CHKERRQ(ierr);
     }
   }
+  
+  // check if the input file has HrefGround; set its pism_intent to "diagnostic" and
+  // set the field itself to 0 if it is not present
+  if (config.get_flag("part_grid_ground")) {
+    bool exists;
+    ierr = nc.find_variable("HrefGround", NULL, exists); CHKERRQ(ierr);
+    
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: HrefGround for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename); CHKERRQ(ierr);
+
+      ierr = vHrefGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vHrefGround.set(0.0); CHKERRQ(ierr);
+    }
+  }
 
   // Find the index of the last record in the file:
   int last_record;
@@ -444,7 +460,10 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
   if (config.get_flag("part_grid")) {
     ierr = vHref.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
   }
-
+  if (config.get_flag("part_grid_ground")) {
+    ierr = vHrefGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+  }
+  
   string history;
   ierr = nc.get_att_text(NC_GLOBAL, "history", history); CHKERRQ(ierr);
   global_attributes.prepend_history(history);
