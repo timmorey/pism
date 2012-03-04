@@ -330,8 +330,6 @@ PetscErrorCode IceModel::massContExplicitStep() {
 
       divQ += Qssa.e/dx + Qssa.w/dx + Qssa.n/dy + Qssa.s/dy;
 
-
-
       PetscReal S = 0.0;
       if (include_bmr_in_continuity) {
         if (mask.ocean(i, j))

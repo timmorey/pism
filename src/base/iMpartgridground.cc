@@ -35,7 +35,7 @@ PetscReal IceModel::get_average_thickness_fg(planeStar<int> M, planeStar<PetscSc
   PetscErrorCode ierr;
   bool margin_coeff_set;
   PetscReal margin_coeff;
-  ierr = PISMOptionsReal("-margin_coeff", "specifies the ratio of partially filled grid box height to its surrounding neighbours", margin_coeff,  margin_coeff_set); CHKERRQ(ierr);
+  ierr = PISMOptionsReal("-margin_coeff_ground", "specifies the ratio of partially filled grid box height to its surrounding neighbours", margin_coeff,  margin_coeff_set); CHKERRQ(ierr);
   if (!margin_coeff_set) {
     ierr = PetscPrintf(grid.com, "PISM ERROR: Please specify scale coefficient for scaleMargin method.\n");
     CHKERRQ(ierr);
@@ -151,7 +151,7 @@ PetscReal IceModel::get_average_thickness_g(planeStar<int> M, planeStar<PetscSca
   if (HrefCalcMethod == "scaleMargin"){
     
     bool margin_coeff_set;
-    ierr = PISMOptionsReal("-margin_coeff", "specifies the ratio of partially filled grid box height to its surrounding neighbours", margin_coeff,  margin_coeff_set); CHKERRQ(ierr);
+    ierr = PISMOptionsReal("-margin_coeff_ground", "specifies the ratio of partially filled grid box height to its surrounding neighbours", margin_coeff,  margin_coeff_set); CHKERRQ(ierr);
     if (!margin_coeff_set) {
       ierr = PetscPrintf(grid.com, "PISM ERROR: Please specify scale coefficient for scaleMargin method.\n");
       CHKERRQ(ierr);
