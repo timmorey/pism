@@ -350,6 +350,35 @@ PetscErrorCode IceModel::createVecs() {
 	}
   }
 
+  
+   // just for testing
+    ierr = vTestVar.create(grid, "TestVar", true); CHKERRQ(ierr);
+    ierr = vTestVar.set_attrs("diagnostic", "test variable to write any stuff to netcdf", "", ""); CHKERRQ(ierr);
+    ierr = variables.add(vTestVar); CHKERRQ(ierr);
+  if (config.get_flag("part_grid_ground") == true) {
+    // Href
+    ierr = vHrefGround.create(grid, "HrefGround", true); CHKERRQ(ierr);
+    ierr = vHrefGround.set_attrs("model_state", "temporary ice thickness at grounded margin ice front", "m", ""); CHKERRQ(ierr);
+    ierr = variables.add(vHrefGround); CHKERRQ(ierr);
+    ierr = vGroundCalvHeight.create(grid, "GroundCalvHeight", true); CHKERRQ(ierr);
+    ierr = vGroundCalvHeight.set_attrs("diagnostic", "test variable to write any stuff to netcdf", "", ""); CHKERRQ(ierr);
+    ierr = variables.add(vGroundCalvHeight); CHKERRQ(ierr);
+    ierr = vNoPartGridNeighbour.create(grid, "NoPartGridNeighbour", true); CHKERRQ(ierr);
+    ierr = vNoPartGridNeighbour.set_attrs("diagnostic", "this box has no neighbour that is partially filled", "", ""); CHKERRQ(ierr);
+    ierr = variables.add(vNoPartGridNeighbour); CHKERRQ(ierr);
+    ierr = vDiffCalvHeight.create(grid, "DiffCalvHeight", true); CHKERRQ(ierr);
+    ierr = vDiffCalvHeight.set_attrs("diagnostic", "ice mass in height redistributed to grounded neighbours", "", ""); CHKERRQ(ierr);
+    ierr = variables.add(vDiffCalvHeight); CHKERRQ(ierr);
+
+    if (config.get_flag("part_redist_ground") == true){
+      // Hav
+      ierr = vHresidualGround.create(grid, "HresidualGround", true); CHKERRQ(ierr);
+      ierr = vHresidualGround.set_attrs("diagnostic", "residual ice thickness in recently filled boundary grid cell at grounded margins", "m", ""); CHKERRQ(ierr);
+      ierr = variables.add(vHresidualGround); CHKERRQ(ierr);
+    }
+  } 
+  
+
   if (config.get_flag("do_eigen_calving") == true) {
     ierr = vPrinStrain1.create(grid, "edot_1", true); CHKERRQ(ierr);
     ierr = vPrinStrain1.set_attrs("internal", 

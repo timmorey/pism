@@ -144,6 +144,7 @@ public:
 
 //! \brief Computes the "new" mask.
 class IceModel_new_mask : public PISMDiag<IceModel>
+
 {
 public:
   IceModel_new_mask(IceModel *m, IceGrid &g, PISMVars &my_vars);
