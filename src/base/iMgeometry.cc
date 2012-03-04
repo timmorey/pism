@@ -260,7 +260,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
     ierr = vNoPartGridNeighbour.begin_access(); CHKERRQ(ierr);
   }
     
-  const bool dirichlet_bc = config.get_flag("ssa_dirichlet_bc");
+  const bool dirichlet_bc = config.get_flag("dirichlet_bc");
   if (dirichlet_bc) {
     ierr = vBCMask.begin_access();  CHKERRQ(ierr);
     ierr = vBCvel.begin_access();  CHKERRQ(ierr);
