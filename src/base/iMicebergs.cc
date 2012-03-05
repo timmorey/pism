@@ -49,6 +49,7 @@
 PetscErrorCode IceModel::killIceBergs() {
   PetscErrorCode ierr;
 
+  ierr = killEasyIceBergs(); CHKERRQ(ierr);
   ierr = findIceBergCandidates(); CHKERRQ(ierr);
   ierr = identifyNotAnIceBerg(); CHKERRQ(ierr);
   ierr = killIdentifiedIceBergs(); CHKERRQ(ierr);
