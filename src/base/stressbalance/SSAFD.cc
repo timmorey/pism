@@ -999,12 +999,12 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
           CHKERRQ(ierr);
         }
 
-        // We ensure that nuH is bounded below by a positive constant.
-        result(i,j,o) += epsilon;
-
         // include the SSA enhancement factor; in most cases ssa_enhancement_factor is 1
         result(i,j,o) /= pow(ssa_enhancement_factor,1/n_glen);
 
+        // We ensure that nuH is bounded below by a positive constant.
+        result(i,j,o) += epsilon;
+	
       } // j
     } // i
   } // o

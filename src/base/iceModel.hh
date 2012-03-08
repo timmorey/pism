@@ -354,6 +354,7 @@ protected:
   // scalar:
   virtual PetscErrorCode ice_mass_bookkeeping();
   virtual PetscErrorCode compute_ice_volume(PetscScalar &result);
+  virtual PetscErrorCode compute_sealevel_volume(PetscScalar &result);
   virtual PetscErrorCode compute_ice_volume_temperate(PetscScalar &result);
   virtual PetscErrorCode compute_ice_volume_cold(PetscScalar &result);
   virtual PetscErrorCode compute_ice_area(PetscScalar &result);
