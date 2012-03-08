@@ -253,6 +253,9 @@ netcdf pism_config {
     pism_config:max_low_temp_count = 10;
     pism_config:max_low_temp_count_doc = "Maximum number of grid points with ice temperature below global_min_allowed_temp.";
 
+    pism_config:verbose_pik_messages = "no";
+    pism_config:verbose_pik_messages_doc = "Display verbose PIK messages e.g. about iceberg removal.";
+
     pism_config:eigen_calving = 0.0;
     pism_config:eigen_calving_doc = "Set proportionality constant to determine calving rate from strain rates";
 
