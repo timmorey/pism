@@ -249,6 +249,7 @@ PetscErrorCode IceModel::killIdentifiedIceBergs() {
   PetscErrorCode ierr;
 
   ierr = verbPrintf(4, grid.com, "PISM-PIK INFO:  killIceBergs is called \n"); CHKERRQ(ierr);
+  const bool vpik = config.get_flag("verbose_pik_messages");
 
   ierr = vMask.begin_access(); CHKERRQ(ierr);
   ierr = vIcebergMask.begin_access(); CHKERRQ(ierr);
@@ -262,10 +263,11 @@ PetscErrorCode IceModel::killIdentifiedIceBergs() {
          vH(i, j) = 0.0;
          vh(i, j) = 0.0;
          vMask(i, j) = MASK_ICE_FREE_OCEAN;
-         // FIXME: this occurs regardless of verbosity
+	 if (vpik) {
          PetscSynchronizedPrintf(grid.com, 
                      "PISM-PIK INFO: [rank %d] killed iceberg at i=%d, j=%d\n", 
                      grid.rank, i, j);
+	 }
       }
 
     }
@@ -298,6 +300,7 @@ PetscErrorCode IceModel::killEasyIceBergs() {
   PetscErrorCode ierr;
 
   ierr = verbPrintf(4, grid.com, "PISM-PIK INFO:  killEasyIceBergs is called \n"); CHKERRQ(ierr);
+  const bool vpik = config.get_flag("verbose_pik_messages");
 
   IceModelVec2S vHnew = vWork2d[0];
   ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
@@ -366,10 +369,11 @@ PetscErrorCode IceModel::killEasyIceBergs() {
           vHnew(i, j) = 0.0;
           vh(i, j) = 0.0;
           vMask(i, j) = MASK_ICE_FREE_OCEAN;
-          // FIXME: this occurs regardless of verbosity
+	 if (vpik) {
           PetscSynchronizedPrintf(grid.com, 
             "PISM-PIK INFO: [rank %d] cut off nose or one-box-iceberg at i=%d, j=%d\n",
             grid.rank, i, j);
+	 }
         }
       }
     }
@@ -406,10 +410,11 @@ PetscErrorCode IceModel::killEasyIceBergs() {
         //vh(i, j) = hfloating; // why?
         vh(i, j) = 0.0;
         vMask(i, j) = MASK_ICE_FREE_OCEAN;
-        // FIXME: this occurs regardless of verbosity
+	 if (vpik) {
         PetscSynchronizedPrintf(grid.com,
           "PISM-PIK INFO: [rank %d] killed isolated one-box-iceberg at i=%d, j=%d\n",
           grid.rank, i, j);
+	 }
       }
     }
   }
@@ -439,10 +444,11 @@ PetscErrorCode IceModel::killEasyIceBergs() {
       if (vHref(i, j) > 0.0 && all_4neighbors_icefree) {
         vHref(i, j) = 0.0;
         //vMask(i, j) = MASK_ICE_FREE_OCEAN;
-        // FIXME: this occurs regardless of verbosity
+	 if (vpik) {
         PetscSynchronizedPrintf(grid.com, 
           "PISM-PIK INFO: [rank %d] killed lonely partially filled grid cell at i = %d, j = %d\n",
           grid.rank, i, j);
+	 }
       }
     }
   }
