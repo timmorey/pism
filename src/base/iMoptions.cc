@@ -92,6 +92,8 @@ PetscErrorCode  IceModel::setFromOptions() {
 
   ierr = config.flag_from_option("diffuse_bwat", "do_diffuse_bwat"); CHKERRQ(ierr);
 
+  ierr = config.flag_from_option("fixDryWall", "do_fixDryWall"); CHKERRQ(ierr);
+  
   ierr = config.scalar_from_option("e", "enhancement_factor"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("e_ssa", "ssa_enhancement_factor"); CHKERRQ(ierr);
