@@ -151,5 +151,6 @@ public:
   virtual PetscErrorCode compute(IceModelVec* &result);
 };
 
+
 #endif /* _ICEMODEL_DIAGNOSTICS_H_ */
 

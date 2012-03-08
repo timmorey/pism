@@ -125,6 +125,19 @@ PetscErrorCode IceModel::create_timeseries() {
     ivol->set_attr("valid_min", 0.0);
 
     timeseries.push_back(ivol);
+  }  
+  
+  if (find(ts_vars.begin(), ts_vars.end(), "slvol") != ts_vars.end()) {
+    DiagnosticTimeseries *slvol = new DiagnosticTimeseries(&grid, "slvol", "t");
+
+    slvol->set_units("m", "");
+    slvol->set_dimension_units(time_units, "");
+    slvol->output_filename = ts_filename;
+
+    slvol->set_attr("long_name", "total sea-level relevant ice IN SEA-LEVEL EQUIVALENT");
+    slvol->set_attr("valid_min", 0.0);
+
+    timeseries.push_back(slvol);
   }
 
   if (find(ts_vars.begin(), ts_vars.end(), "ivoltemp") != ts_vars.end()) {
