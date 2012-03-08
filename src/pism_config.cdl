@@ -99,6 +99,9 @@ netcdf pism_config {
     pism_config:do_diffuse_bwat = "no";
     pism_config:do_diffuse_bwat_doc = "Do explicit time stepping of equation (11) in [\\ref BBssasliding] to diffuse the layer of stored basal water (bwat).  Normally bwat affects the basal values of the internal energy (enthalpy or temperature) field and it affects the strength of the subglacial layer (the basal stress).";
 
+    pism_config:do_fixDryWall = "no";
+    pism_config:do_fixDryWall_doc = "Do the fiddle that avoids the dry wall in bwat at the grounding line.";
+
 
     // parameters:
 

@@ -486,6 +486,7 @@ During the time-step we perform the following actions:
 PetscErrorCode IceModel::step(bool do_mass_continuity,
 			      bool do_energy,
 			      bool do_diffuse_bwat,
+			      bool do_fixDryWall,
 			      bool do_age,
 			      bool do_skip) {
   PetscErrorCode ierr;
@@ -629,6 +630,11 @@ PetscErrorCode IceModel::step(bool do_mass_continuity,
   if (do_diffuse_bwat) {
     ierr = diffuse_bwat(); CHKERRQ(ierr);
   }
+  
+  //! \li fix the dry wall at the grounding line if that is requested
+  if (do_fixDryWall) {
+    ierr = fixDryWall_bwat(); CHKERRQ(ierr);
+  }
 
   //! \li compute fluxes through ice boundaries; this method frequently updates
   //! the surface process models pre-emptively, so that massContExplicitStep()
@@ -700,6 +706,7 @@ PetscErrorCode IceModel::run() {
   bool do_mass_conserve = config.get_flag("do_mass_conserve"),
     do_energy = config.get_flag("do_energy"),
     do_diffuse_bwat = config.get_flag("do_diffuse_bwat"),
+    do_fixDryWall = config.get_flag("do_fixDryWall"),
     do_age = config.get_flag("do_age"),
     do_skip = config.get_flag("do_skip");
   int stepcount = (config.get_flag("count_time_steps")) ? 0 : -1;
@@ -730,7 +737,7 @@ PetscErrorCode IceModel::run() {
 				       // greater than start_year
 
   
-  ierr = step(do_mass_conserve, do_energy, do_diffuse_bwat, do_age,
+  ierr = step(do_mass_conserve, do_energy, do_diffuse_bwat, do_fixDryWall, do_age,
 	      do_skip); CHKERRQ(ierr);
 
   // print verbose messages according to user-set verbosity
@@ -771,7 +778,7 @@ PetscErrorCode IceModel::run() {
     dt_force = -1.0;
     maxdt_temporary = -1.0;
 
-    ierr = step(do_mass_conserve, do_energy, do_diffuse_bwat, do_age,
+    ierr = step(do_mass_conserve, do_energy, do_diffuse_bwat, do_fixDryWall, do_age,
 		do_skip); CHKERRQ(ierr);
     
     // report a summary for major steps or the last one
