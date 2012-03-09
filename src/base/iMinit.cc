@@ -478,6 +478,10 @@ PetscErrorCode IceModel::model_state_setup() {
     ierr = verbPrintf(2, grid.com, "\n"); CHKERRQ(ierr);
   }
 
+  const bool pgg = config.get_flag("part_grid_ground");
+  if ( pgg ) { ierr = verbPrintf(2, grid.com, "part_grid_ground in use,"); CHKERRQ(ierr); }
+  
+
   ierr = stampHistoryCommand(); CHKERRQ(ierr);
 
   return 0;

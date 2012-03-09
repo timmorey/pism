@@ -198,6 +198,8 @@ PetscErrorCode  IceModel::setFromOptions() {
     config.set_flag("part_redist", true);
     config.set_flag("kill_icebergs", true);
   }
+  
+  ierr = config.flag_from_option("part_grid_ground", "part_grid_ground"); CHKERRQ(ierr);  
 
   // plastic_till_c_0 is a parameter in the computation of the till yield stress tau_c
   // from the thickness of the basal melt water; see updateYieldStressFromHmelt()
