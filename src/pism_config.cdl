@@ -108,6 +108,9 @@ netcdf pism_config {
     pism_config:do_diffuse_bwat = "no";
     pism_config:do_diffuse_bwat_doc = "Do explicit time stepping of equation (11) in [\\ref BBssasliding] to diffuse the layer of stored basal water (bwat).  Normally bwat affects the basal values of the internal energy (enthalpy or temperature) field and it affects the strength of the subglacial layer (the basal stress).";
 
+    pism_config:do_fixDryWall = "no";
+    pism_config:do_fixDryWall_doc = "Do the fiddle that avoids the dry wall in bwat at the grounding line.";
+
 
     // parameters:
 
@@ -249,6 +252,9 @@ netcdf pism_config {
 
     pism_config:max_low_temp_count = 10;
     pism_config:max_low_temp_count_doc = "Maximum number of grid points with ice temperature below global_min_allowed_temp.";
+
+    pism_config:verbose_pik_messages = "no";
+    pism_config:verbose_pik_messages_doc = "Display verbose PIK messages e.g. about iceberg removal.";
 
     pism_config:eigen_calving = 0.0;
     pism_config:eigen_calving_doc = "Set proportionality constant to determine calving rate from strain rates";

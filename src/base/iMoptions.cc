@@ -83,6 +83,9 @@ PetscErrorCode  IceModel::setFromOptions() {
   if (flag)  config.set_flag("do_thickness_calving", true);
 
   ierr = config.flag_from_option("cfbc", "calving_front_stress_boundary_condition"); CHKERRQ(ierr);
+  
+  ierr = config.flag_from_option("vpik", "verbose_pik_messages");  CHKERRQ(ierr);
+  if (getVerbosityLevel() > 2)  config.set_flag("verbose_pik_messages", true);
 
   // if set, use old IceModel::temperatureStep(), and set enthalpy as though
   //   ice is cold
@@ -92,6 +95,8 @@ PetscErrorCode  IceModel::setFromOptions() {
 
   ierr = config.flag_from_option("diffuse_bwat", "do_diffuse_bwat"); CHKERRQ(ierr);
 
+  ierr = config.flag_from_option("fixDryWall", "do_fixDryWall"); CHKERRQ(ierr);
+  
   ierr = config.scalar_from_option("e", "enhancement_factor"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("e_ssa", "ssa_enhancement_factor"); CHKERRQ(ierr);
