@@ -389,6 +389,7 @@ protected:
   // see iMpartgridground.cc 
   PetscReal get_average_thickness_g(planeStar<int> M, planeStar<PetscScalar> H, PetscReal, PetscInt, PetscInt);
   PetscReal get_average_thickness_fg(planeStar<int> M, planeStar<PetscScalar> H, planeStar<PetscScalar> h, planeStar<PetscScalar> Q, planeStar<PetscScalar> Qssa, PetscReal bed_ij, PetscScalar &sia_ssa_coeff);
+  virtual PetscErrorCode killLonelyPGGCells();
 
   //virtual PetscErrorCode update_mask_forpartgrid();
 

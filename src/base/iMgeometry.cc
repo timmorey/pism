@@ -49,6 +49,9 @@ PetscErrorCode IceModel::updateSurfaceElevationAndMask() {
   if (config.get_flag("kill_icebergs")) {
     ierr = killIceBergs(); CHKERRQ(ierr);
   }
+  if (config.get_flag("part_grid_ground")) {
+    ierr = killLonelyPGGCells(); CHKERRQ(ierr);
+  }
 
   return 0;
 }
@@ -385,11 +388,11 @@ PetscErrorCode IceModel::massContExplicitStep() {
         PetscReal H_average = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
         vTestVar(i,j) = coeff;
 
-        if ( mask.ice_margin(i,j) && (vHnew(i,j) < H_average) && vNoPartGridNeighbour(i,j) == 1 ) {
+        if ( mask.grounded_ice_margin(i,j) && (vHnew(i,j) < H_average) && vNoPartGridNeighbour(i,j) == 1 ) {
           // vNoPartGridNeighbour checks that all neighbours are not partially filled.
           // ice filled cell --> partial grid cell
           if ( vHrefGround(i, j) != 0 ){
-            ierr = verbPrintf(2, grid.com,"Href should not be %e > 0 at  i=%d, j=%d\n",vHrefGround(i, j),i,j); CHKERRQ(ierr);
+            ierr = verbPrintf(2, grid.com,"HrefGround should not be %e > 0 at  i=%d, j=%d\n",vHrefGround(i, j),i,j); CHKERRQ(ierr);
           }
           vHrefGround(i,j) = vHnew(i,j) + (acab(i, j) - S - divQ) * dt;
           vHnew(i,j) = 0.0;
@@ -400,7 +403,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
           }
           vHnew(i,j) = vHrefGround(i,j) + (acab(i, j) - S - divQ)*dt;
           vHrefGround(i,j) = 0.0;
-        } else if (mask.ice_margin(i,j)){
+        } else if (mask.grounded_ice_margin(i,j)){
           // standard case
           vHnew(i,j) += (acab(i, j) - S - divQ) * dt;
         } else if ( mask.next_to_grounded_ice(i, j) ){

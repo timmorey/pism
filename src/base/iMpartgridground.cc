@@ -105,6 +105,46 @@ PetscReal IceModel::get_average_thickness_fg(planeStar<int> M, planeStar<PetscSc
   return H_average * sia_ssa_coeff;
 }
 
+PetscErrorCode IceModel::killLonelyPGGCells() {
+  PetscErrorCode ierr;
+  // looking for one-grid-cell partially filled grid cells, that have 4 neighbors of thickness H=0
+  const bool vpik = config.get_flag("verbose_pik_messages");
+
+  IceModelVec2S vHnew = vWork2d[0];
+  ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
+  ierr = vH.begin_access(); CHKERRQ(ierr);
+  ierr = vHnew.begin_access(); CHKERRQ(ierr);
+  ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
+
+  for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
+    for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+
+      // instead of updating surface elevation, counting here floating or icefree neighbors
+
+      bool all_4neighbors_icefree = (vH(i + 1, j) == 0.0 &&
+                                     vH(i - 1, j) == 0.0 &&
+                                     vH(i, j + 1) == 0.0 &&
+                                     vH(i, j - 1) == 0.0);
+      // What about firstStepAfterInit?
+      if ( vHrefGround(i, j) > 0.0 && all_4neighbors_icefree) {
+        vHrefGround(i, j) = 0.0;
+        //vMask(i, j) = MASK_ICE_FREE_OCEAN;
+        if (vpik) {
+              PetscSynchronizedPrintf(grid.com,
+                "PISM-PIK INFO: [rank %d] killed lonely PGG cell at i = %d, j = %d\n",
+                grid.rank, i, j);
+        }
+      }
+    }
+  }
+
+  ierr = vH.end_access(); CHKERRQ(ierr);
+  ierr = vHnew.end_access(); CHKERRQ(ierr);
+  ierr = vHrefGround.end_access(); CHKERRQ(ierr);
+  return 0;
+}
+
+
 PetscReal IceModel::get_average_thickness_g(planeStar<int> M, planeStar<PetscScalar> H, PetscReal bed_ij, PetscInt i, PetscInt j) {
   
   //////////// get part_grid_ground choice 

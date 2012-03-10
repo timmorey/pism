@@ -445,11 +445,11 @@ PetscErrorCode IceModel::killEasyIceBergs() {
       if (vHref(i, j) > 0.0 && all_4neighbors_icefree) {
         vHref(i, j) = 0.0;
         //vMask(i, j) = MASK_ICE_FREE_OCEAN;
-	 if (vpik) {
-        PetscSynchronizedPrintf(grid.com, 
-          "PISM-PIK INFO: [rank %d] killed lonely partially filled grid cell at i = %d, j = %d\n",
-          grid.rank, i, j);
-	 }
+        if (vpik) {
+              PetscSynchronizedPrintf(grid.com,
+                "PISM-PIK INFO: [rank %d] killed lonely partially filled grid cell at i = %d, j = %d\n",
+                grid.rank, i, j);
+        }
       }
     }
   }
