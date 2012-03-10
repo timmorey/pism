@@ -558,7 +558,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
     ierr = eigenCalving(); CHKERRQ(ierr);
   }
   
-  if (config.get_flag("ocean_melt")) {
+  if (config.get_flag("grounded_calving")) {
     if (!do_part_grid_ground) {
       ierr = PetscPrintf(grid.com, "PISM ERROR: This option just works with part_grid_ground, switch on!\n");
       CHKERRQ(ierr);

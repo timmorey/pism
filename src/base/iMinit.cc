@@ -480,7 +480,8 @@ PetscErrorCode IceModel::model_state_setup() {
 
   const bool pgg = config.get_flag("part_grid_ground");
   if ( pgg ) { ierr = verbPrintf(2, grid.com, "part_grid_ground in use,"); CHKERRQ(ierr); }
-  
+  const bool do_grounded_calving = config.get_flag("grounded_calving");
+  if ( do_grounded_calving ) { ierr = verbPrintf(2, grid.com, "grounded_calving in use,"); CHKERRQ(ierr); } 
 
   ierr = stampHistoryCommand(); CHKERRQ(ierr);
 
