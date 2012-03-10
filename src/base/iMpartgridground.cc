@@ -110,25 +110,36 @@ PetscErrorCode IceModel::killLonelyPGGCells() {
   // looking for one-grid-cell partially filled grid cells, that have 4 neighbors of thickness H=0
   const bool vpik = config.get_flag("verbose_pik_messages");
 
+  PetscReal sea_level;
+  if (ocean != NULL) {
+    ierr = ocean->sea_level_elevation(sea_level); CHKERRQ(ierr);
+  } else { SETERRQ(2, "PISM ERROR: ocean == NULL"); }
+  double ocean_rho = config.get("sea_water_density"),
+         ice_rho   = config.get("ice_density");
+
   IceModelVec2S vHnew = vWork2d[0];
   ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
   ierr = vH.begin_access(); CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
+  ierr = vbed.begin_access(); CHKERRQ(ierr);
 
+  PetscReal C = (1.0 - ice_rho / ocean_rho);
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
 
-      // instead of updating surface elevation, counting here floating or icefree neighbors
+      planeStar<PetscScalar> thk = vH.star(i, j),
+                             bed = vbed.star(i, j);
 
-      bool all_4neighbors_icefree = (vH(i + 1, j) == 0.0 &&
-                                     vH(i - 1, j) == 0.0 &&
-                                     vH(i, j + 1) == 0.0 &&
-                                     vH(i, j - 1) == 0.0);
-      // What about firstStepAfterInit?
-      if ( vHrefGround(i, j) > 0.0 && all_4neighbors_icefree) {
-        vHrefGround(i, j) = 0.0;
-        //vMask(i, j) = MASK_ICE_FREE_OCEAN;
+      bool all_4neighbors_ungrounded =
+        (bed.e + thk.e <  sea_level + C * thk.e) &&
+        (bed.w + thk.w <  sea_level + C * thk.w) &&
+        (bed.n + thk.n <  sea_level + C * thk.n) &&
+        (bed.s + thk.s <  sea_level + C * thk.s);
+        
+      if ( vHrefGround(i, j) > 0.0 && all_4neighbors_ungrounded) {
+        vHrefGround(i, j) = 0.0;        
+//         vMask(i, j) = MASK_ICE_FREE_OCEAN;
         if (vpik) {
               PetscSynchronizedPrintf(grid.com,
                 "PISM-PIK INFO: [rank %d] killed lonely PGG cell at i = %d, j = %d\n",
@@ -141,6 +152,7 @@ PetscErrorCode IceModel::killLonelyPGGCells() {
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vHrefGround.end_access(); CHKERRQ(ierr);
+  ierr = vbed.begin_access(); CHKERRQ(ierr);
   return 0;
 }
 

@@ -346,11 +346,11 @@ PetscErrorCode IceModel::massContExplicitStep() {
       // applies for ice flux from floating ice shelf to open ocean only
       if (do_part_grid && mask.next_to_floating_ice(i, j) && mask.ocean(i, j)) {
         vHref(i, j) -= divQ * dt;
-		if (vHref(i, j) < 0.0) { 
-			my_nonneg_rule_flux += ( - vHref(i, j));
-			vHref(i, j) = 0.0;
-			ierr = verbPrintf(2, grid.com,"!!! PISM_WARNING: vHref is negative at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
-		}
+        if (vHref(i, j) < 0.0) {
+          my_nonneg_rule_flux += ( - vHref(i, j));
+          vHref(i, j) = 0.0;
+          ierr = verbPrintf(2, grid.com,"!!! PISM_WARNING: vHref is negative at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
+        }
 
         PetscReal H_average = get_average_thickness(do_redist, M, vH.star(i, j));
 
@@ -361,13 +361,13 @@ PetscErrorCode IceModel::massContExplicitStep() {
         //   X = vHref_old + (M - S) * dt * X / H_average.
         // where M = acab and S = shelfbaseflux for floating ice.  Solving for X we get
         //   X = vHref_old / (1.0 - (M - S) * dt * H_average))
-		/*
+        /*
         if ((acab(i, j) - S) * dt < H_average) {
-			vHref(i, j) = vHref(i, j) / (1.0 - (acab(i, j) - S) * dt / H_average);
-		} else {
-			ierr = verbPrintf(4, grid.com,"!!! PISM_WARNING: H_average is smaller than surface mass balance at i=%d, j=%d.\n",i,j); CHKERRQ(ierr);
-		}
-		*/
+          vHref(i, j) = vHref(i, j) / (1.0 - (acab(i, j) - S) * dt / H_average);
+        } else {
+          ierr = verbPrintf(4, grid.com,"!!! PISM_WARNING: H_average is smaller than surface mass balance at i=%d, j=%d.\n",i,j); CHKERRQ(ierr);
+        }
+        */
 
         const PetscScalar coverageRatio = vHref(i, j) / H_average;
 
@@ -377,8 +377,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
 	   	  vHnew(i, j)+= (acab(i, j) - S) * dt; // no implicit SMB in partially filled cells any more
           vHref(i, j) = 0.0;
         } else {
-          vHnew(i, j) = 0.0; // no change from vH value, actually
-          // vHref(i, j) not changed
+          vHnew(i, j) = 0.0; // no change from vH value, actually, vHref(i, j) not changed
         }
 
       } else if ( do_part_grid_ground && (mask.next_to_grounded_ice(i, j) || mask.grounded_ice_margin(i,j)) ) {
@@ -414,6 +413,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
       } else if (mask.grounded(i, j) || mask.floating_ice(i, j)){
         // grounded/floating default case, and case of ice-free ocean adjacent to grounded
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
+        if ( do_part_grid_ground && vHrefGround(i,j) > 0.0 ){
+          vHnew(i,j) += vHrefGround(i,j);
+          vHrefGround(i,j) = 0.0;
+        }
       } else {
         // last possibility: ice-free, not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;

@@ -338,7 +338,7 @@ PetscErrorCode IceModel::killEasyIceBergs() {
 
       // instead of updating surface elevation, counting here floating or icefree neighbors
       const PetscScalar hgrounded = bed.ij + thk.ij,
-        hfloating = sea_level + (1.0 - ice_rho / ocean_rho) * thk.ij;
+        hfloating = sea_level + C * thk.ij;
 
       if (vH(i, j) > 0.0 && hgrounded < hfloating) { //is floating ice shelf
 
