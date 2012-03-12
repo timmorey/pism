@@ -391,9 +391,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
           // vNoPartGridNeighbour checks that all neighbours are not partially filled.
           // ice filled cell --> partial grid cell
           if ( vHrefGround(i, j) != 0 ){
-            ierr = verbPrintf(2, grid.com,"HrefGround should not be %e > 0 at  i=%d, j=%d\n",vHrefGround(i, j),i,j); CHKERRQ(ierr);
+            PetscSynchronizedPrintf(grid.com,"HrefGround should not be %e > 0 at  i=%d, j=%d\n",vHrefGround(i, j),i,j);
           }
           vHrefGround(i,j) = vHnew(i,j) + (acab(i, j) - S - divQ) * dt;
+          PetscSynchronizedPrintf(grid.com,"make Hnew=%e a HrefG+MB=%e at i=%d, j=%d\n",vHnew(i, j),vHrefGround(i,j),i,j);
           vHnew(i,j) = 0.0;
         } else if ( mask.next_to_grounded_ice(i, j) && (vHrefGround(i,j) > H_average) ){
           // partial grid cell --> ice filled cell
@@ -401,6 +402,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
             ierr = verbPrintf(2, grid.com,"Hnew should not be %e > 0 at  i=%d, j=%d\n",vHnew(i, j),i,j); CHKERRQ(ierr);
           }
           vHnew(i,j) = vHrefGround(i,j) + (acab(i, j) - S - divQ)*dt;
+          PetscSynchronizedPrintf(grid.com,"make HrefG=%e a Hnew+MB=%e at i=%d, j=%d\n",vHrefGround(i,j),vHnew(i, j),i,j);
           vHrefGround(i,j) = 0.0;
         } else if (mask.grounded_ice_margin(i,j)){
           // standard case
@@ -414,6 +416,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
         // grounded/floating default case, and case of ice-free ocean adjacent to grounded
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
         if ( do_part_grid_ground && vHrefGround(i,j) > 0.0 ){
+          PetscSynchronizedPrintf(grid.com,"kill HrefG=%e inside ice at i=%d, j=%d\n",vHrefGround(i,j),i,j);
           vHnew(i,j) += vHrefGround(i,j);
           vHrefGround(i,j) = 0.0;
         }
