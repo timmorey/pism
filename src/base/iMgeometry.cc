@@ -386,7 +386,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
         PetscReal H_average = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
         vTestVar(i,j) = coeff;
 
-        if ( mask.grounded_ice_margin(i,j) && (vHnew(i,j) < H_average) && vNoPartGridNeighbour(i,j) == 1 ) {
+        if ( mask.grounded_ice_margin(i,j) && (vHnew(i,j) < H_average) && vNoPartGridNeighbour(i,j) == 1 &&
+             !mask.grounded_ice_link(i,j) ) {
           // vNoPartGridNeighbour checks that all neighbours are not partially filled.
           // ice filled cell --> partial grid cell
           if ( vHrefGround(i, j) != 0 ){

@@ -141,6 +141,17 @@ public:
       (ice_free(i + 1, j) || ice_free(i - 1, j) || ice_free(i, j + 1) || ice_free(i, j - 1));
   }
 
+  //! \brief Grounded Ice margin that links grounded and ice shelf
+  // see iMgeoometry.cc important 
+  inline bool grounded_ice_link(int i, int j)
+  {
+    return  grounded_ice(i, j) &&
+      (grounded_ice(i+1,j) && floating_ice(i-1,j)) ||
+      (grounded_ice(i-1,j) && floating_ice(i+1,j)) ||
+      (grounded_ice(i,j+1) && floating_ice(i,j-1)) ||
+      (grounded_ice(i,j-1) && floating_ice(i,j+1));
+  }  
+
   //! \brief Floating ice margin (ice-filled with at least one of four neighbors ice-free).
   inline bool floating_ice_margin(int i, int j)
   {
