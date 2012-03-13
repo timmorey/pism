@@ -22,6 +22,7 @@
 #include "PISMIO.hh"
 #include "Timeseries.hh"
 #include "Mask.hh"
+#include "pism_signal.h"
 
 static char help[] =
   "Driver for EISMINT-Ross diagnostic velocity computation in ice shelf.\n"
