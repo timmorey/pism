@@ -211,6 +211,12 @@ netcdf pism_config {
     pism_config:default_till_phi = 30.0;
     pism_config:default_till_phi_doc = "degrees; fill value for till friction angle";
 
+    pism_config:default_bwatPIK = 0.0;
+    pism_config:default_bwatPIK_doc = "meters; basal water content";
+
+    pism_config:bootstrapping_bwatPIK_value_no_var = 0.0;
+    pism_config:bootstrapping_bwatPIK_value_no_var_doc = "m; basal water content value to use if variable bwatPIK is absent in bootstrapping file";
+
     pism_config:till_pw_fraction = 0.95;
     pism_config:till_pw_fraction_doc = "pure number; pore water pressure is this fraction of overburden";
 
