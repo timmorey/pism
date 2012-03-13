@@ -653,6 +653,7 @@ PetscErrorCode SSAFD::solve() {
 
       // call PETSc to solve linear system by iterative method; "inner linear iteration"
       ierr = KSPSetOperators(SSAKSP, A, A, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
+      ierr = KSPView(SSAKSP,PETSC_VIEWER_STDOUT_WORLD); CHKERRQ(ierr); 
       ierr = KSPSolve(SSAKSP, SSARHS, SSAX); CHKERRQ(ierr); // SOLVE
 
       // report to standard out about iteration

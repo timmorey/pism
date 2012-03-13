@@ -381,7 +381,6 @@ PetscErrorCode IceModel::massContExplicitStep() {
         }
 
       } else if ( do_part_grid_ground && (mask.next_to_grounded_ice(i, j) || mask.grounded_ice_margin(i,j)) ) {
-        
         // calc part grid criterum from surrounding boxes
         PetscScalar coeff;
         PetscReal H_average = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
