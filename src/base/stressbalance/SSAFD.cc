@@ -18,6 +18,7 @@
 
 #include "SSAFD.hh"
 #include "Mask.hh"
+#include "pism_signal.h"
 
 SSA *SSAFDFactory(IceGrid &g, IceBasalResistancePlasticLaw &b,
                 IceFlowLaw &i, EnthalpyConverter &ec,
@@ -662,7 +663,8 @@ PetscErrorCode SSAFD::solve() {
             "\n\n\nPISM ERROR:  KSPSolve() reports 'diverged'; reason = %d = '%s';\n"
                   "  see PETSc man page for KSPGetConvergedReason();   ENDING ...\n\n",
             reason,KSPConvergedReasons[reason]); CHKERRQ(ierr);
-        PISMEnd();
+        //PISMEnd();
+	pism_signal=SIGTERM;
       }
       ierr = KSPGetIterationNumber(SSAKSP, &ksp_iterations); CHKERRQ(ierr);
       if (getVerbosityLevel() > 2) {
