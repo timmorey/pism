@@ -564,7 +564,7 @@ PetscErrorCode PISMDefaultYieldStress::topg_to_bwatPIK() {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
       PetscScalar bed = (*bed_topography)(i, j);
 
-      if (m.grounded(i, j) || (Nparam < 5)) {
+//       if (m.grounded(i, j) || (Nparam < 5)) { // this is stupid, we want it to be independent of GL position!
         if (bed <= topg_min) {
           bwatPIK(i, j) = bwatPIK_max;
         } else if (bed >= topg_max) {
@@ -572,11 +572,11 @@ PetscErrorCode PISMDefaultYieldStress::topg_to_bwatPIK() {
         } else {
           bwatPIK(i, j) = bwatPIK_max - (bed - topg_min) * slope;
         }
-      } else if(m.floating_ice(i, j)){
-        bwatPIK(i,j) = phi_shelf;
-      } else {
-	bwatPIK(i,j) = 0.0;
-      }
+//       } else if(m.floating_ice(i, j)){
+//         bwatPIK(i,j) = phi_shelf;
+//       } else {
+// 	bwatPIK(i,j) = 0.0;
+//       }
     }
   }
 
