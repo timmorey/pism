@@ -66,12 +66,10 @@ void PAFactory::add_standard_types() {
   add_model("constant",          &create_pa_constant);
   add_model("given",             &create_pa_given);
   add_model("searise_greenland", &create_pa_searise_greenland);
-  add_model("eismint_greenland", &create_pa_eismint_greenland);
   add_model("pik",               &create_pa_constant_pik);
   set_default("constant");
-
   add_modifier("anomaly",    &create_pa_anomalies);
-  add_modifier("dTforcing",    &create_pa_dTforcing);
+  add_modifier("dTforcing",  &create_pa_dTforcing);
   add_modifier("lapse_rate", &create_pa_lapse_rates);
 }
 
