@@ -92,6 +92,7 @@ add_library (pismbase
   base/iMbeddef.cc
   base/iMbootstrap.cc
   base/iMcalving.cc
+  base/iMcalvingground.cc
   base/iMdefaults.cc
   base/iMenergy.cc
   base/iMenthalpy.cc

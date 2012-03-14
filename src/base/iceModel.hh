@@ -324,6 +324,8 @@ protected:
   PetscErrorCode setDefaults();
 
   virtual PetscErrorCode groundedCalving();
+  virtual PetscErrorCode groundedCalvingConst();
+  virtual PetscErrorCode groundedCalvingOld();
 
   // see iMenergy.cc
   virtual PetscErrorCode energyStep();
