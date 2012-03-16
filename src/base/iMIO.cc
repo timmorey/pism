@@ -386,6 +386,16 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
       ierr = vHavgGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
       ierr = vHavgGround.set(0.0); CHKERRQ(ierr);
     }
+    ierr = nc.find_variable("HrefThresh", NULL, exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: HrefThresh for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename); CHKERRQ(ierr);
+
+      ierr = vHrefThresh.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vHrefThresh.set(0.0); CHKERRQ(ierr);
+    }
+    
   }
 
   // Find the index of the last record in the file:
@@ -472,6 +482,7 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
   if (config.get_flag("part_grid_ground")) {
     ierr = vHrefGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
     ierr = vHavgGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vHrefThresh.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
   }
   
   string history;

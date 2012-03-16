@@ -83,6 +83,8 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
   ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
+  ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
+  ierr = vDiffCalvHeight.begin_access(); CHKERRQ(ierr);
   ierr = vTestVar.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
 
@@ -97,14 +99,10 @@ PetscErrorCode IceModel::groundedCalvingConst() {
       bool free_ocean       = vH(i,j) == 0.0 && below_sealevel && !part_grid_cell;
 
       // ocean front is where no partially filled grid cell is in front.
-      bool at_ocean_front_e = ( (grounded_ice || part_grid_cell) &&
-                                (vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0) && vHrefGround(i+1,j) == 0.0) );
-      bool at_ocean_front_w = ( (grounded_ice || part_grid_cell) &&
-                                (vH(i-1,j) == 0.0 && ((vbed(i-1,j) + sea_level) < 0) && vHrefGround(i-1,j) == 0.0) );
-      bool at_ocean_front_n = ( (grounded_ice || part_grid_cell) &&
-                                (vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0) && vHrefGround(i,j+1) == 0.0) );
-      bool at_ocean_front_s = ( (grounded_ice || part_grid_cell) &&
-                                (vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0) && vHrefGround(i,j-1) == 0.0) );
+      bool at_ocean_front_e = ( part_grid_cell && vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0 && vHrefGround(i+1,j) == 0.0) );
+      bool at_ocean_front_w = ( part_grid_cell && vH(i-1,j) == 0.0 && ((vbed(i-1,j) + sea_level) < 0 && vHrefGround(i-1,j) == 0.0) );
+      bool at_ocean_front_n = ( part_grid_cell && vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0 && vHrefGround(i,j+1) == 0.0) );
+      bool at_ocean_front_s = ( part_grid_cell && vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
 
       if( at_ocean_front && below_sealevel ){
@@ -112,11 +110,12 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
         vTestVar(i,j) = 1.0;
 
+        PetscInt N = 0;
         PetscReal dHref = 0.0;
-        if ( at_ocean_front_e ) { dHref+= 1/dy; }
-        if ( at_ocean_front_w ) { dHref+= 1/dy; }
-        if ( at_ocean_front_n ) { dHref+= 1/dx; }
-        if ( at_ocean_front_s ) { dHref+= 1/dx; }
+        if ( at_ocean_front_e ) { dHref+= 1/dy; N++;}
+        if ( at_ocean_front_w ) { dHref+= 1/dy; N++;}
+        if ( at_ocean_front_n ) { dHref+= 1/dx; N++;}
+        if ( at_ocean_front_s ) { dHref+= 1/dx; N++;}
         // dHref corresponds to the height we have to cut off to mimic a
         // a constant horizontal retreat of a part grid cell.
         // volume_partgrid = Href * dx*dy
@@ -124,16 +123,14 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
         dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;
 
-        if( part_grid_cell && vHrefGround(i,j) > dHref){
+        if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
           vHrefGround(i,j) -= dHref;
-        } else if( !part_grid_cell && vHnew(i,j) > dHref){
-          // enough ice to calv from full cell
-          vHnew(i,j) -= dHref;
-        } else if( part_grid_cell && vHrefGround(i,j) < dHref ){
+        } else {
         // kill partial cell and redistribute to grounded neighbours
-        PetscReal restCalv = dHref - vHrefGround(i,j);
-        // to be continued.
+        vDiffCalvHeight(i,j) = (dHref - vHrefGround(i,j))/N;
+        vHrefThresh(i,j)     = vHrefGround(i,j)*1.05;
+        vHrefGround(i,j)     = 0.0;
         }
       }
 
@@ -146,6 +143,8 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
   ierr = vHavgGround.end_access(); CHKERRQ(ierr);
   ierr = vHrefGround.end_access(); CHKERRQ(ierr);
+  ierr = vHrefThresh.end_access(); CHKERRQ(ierr);
+  ierr = vDiffCalvHeight.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);

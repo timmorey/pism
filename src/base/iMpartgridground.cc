@@ -122,6 +122,7 @@ PetscErrorCode IceModel::killLonelyPGGCells() {
   ierr = vH.begin_access(); CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
+  ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
 
   PetscReal C = (1.0 - ice_rho / ocean_rho);
@@ -138,7 +139,8 @@ PetscErrorCode IceModel::killLonelyPGGCells() {
         (bed.s + thk.s <  sea_level + C * thk.s);
         
       if ( vHrefGround(i, j) > 0.0 && all_4neighbors_ungrounded) {
-        vHrefGround(i, j) = 0.0;        
+        vHrefGround(i, j) = 0.0;
+        vHrefThresh(i, j) = 0.0;
 //         vMask(i, j) = MASK_ICE_FREE_OCEAN;
         if (vpik) {
               PetscSynchronizedPrintf(grid.com,
@@ -152,6 +154,7 @@ PetscErrorCode IceModel::killLonelyPGGCells() {
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vHrefGround.end_access(); CHKERRQ(ierr);
+  ierr = vHrefThresh.end_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
   return 0;
 }
