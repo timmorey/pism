@@ -82,6 +82,7 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vH.begin_access(); CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
+  ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
   ierr = vTestVar.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
 
@@ -105,9 +106,9 @@ PetscErrorCode IceModel::groundedCalvingConst() {
       bool at_ocean_front_s = ( (grounded_ice || part_grid_cell) &&
                                 (vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0) && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
-      
+
       if( at_ocean_front && below_sealevel ){
-        
+
         ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
         vTestVar(i,j) = 1.0;
 
@@ -123,9 +124,9 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
         dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;
 
-        if( part_grid_cell ){
+        if( part_grid_cell && vHrefGround(i,j) > dHref){
           vHrefGround(i,j) -= dHref;
-        } else{
+        } else if( !part_grid_cell && vHnew(i,j) > dHref){
           vHnew(i,j) -= dHref;
         }
 
@@ -140,7 +141,7 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
   ierr = vHavgGround.end_access(); CHKERRQ(ierr);
-
+  ierr = vHrefGround.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
