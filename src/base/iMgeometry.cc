@@ -238,6 +238,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vh.begin_access(); CHKERRQ(ierr);
   ierr = vTestVar.begin_access(); CHKERRQ(ierr);
+  ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access();  CHKERRQ(ierr);
 
   // related to PIK part_grid mechanism; see Albrecht et al 2011
@@ -383,10 +384,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
       } else if ( do_part_grid_ground && (mask.next_to_grounded_ice(i, j) || mask.grounded_ice_margin(i,j)) ) {
         // calc part grid criterum from surrounding boxes
         PetscScalar coeff;
-        PetscReal H_average = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
+        vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
         vTestVar(i,j) = coeff;
 
-        if ( mask.grounded_ice_margin(i,j) && (vHnew(i,j) < H_average) && vNoPartGridNeighbour(i,j) == 1 &&
+        if ( mask.grounded_ice_margin(i,j) && (vHnew(i,j) < vHavgGround(i,j)) && vNoPartGridNeighbour(i,j) == 1 &&
              !mask.grounded_ice_link(i,j) ) {
           // vNoPartGridNeighbour checks that all neighbours are not partially filled.
           // ice filled cell --> partial grid cell
@@ -396,7 +397,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHrefGround(i,j) = vHnew(i,j) + (acab(i, j) - S - divQ) * dt;
           PetscSynchronizedPrintf(grid.com,"make Hnew=%e a HrefG+MB=%e at i=%d, j=%d\n",vHnew(i, j),vHrefGround(i,j),i,j);
           vHnew(i,j) = 0.0;
-        } else if ( mask.next_to_grounded_ice(i, j) && (vHrefGround(i,j) > H_average) ){
+        } else if ( mask.next_to_grounded_ice(i, j) && (vHrefGround(i,j) > vHavgGround(i,j)) ){
           // partial grid cell --> ice filled cell
           if ( vHnew(i, j) != 0 ){
             ierr = verbPrintf(2, grid.com,"Hnew should not be %e > 0 at  i=%d, j=%d\n",vHnew(i, j),i,j); CHKERRQ(ierr);
@@ -472,6 +473,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vh.end_access(); CHKERRQ(ierr);
   ierr = vTestVar.end_access(); CHKERRQ(ierr);
+  ierr = vHavgGround.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access();  CHKERRQ(ierr);
 
   if (do_part_grid) {

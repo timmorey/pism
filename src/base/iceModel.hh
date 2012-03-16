@@ -229,7 +229,8 @@ protected:
 
         vHref,          //!< accumulated mass advected to a partially filled grid cell
         vHresidual,     //!< residual ice mass of a not any longer partially (fully) filled grid cell
-        vHrefGround,          //!< accumulated mass advected to a partially filled grid cell at grounded margins
+        vHrefGround,    //!< accumulated mass advected to a partially filled grid cell at grounded margins
+        vHavgGround,    //!< height attributed to grounded partial cell from neighbouring ice thicknesses.        
         vHresidualGround,     //!< residual ice mass of a not any longer partially (fully) filled at grounded margins
         vTestVar,       //!< just a variable to save things for writing to netcdf.
         vGroundCalvHeight, //!< Calve this off from grounded cell from ocean melt.

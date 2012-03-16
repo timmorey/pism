@@ -137,6 +137,7 @@ PetscErrorCode IceModel::bootstrap_2d(const char *filename) {
  if (config.get_flag("part_grid_ground")) {
     // description to be added, matthias.mengel@pik
     ierr = vHrefGround.set(0.0); CHKERRQ(ierr);
+    ierr = vHavgGround.set(0.0); CHKERRQ(ierr);
     if (config.get_flag("part_redist_ground")) { ierr = vHresidualGround.set(0.0); CHKERRQ(ierr); }
   }
 

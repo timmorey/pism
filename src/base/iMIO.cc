@@ -367,8 +367,7 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
   // set the field itself to 0 if it is not present
   if (config.get_flag("part_grid_ground")) {
     bool exists;
-    ierr = nc.find_variable("HrefGround", NULL, exists); CHKERRQ(ierr);
-    
+    ierr = nc.find_variable("HrefGround", NULL, exists); CHKERRQ(ierr);    
     if (!exists) {
       ierr = verbPrintf(2, grid.com,
         "PISM WARNING: HrefGround for -part_grid_ground not found in %s. Setting it to zero...\n",
@@ -376,6 +375,16 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
 
       ierr = vHrefGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
       ierr = vHrefGround.set(0.0); CHKERRQ(ierr);
+    }
+    
+    ierr = nc.find_variable("HavgGround", NULL, exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: HavgGround for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename); CHKERRQ(ierr);
+
+      ierr = vHavgGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vHavgGround.set(0.0); CHKERRQ(ierr);
     }
   }
 
@@ -462,6 +471,7 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
   }
   if (config.get_flag("part_grid_ground")) {
     ierr = vHrefGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vHavgGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
   }
   
   string history;

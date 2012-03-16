@@ -360,6 +360,9 @@ PetscErrorCode IceModel::createVecs() {
     ierr = vHrefGround.create(grid, "HrefGround", true); CHKERRQ(ierr);
     ierr = vHrefGround.set_attrs("model_state", "temporary ice thickness at grounded margin ice front", "m", ""); CHKERRQ(ierr);
     ierr = variables.add(vHrefGround); CHKERRQ(ierr);
+    ierr = vHavgGround.create(grid, "HavgGround", true); CHKERRQ(ierr);
+    ierr = vHavgGround.set_attrs("model_state", "ice thickness attributed from neighbours at grounded margin", "m", ""); CHKERRQ(ierr);
+    ierr = variables.add(vHavgGround); CHKERRQ(ierr);
     ierr = vGroundCalvHeight.create(grid, "GroundCalvHeight", true); CHKERRQ(ierr);
     ierr = vGroundCalvHeight.set_attrs("diagnostic", "test variable to write any stuff to netcdf", "", ""); CHKERRQ(ierr);
     ierr = variables.add(vGroundCalvHeight); CHKERRQ(ierr);

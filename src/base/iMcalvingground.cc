@@ -69,6 +69,9 @@ PetscErrorCode IceModel::groundedCalvingConst() {
     PISMEnd();
   }
 
+  double ocean_rho = config.get("sea_water_density");
+  double ice_rho = config.get("ice_density");
+  
   PetscReal sea_level = 0;
   if (ocean != NULL) {
     ierr = ocean->sea_level_elevation(sea_level); CHKERRQ(ierr);
@@ -78,51 +81,56 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
   ierr = vH.begin_access(); CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
-
+  ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
   ierr = vTestVar.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      // find pgg and grounded ice boxes that are adjacent to open ocean
-      bool cell_to_calv = pggmask.grounded(i,j); //|| pggmask.partgridg(i,j);
-//       bool at_ocean_front_e = cell_to_calv && (!mask.icy(i+1,j) && !mask.partgridg(i+1,j));
-//       bool at_ocean_front_w = cell_to_calv && (!mask.icy(i-1,j) && !mask.partgridg(i-1,j));
-//       bool at_ocean_front_n = cell_to_calv && (!mask.icy(i,j+1) && !mask.partgridg(i,j+1));
-//       bool at_ocean_front_s = cell_to_calv && (!mask.icy(i,j-1) && !mask.partgridg(i,j-1));
-//       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
-//       bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
+      // we should substitute these definitions, can we have a more flexible mask class
+      // that we can use to create a mask object that is not the default mask and can
+      // handle part grid cells?
+      bool grounded_ice     = vbed(i,j) > (sea_level - ice_rho / ocean_rho*vH(i,j));
+      bool part_grid_cell   = vHrefGround(i,j) > 0.0;
+      bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
+      bool free_ocean       = vH(i,j) == 0.0 && below_sealevel && !part_grid_cell;
 
-//       ierr = verbPrintf(2, grid.com,"routine running."); CHKERRQ(ierr);
-//     if( at_ocean_front && below_sealevel ){
-// 
-//       PetscReal wannaMelt = 0.0;
-//       if( !mask.partgridg(i,j) ){
-//         wannaMelt = vHnew(i,j);
-//       } else{
-//         wannaMelt = vHrefGround(i,j);
-//       }
-// 
-//       ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
-//       vTestVar(i,j) = 1.0;
-// 
-//       PetscReal GroundCalvHeight  = 0.0;
-//       if ( at_ocean_front_e ) { GroundCalvHeight += 1/dy; }
-//       if ( at_ocean_front_w ) { GroundCalvHeight += 1/dy; }
-//       if ( at_ocean_front_n ) { GroundCalvHeight += 1/dx; }
-//       if ( at_ocean_front_s ) { GroundCalvHeight += 1/dx; }
-//       GroundCalvHeight *= ocean_melt_factor * dt/secpera;
-// 
-// //       PetscScalar coeff;
-// //       PetscReal H_average = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
-// 
-// //       PetscReal GroundCalvHeight = meltLength * ocean_melt_factor * dt/secpera;
-//       if( wannaMelt > GroundCalvHeight ){
-//         wannaMelt -= GroundCalvHeight;
-//       }
+      // ocean front is where no partially filled grid cell is in front.
+      bool at_ocean_front_e = ( (grounded_ice || part_grid_cell) &&
+                                (vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0) && vHrefGround(i+1,j) == 0.0) );
+      bool at_ocean_front_w = ( (grounded_ice || part_grid_cell) &&
+                                (vH(i-1,j) == 0.0 && ((vbed(i-1,j) + sea_level) < 0) && vHrefGround(i-1,j) == 0.0) );
+      bool at_ocean_front_n = ( (grounded_ice || part_grid_cell) &&
+                                (vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0) && vHrefGround(i,j+1) == 0.0) );
+      bool at_ocean_front_s = ( (grounded_ice || part_grid_cell) &&
+                                (vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0) && vHrefGround(i,j-1) == 0.0) );
+      bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
+      
+      if( at_ocean_front && below_sealevel ){
+        
+        ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
+        vTestVar(i,j) = 1.0;
+
+        PetscReal dHref = 0.0;
+        if ( at_ocean_front_e ) { dHref+= 1/dy; }
+        if ( at_ocean_front_w ) { dHref+= 1/dy; }
+        if ( at_ocean_front_n ) { dHref+= 1/dx; }
+        if ( at_ocean_front_s ) { dHref+= 1/dx; }
+        // dHref corresponds to the height we have to cut off to mimic a
+        // a constant horizontal retreat of a part grid cell.
+        // volume_partgrid = Href * dx*dy
+        // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
+        // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
+        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;
+
+        if( part_grid_cell ){
+          vHrefGround(i,j) -= dHref;
+        } else{
+          vHnew(i,j) -= dHref;
+        }
 
 
-//     }
+      }
 
 
 
@@ -131,6 +139,7 @@ PetscErrorCode IceModel::groundedCalvingConst() {
 
   ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
+  ierr = vHavgGround.end_access(); CHKERRQ(ierr);
 
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vH.end_access(); CHKERRQ(ierr);
