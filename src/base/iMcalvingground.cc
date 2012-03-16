@@ -125,12 +125,16 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;
 
         if( part_grid_cell && vHrefGround(i,j) > dHref){
+          // enough ice to calv from partial cell
           vHrefGround(i,j) -= dHref;
         } else if( !part_grid_cell && vHnew(i,j) > dHref){
+          // enough ice to calv from full cell
           vHnew(i,j) -= dHref;
+        } else if( part_grid_cell && vHrefGround(i,j) < dHref ){
+        // kill partial cell and redistribute to grounded neighbours
+        PetscReal restCalv = dHref - vHrefGround(i,j);
+        // to be continued.
         }
-
-
       }
 
 
