@@ -55,6 +55,7 @@ public:
     : PISMYieldStress(g, conf)
   {
     sliding_scale = -1.0;
+    sliding_scalePlastic = -1.0;
     basal_water_thickness = NULL;
     basal_melt_rate = NULL;
     ice_thickness = NULL;
@@ -93,7 +94,7 @@ public:
 
   virtual PetscErrorCode basal_material_yield_stress(IceModelVec2S &result);
 protected:
-  PetscReal sliding_scale;
+  PetscReal sliding_scale, sliding_scalePlastic;
   IceModelVec2S till_phi, bwatPIK;
   IceModelVec2S *basal_water_thickness, *basal_melt_rate, *ice_thickness,
     *bed_topography;

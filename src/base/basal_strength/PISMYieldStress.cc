@@ -146,6 +146,26 @@ PetscErrorCode PISMDefaultYieldStress::init(PISMVars &vars)
         CHKERRQ(ierr);
       }
     }
+    
+    bool scalePlasticSet;
+    double slidescalePlastic;
+    ierr = PISMOptionsReal("-sliding_scalePlastic",
+                           "Divides plastic tauc (yield stress) by given factor",
+                           slidescalePlastic, scalePlasticSet); CHKERRQ(ierr);
+    if (scalePlasticSet) { // only modify config if option set; otherwise leave alone
+      if (slidescalePlastic > 0.0) {
+        ierr = verbPrintf(2, grid.com,
+                          "option -sliding_scalePlastic read; yield stress tauc will be divided by %.4f to\n",
+                          slidescalePlastic);  CHKERRQ(ierr);
+        sliding_scalePlastic = slidescalePlastic;
+      } else {
+        ierr = verbPrintf(1, grid.com,
+                          "PISM WARNING: negative or zero value given for option -sliding_scalePlastic ignored\n");
+        CHKERRQ(ierr);
+      }
+    }    
+    
+    
   }
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
@@ -401,6 +421,9 @@ stresses.  (There is also no singular mathematical operation as \f$A^q = A^0 = 1
     const PetscScalar q = config.get("pseudo_plastic_q");
     result.scale(1.0 / pow(sliding_scale, q));
   }
+  if (sliding_scalePlastic > 0.0) {
+    result.scale(1.0 / sliding_scalePlastic);
+  }
 
   return 0;
 }
@@ -482,7 +505,7 @@ PetscErrorCode PISMDefaultYieldStress::topg_to_phi() {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
       PetscScalar bed = (*bed_topography)(i, j);
 
-      if (m.grounded(i, j) || (Nparam < 5)) {
+//       if (m.grounded(i, j) || (Nparam < 5)) {
         if (bed <= topg_min) {
           till_phi(i, j) = phi_min;
         } else if (bed >= topg_max) {
@@ -490,9 +513,9 @@ PetscErrorCode PISMDefaultYieldStress::topg_to_phi() {
         } else {
           till_phi(i, j) = phi_min + (bed - topg_min) * slope;
         }
-      } else {
-        till_phi(i,j) = phi_ocean;
-      }
+//       } else {
+//         till_phi(i,j) = phi_ocean;
+//       }
     }
   }
 
