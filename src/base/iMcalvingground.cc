@@ -104,21 +104,23 @@ PetscErrorCode IceModel::groundedCalvingConst() {
       bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
       bool free_ocean       = vH(i,j) == 0.0 && below_sealevel && !part_grid_cell;
 
+      
+      bool grounded_e = vH(i+1,j) > 0.0 && vbed(i+1,j) > (sea_level - rhofrac*vH(i+1,j));
+      bool grounded_w = vH(i-1,j) > 0.0 && vbed(i-1,j) > (sea_level - rhofrac*vH(i-1,j));
+      bool grounded_n = vH(i,j+1) > 0.0 && vbed(i,j+1) > (sea_level - rhofrac*vH(i,j+1));
+      bool grounded_s = vH(i,j-1) > 0.0 && vbed(i,j-1) > (sea_level - rhofrac*vH(i,j-1));
+      bool next_to_grounded = grounded_e || grounded_w || grounded_n || grounded_s;
       // ocean front is where no partially filled grid cell is in front.
-      bool at_ocean_front_e = ( part_grid_cell && vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0 && vHrefGround(i+1,j) == 0.0) );
-      bool at_ocean_front_w = ( part_grid_cell && vH(i-1,j) == 0.0 && ((vbed(i-1,j) + sea_level) < 0 && vHrefGround(i-1,j) == 0.0) );
-      bool at_ocean_front_n = ( part_grid_cell && vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0 && vHrefGround(i,j+1) == 0.0) );
-      bool at_ocean_front_s = ( part_grid_cell && vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
+      bool at_ocean_front_e = ( vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0 && vHrefGround(i+1,j) == 0.0) );
+      bool at_ocean_front_w = ( vH(i-1,j) == 0.0 && ((vbed(i-1,j) + sea_level) < 0 && vHrefGround(i-1,j) == 0.0) );
+      bool at_ocean_front_n = ( vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0 && vHrefGround(i,j+1) == 0.0) );
+      bool at_ocean_front_s = ( vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
 
-      vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
+//       vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
 
-      if( at_ocean_front && below_sealevel ){
-
-//         ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
-//         vTestVar(i,j) = 1.0;
-
-
+      if( part_grid_cell && at_ocean_front && below_sealevel ){
+        
         PetscReal dHref = 0.0;
         if ( at_ocean_front_e ) { dHref+= 1/dy; }
         if ( at_ocean_front_w ) { dHref+= 1/dy; }
@@ -129,7 +131,8 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         // volume_partgrid = Href * dx*dy
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
-        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;        
+        if (vHavgGround(i,j) == 0.0) vTestVar(i,j) = 1.0;
+        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera;
         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
@@ -137,13 +140,14 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         } else {
         PetscInt N = 0;
         // count grounded neighbours
-        if ( vH(i+1,j) > 0.0 && vbed(i+1,j) > (sea_level-rhofrac*vH(i+1,j)) ) N++;
-        if ( vH(i-1,j) > 0.0 && vbed(i-1,j) > (sea_level-rhofrac*vH(i-1,j)) ) N++;
-        if ( vH(i,j+1) > 0.0 && vbed(i,j+1) > (sea_level-rhofrac*vH(i,j+1)) ) N++;
-        if ( vH(i,j-1) > 0.0 && vbed(i,j-1) > (sea_level-rhofrac*vH(i,j-1)) ) N++;
+        if ( grounded_e ) N++;
+        if ( grounded_w ) N++;
+        if ( grounded_n ) N++;
+        if ( grounded_s ) N++;
 //         vTestVar(i,j) = N;
         // kill partial cell and save for redistribution to grounded neighbours
-        vDiffCalvHeight(i,j) = (dHref - vHrefGround(i,j))/N;
+        // isolated (N==0) PGG cell at ocean front is killed without redistribution.
+        if (N > 0) vDiffCalvHeight(i,j) = (dHref - vHrefGround(i,j))/N;
         vHrefGround(i,j)     = 0.0;
         }
       }
@@ -173,15 +177,13 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         vHrefGround(i, j) = vH(i, j) - restCalvHeight; // in m
         PetscSynchronizedPrintf(grid.com,"make Hnew=%e a Href=%e cell with rCalv= %e at i=%d, j=%d\n",vH(i, j),vHrefGround(i, j), restCalvHeight,i,j);
       
-        vTestVar(i,j) = restCalvHeight;
+//         vTestVar(i,j) = restCalvHeight;
       
         vHrefThresh(i,j) = vH(i, j) * thresh_coeff;
         vHnew(i, j)      = 0.0;
 
         if(vHrefGround(i, j) < 0.0) { // i.e. terminal floating ice grid cell has calved off completely.
           // We do not account for further calving ice-inwards!
-          // Alternatively CFL criterion for time stepping could be adjusted to maximum of calving rate.
-          //Hav = 0.0;
           vHrefGround(i, j) = 0.0;
         }
       }

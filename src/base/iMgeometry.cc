@@ -386,7 +386,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
         // calc part grid criterum from surrounding boxes
         PetscScalar coeff;
         vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
-        vTestVar(i,j) = coeff;
+//         vTestVar(i,j) = coeff;
 
       if( vHrefGround(i,j) > PetscMax(vHavgGround(i,j), vHrefThresh(i,j)) ){
           // partial grid cell --> ice filled cell
