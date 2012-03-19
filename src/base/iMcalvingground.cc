@@ -68,9 +68,13 @@ PetscErrorCode IceModel::groundedCalvingConst() {
     CHKERRQ(ierr);
     PISMEnd();
   }
+  bool thresh_coeff_set;
+  PetscReal thresh_coeff = 1.0;
+  ierr = PISMOptionsReal("-thresh_coeff", "specifies a coefficient to avoid oscillations between HrefG and full cell", thresh_coeff, thresh_coeff_set); CHKERRQ(ierr);
 
   double ocean_rho = config.get("sea_water_density");
-  double ice_rho = config.get("ice_density");
+  double ice_rho   = config.get("ice_density");
+  double rhofrac   = ice_rho/ocean_rho;
   
   PetscReal sea_level = 0;
   if (ocean != NULL) {
@@ -83,17 +87,19 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
   ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
-  ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
-  ierr = vDiffCalvHeight.begin_access(); CHKERRQ(ierr);
   ierr = vTestVar.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
-
+  
+  IceModelVec2S vDiffCalvHeight = vWork2d[1];
+  ierr = vDiffCalvHeight.set(0.0); CHKERRQ(ierr);
+  ierr = vDiffCalvHeight.begin_access(); CHKERRQ(ierr);
+  
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
       // we should substitute these definitions, can we have a more flexible mask class
       // that we can use to create a mask object that is not the default mask and can
       // handle part grid cells?
-      bool grounded_ice     = vbed(i,j) > (sea_level - ice_rho / ocean_rho*vH(i,j));
+      bool grounded_ice     = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
       bool part_grid_cell   = vHrefGround(i,j) > 0.0;
       bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
       bool free_ocean       = vH(i,j) == 0.0 && below_sealevel && !part_grid_cell;
@@ -105,42 +111,87 @@ PetscErrorCode IceModel::groundedCalvingConst() {
       bool at_ocean_front_s = ( part_grid_cell && vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
 
+      vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
+
       if( at_ocean_front && below_sealevel ){
 
-        ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
-        vTestVar(i,j) = 1.0;
+//         ierr = verbPrintf(2, grid.com,"ocean front at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
+//         vTestVar(i,j) = 1.0;
 
-        PetscInt N = 0;
+
         PetscReal dHref = 0.0;
-        if ( at_ocean_front_e ) { dHref+= 1/dy; N++;}
-        if ( at_ocean_front_w ) { dHref+= 1/dy; N++;}
-        if ( at_ocean_front_n ) { dHref+= 1/dx; N++;}
-        if ( at_ocean_front_s ) { dHref+= 1/dx; N++;}
+        if ( at_ocean_front_e ) { dHref+= 1/dy; }
+        if ( at_ocean_front_w ) { dHref+= 1/dy; }
+        if ( at_ocean_front_n ) { dHref+= 1/dx; }
+        if ( at_ocean_front_s ) { dHref+= 1/dx; }
         // dHref corresponds to the height we have to cut off to mimic a
         // a constant horizontal retreat of a part grid cell.
         // volume_partgrid = Href * dx*dy
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
-        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;
-
+        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera ;        
+        ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
           vHrefGround(i,j) -= dHref;
         } else {
-        // kill partial cell and redistribute to grounded neighbours
+        PetscInt N = 0;
+        // count grounded neighbours
+        if ( vH(i+1,j) > 0.0 && vbed(i+1,j) > (sea_level-rhofrac*vH(i+1,j)) ) N++;
+        if ( vH(i-1,j) > 0.0 && vbed(i-1,j) > (sea_level-rhofrac*vH(i-1,j)) ) N++;
+        if ( vH(i,j+1) > 0.0 && vbed(i,j+1) > (sea_level-rhofrac*vH(i,j+1)) ) N++;
+        if ( vH(i,j-1) > 0.0 && vbed(i,j-1) > (sea_level-rhofrac*vH(i,j-1)) ) N++;
+//         vTestVar(i,j) = N;
+        // kill partial cell and save for redistribution to grounded neighbours
         vDiffCalvHeight(i,j) = (dHref - vHrefGround(i,j))/N;
-        vHrefThresh(i,j)     = vHrefGround(i,j)*1.05;
         vHrefGround(i,j)     = 0.0;
         }
       }
-
-
-
     }
   }
 
+  ierr = vDiffCalvHeight.end_access(); CHKERRQ(ierr);
+
+  ierr = vDiffCalvHeight.beginGhostComm(); CHKERRQ(ierr);
+  ierr = vDiffCalvHeight.endGhostComm(); CHKERRQ(ierr);
+
+  ierr = vDiffCalvHeight.begin_access(); CHKERRQ(ierr);
+  ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
+  for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
+    for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+
+      PetscScalar restCalvHeight = 0.0;
+      bool grounded_ice = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
+      // if grounded and DiffCalv in a neighbouring cell
+      if ( grounded_ice &&
+           (vDiffCalvHeight(i + 1, j) > 0.0 || vDiffCalvHeight(i - 1, j) > 0.0 ||
+            vDiffCalvHeight(i, j + 1) > 0.0 || vDiffCalvHeight(i, j - 1) > 0.0 )) {
+
+        restCalvHeight = vDiffCalvHeight(i + 1, j) + vDiffCalvHeight(i - 1, j) +
+                         vDiffCalvHeight(i, j + 1) + vDiffCalvHeight(i, j - 1);
+
+        vHrefGround(i, j) = vH(i, j) - restCalvHeight; // in m
+        PetscSynchronizedPrintf(grid.com,"make Hnew=%e a Href=%e cell with rCalv= %e at i=%d, j=%d\n",vH(i, j),vHrefGround(i, j), restCalvHeight,i,j);
+      
+        vTestVar(i,j) = restCalvHeight;
+      
+        vHrefThresh(i,j) = vH(i, j) * thresh_coeff;
+        vHnew(i, j)      = 0.0;
+
+        if(vHrefGround(i, j) < 0.0) { // i.e. terminal floating ice grid cell has calved off completely.
+          // We do not account for further calving ice-inwards!
+          // Alternatively CFL criterion for time stepping could be adjusted to maximum of calving rate.
+          //Hav = 0.0;
+          vHrefGround(i, j) = 0.0;
+        }
+      }
+    }
+  }
+
+  // finally copy vHnew into vH and communicate ghosted values
   ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
+
   ierr = vHavgGround.end_access(); CHKERRQ(ierr);
   ierr = vHrefGround.end_access(); CHKERRQ(ierr);
   ierr = vHrefThresh.end_access(); CHKERRQ(ierr);
@@ -149,6 +200,11 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
   ierr = vTestVar.end_access(); CHKERRQ(ierr);
+
+
+
+
+  
   return 0;
 }
 

@@ -201,7 +201,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   PetscErrorCode ierr;
   PetscScalar my_nonneg_rule_flux = 0, my_ocean_kill_flux = 0, my_float_kill_flux = 0;
 
-  PetscScalar ocean_melt_factor = 0, sea_level = 0;
+  PetscScalar sea_level = 0;
 
   const PetscScalar dx = grid.dx, dy = grid.dy;
 
