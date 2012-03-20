@@ -35,6 +35,7 @@ PetscErrorCode IceModel::groundedCalving() {
   string GroundedCalvingMethod;
   set<string> GroundCalv_choices;
   GroundCalv_choices.insert("constant");
+  GroundCalv_choices.insert("eigen");
   ierr = PISMOptionsList(grid.com,"-grounded_calving", "specifies the grounded calving calculation method",
          GroundCalv_choices, "constant", GroundedCalvingMethod, calvMethod_set); CHKERRQ(ierr);
   if (!calvMethod_set) {
@@ -46,6 +47,9 @@ PetscErrorCode IceModel::groundedCalving() {
   
   if (GroundedCalvingMethod == "constant"){
     ierr = groundedCalvingConst(); CHKERRQ(ierr);
+  }
+  if (GroundedCalvingMethod == "eigen"){
+    ierr = groundedEigenCalving(); CHKERRQ(ierr);
   }
   
   return 0;
@@ -94,19 +98,16 @@ PetscErrorCode IceModel::groundedEigenCalving() {
   ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
   ierr = vTestVar.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
+  ierr = vPrinStrain1.begin_access(); CHKERRQ(ierr);
+  ierr = vPrinStrain2.begin_access(); CHKERRQ(ierr);
+  ierr = vMask.begin_access(); CHKERRQ(ierr);
 
   IceModelVec2S vDiffCalvHeight = vWork2d[1];
   ierr = vDiffCalvHeight.set(0.0); CHKERRQ(ierr);
   ierr = vDiffCalvHeight.begin_access(); CHKERRQ(ierr);
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      // Average of strain-rate eigenvalues in adjacent floating gird cells to
-      // be used for eigencalving
-      PetscScalar eigen1 = 0.0, eigen2 = 0.0;
-      // Counting adjacent floating boxes (with distance "offset")
-      PetscInt M = 0;
-      
+    for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {   
       // we should substitute these definitions, can we have a more flexible mask class
       // that we can use to create a mask object that is not the default mask and can
       // handle part grid cells?
@@ -128,68 +129,62 @@ PetscErrorCode IceModel::groundedEigenCalving() {
 
 //       vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
 
+                               
       if( part_grid_cell && at_ocean_front && below_sealevel ){
+        PetscScalar dHref = 0.0, oceanFace = 0.0, calvrateHorizontal = 0.0,
+        eigen1 = 0.0, eigen2 = 0.0, 
+        eigenCalvOffset = 0.0; // if it's not exactly the zero line of
+                               // transition from compressive to extensive flow
+                               // regime;
+        // Counting adjacent grounded boxes (with distance "offset")
+        PetscInt M = 0;
 
-        PetscReal dHref = 0.0;
-        if ( at_ocean_front_e ) { dHref+= 1/dy; }
-        if ( at_ocean_front_w ) { dHref+= 1/dy; }
-        if ( at_ocean_front_n ) { dHref+= 1/dx; }
-        if ( at_ocean_front_s ) { dHref+= 1/dx; }
-
+        if ( at_ocean_front_e ) { oceanFace+= 1.0/dy; }
+        if ( at_ocean_front_w ) { oceanFace+= 1.0/dy; }
+        if ( at_ocean_front_n ) { oceanFace+= 1.0/dx; }
+        if ( at_ocean_front_s ) { oceanFace+= 1.0/dx; }
 
         if ( mask.grounded_ice(i + offset, j) && !mask.ice_margin(i + offset, j)){
           eigen1 += vPrinStrain1(i + offset, j);
           eigen2 += vPrinStrain2(i + offset, j);
           M += 1;
         }
-
         if ( mask.grounded_ice(i - offset, j) && !mask.ice_margin(i - offset, j)){
           eigen1 += vPrinStrain1(i - offset, j);
           eigen2 += vPrinStrain2(i - offset, j);
           M += 1;
         }
-
         if ( mask.grounded_ice(i, j + offset) && !mask.ice_margin(i , j + offset)){
           eigen1 += vPrinStrain1(i, j + offset);
           eigen2 += vPrinStrain2(i, j + offset);
           M += 1;
         }
-
         if ( mask.grounded_ice(i, j - offset) && !mask.ice_margin(i , j - offset)){
           eigen1 += vPrinStrain1(i, j - offset);
           eigen2 += vPrinStrain2(i, j - offset);
           M += 1;
         }
-
         if (M > 0) {
           eigen1 /= M;
           eigen2 /= M;
         }
 
 
-        PetscScalar calvrateHorizontal = 0.0,
-        eigenCalvOffset = 0.0; // if it's not exactly the zero line of
-                               // transition from compressive to extensive flow
-                               // regime
-
         // calving law
         if ( eigen2 > eigenCalvOffset && eigen1 > 0.0) { // if spreading in all directions
-          calvrateHorizontal = eigenCalvFactor * eigen1 * (eigen2 - eigenCalvOffset);
+          calvrateHorizontal = eigcalv_ground_factor * eigen1 * (eigen2 - eigenCalvOffset);
           // eigen1 * eigen2 has units [s^ - 2] and calvrateHorizontal [m*s^1]
-          // hence, eigenCalvFactor has units [m*s]
+          // hence, eigcalv_ground_factor has units [m*s]
         } else calvrateHorizontal = 0.0;
 
         // calculate mass loss with respect to the associated ice thickness and the grid size:
-        PetscScalar calvrate = calvrateHorizontal * H_average / dx; // in m/s
+        PetscScalar calvrate = calvrateHorizontal * vHavgGround(i,j) * oceanFace; // in m/s
         // dHref corresponds to the height we have to cut off to mimic a
         // a constant horizontal retreat of a part grid cell.
         // volume_partgrid = Href * dx*dy
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
-        // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
-
-        
-        if (vHavgGround(i,j) == 0.0) vTestVar(i,j) = 1.0;
-        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera;
+        // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg    
+        dHref = calvrate * dt;
         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
@@ -259,6 +254,9 @@ PetscErrorCode IceModel::groundedEigenCalving() {
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
   ierr = vTestVar.end_access(); CHKERRQ(ierr);
+  ierr = vPrinStrain1.end_access(); CHKERRQ(ierr);
+  ierr = vPrinStrain2.end_access(); CHKERRQ(ierr);
+  ierr = vMask.end_access(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -333,7 +331,6 @@ PetscErrorCode IceModel::groundedCalvingConst() {
 //       vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
 
       if( part_grid_cell && at_ocean_front && below_sealevel ){
-        
         PetscReal dHref = 0.0;
         if ( at_ocean_front_e ) { dHref+= 1/dy; }
         if ( at_ocean_front_w ) { dHref+= 1/dy; }
@@ -345,7 +342,7 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
         if (vHavgGround(i,j) == 0.0) vTestVar(i,j) = 1.0;
-        dHref = dHref/vHavgGround(i,j) * ocean_melt_factor * dt/secpera;
+        dHref = dHref * vHavgGround(i,j) * ocean_melt_factor * dt/secpera;
         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell

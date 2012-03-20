@@ -326,6 +326,7 @@ protected:
   PetscErrorCode setDefaults();
 
   virtual PetscErrorCode groundedCalving();
+  virtual PetscErrorCode groundedEigenCalving();
   virtual PetscErrorCode groundedCalvingConst();
   virtual PetscErrorCode groundedCalvingOld();
 
