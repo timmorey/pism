@@ -77,6 +77,9 @@ PetscErrorCode IceModel::groundedEigenCalving() {
   PetscReal thresh_coeff = 1.0;
   ierr = PISMOptionsReal("-thresh_coeff", "specifies a coefficient to avoid oscillations between HrefG and full cell", thresh_coeff, thresh_coeff_set); CHKERRQ(ierr);
 
+  bool landeigencalving;
+  ierr = PISMOptionsIsSet("-landeigencalving", "Use eigenCalvingGround also on land above SL.", landeigencalving); CHKERRQ(ierr);
+
   double ocean_rho = config.get("sea_water_density");
   double ice_rho   = config.get("ice_density");
   double rhofrac   = ice_rho/ocean_rho;
@@ -130,8 +133,8 @@ PetscErrorCode IceModel::groundedEigenCalving() {
 //       vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
 
                                
-      if( part_grid_cell && at_ocean_front && below_sealevel ){
-        PetscScalar dHref = 0.0, oceanFace = 0.0, calvrateHorizontal = 0.0,
+      if( part_grid_cell && (at_ocean_front && below_sealevel || landeigencalving)){
+        PetscScalar dHref = 0.0, Face = 0.0, calvrateHorizontal = 0.0,
         eigen1 = 0.0, eigen2 = 0.0, 
         eigenCalvOffset = 0.0; // if it's not exactly the zero line of
                                // transition from compressive to extensive flow
@@ -139,10 +142,13 @@ PetscErrorCode IceModel::groundedEigenCalving() {
         // Counting adjacent grounded boxes (with distance "offset")
         PetscInt M = 0;
 
-        if ( at_ocean_front_e ) { oceanFace+= 1.0/dy; }
-        if ( at_ocean_front_w ) { oceanFace+= 1.0/dy; }
-        if ( at_ocean_front_n ) { oceanFace+= 1.0/dx; }
-        if ( at_ocean_front_s ) { oceanFace+= 1.0/dx; }
+        if ( at_ocean_front_e ) { Face+= 1.0/dy; }
+        if ( at_ocean_front_w ) { Face+= 1.0/dy; }
+        if ( at_ocean_front_n ) { Face+= 1.0/dx; }
+        if ( at_ocean_front_s ) { Face+= 1.0/dx; }
+
+        // make this less rough if in use for future.
+        if ( landeigencalving ) Face = 1.0/dx;
 
         if ( mask.grounded_ice(i + offset, j) && !mask.ice_margin(i + offset, j)){
           eigen1 += vPrinStrain1(i + offset, j);
@@ -178,7 +184,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
         } else calvrateHorizontal = 0.0;
 
         // calculate mass loss with respect to the associated ice thickness and the grid size:
-        PetscScalar calvrate = calvrateHorizontal * vHavgGround(i,j) * oceanFace; // in m/s
+        PetscScalar calvrate = calvrateHorizontal * vHavgGround(i,j) * Face; // in m/s
         // dHref corresponds to the height we have to cut off to mimic a
         // a constant horizontal retreat of a part grid cell.
         // volume_partgrid = Href * dx*dy
