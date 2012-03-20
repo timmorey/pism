@@ -46,11 +46,11 @@ PetscErrorCode IceModel::updateSurfaceElevationAndMask() {
   ierr = update_mask(); CHKERRQ(ierr);
   ierr = update_surface_elevation(); CHKERRQ(ierr);
 
-  if (config.get_flag("kill_icebergs")) {
-    ierr = killIceBergs(); CHKERRQ(ierr);
-  }
   if (config.get_flag("part_grid_ground")) {
     ierr = killLonelyPGGCells(); CHKERRQ(ierr);
+  }
+  if (config.get_flag("kill_icebergs")) {
+    ierr = killIceBergs(); CHKERRQ(ierr);
   }
   
   return 0;
