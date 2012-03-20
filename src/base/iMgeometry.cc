@@ -52,7 +52,7 @@ PetscErrorCode IceModel::updateSurfaceElevationAndMask() {
   if (config.get_flag("part_grid_ground")) {
     ierr = killLonelyPGGCells(); CHKERRQ(ierr);
   }
-
+  
   return 0;
 }
 
@@ -409,7 +409,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
         if ( do_part_grid_ground && vHrefGround(i,j) > 0.0 ){
           PetscSynchronizedPrintf(grid.com,"kill HrefG=%e inside ice at i=%d, j=%d\n",vHrefGround(i,j),i,j);
-          vHnew(i,j) += vHrefGround(i,j);
+          //vHnew(i,j) += vHrefGround(i,j);
           vHrefGround(i,j) = 0.0;
           vHrefThresh(i,j) = 0.0;
         }
