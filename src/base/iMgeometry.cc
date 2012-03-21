@@ -397,7 +397,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHrefGround(i,j) = 0.0;
         } else if (mask.grounded_ice_margin(i,j)){
           // standard case
-          vHnew(i,j) += (acab(i, j) - S - divQ) * dt;
+//           vHnew(i,j) += (acab(i, j) - S - divQ) * dt;
+          vHnew(i,j) += (acab(i, j) - S) * dt;
         } else if ( mask.next_to_grounded_ice(i, j) ){
           // no surface mass balance here
           vHrefGround(i,j) -= divQ * dt;
