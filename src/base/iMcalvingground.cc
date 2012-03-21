@@ -118,10 +118,10 @@ PetscErrorCode IceModel::groundedEigenCalving() {
       bool part_grid_cell   = vHrefGround(i,j) > 0.0;
       bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
       bool free_ocean       = vH(i,j) == 0.0 && below_sealevel && !part_grid_cell;
-      bool grounded_e = vH(i+1,j) > 0.0 && vbed(i+1,j) > (sea_level - rhofrac*vH(i+1,j));
-      bool grounded_w = vH(i-1,j) > 0.0 && vbed(i-1,j) > (sea_level - rhofrac*vH(i-1,j));
-      bool grounded_n = vH(i,j+1) > 0.0 && vbed(i,j+1) > (sea_level - rhofrac*vH(i,j+1));
-      bool grounded_s = vH(i,j-1) > 0.0 && vbed(i,j-1) > (sea_level - rhofrac*vH(i,j-1));
+      bool grounded_e = vH(i+1,j)>0.0 && vbed(i+1,j)>(sea_level-rhofrac*vH(i+1,j)) && (vbed(i+1,j)+sea_level)<0;
+      bool grounded_w = vH(i-1,j)>0.0 && vbed(i-1,j)>(sea_level-rhofrac*vH(i-1,j)) && (vbed(i-1,j)+sea_level)<0;
+      bool grounded_n = vH(i,j+1)>0.0 && vbed(i,j+1)>(sea_level-rhofrac*vH(i,j+1)) && (vbed(i,j+1)+sea_level)<0;
+      bool grounded_s = vH(i,j-1)>0.0 && vbed(i,j-1)>(sea_level-rhofrac*vH(i,j-1)) && (vbed(i,j-1)+sea_level)<0;
       bool next_to_grounded = grounded_e || grounded_w || grounded_n || grounded_s;
       // ocean front is where no partially filled grid cell is in front.
       bool at_ocean_front_e = ( vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0 && vHrefGround(i+1,j) == 0.0) );
@@ -223,9 +223,10 @@ PetscErrorCode IceModel::groundedEigenCalving() {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
 
       PetscScalar restCalvHeight = 0.0;
-      bool grounded_ice = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
+      bool grounded_ice   = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
+      bool below_sealevel = (vbed(i,j) + sea_level) < 0;
       // if grounded and DiffCalv in a neighbouring cell
-      if ( grounded_ice &&
+      if ( grounded_ice && below_sealevel &&
            (vDiffCalvHeight(i + 1, j) > 0.0 || vDiffCalvHeight(i - 1, j) > 0.0 ||
             vDiffCalvHeight(i, j + 1) > 0.0 || vDiffCalvHeight(i, j - 1) > 0.0 )) {
 
@@ -322,10 +323,10 @@ PetscErrorCode IceModel::groundedCalvingConst() {
       bool free_ocean       = vH(i,j) == 0.0 && below_sealevel && !part_grid_cell;
 
       
-      bool grounded_e = vH(i+1,j) > 0.0 && vbed(i+1,j) > (sea_level - rhofrac*vH(i+1,j));
-      bool grounded_w = vH(i-1,j) > 0.0 && vbed(i-1,j) > (sea_level - rhofrac*vH(i-1,j));
-      bool grounded_n = vH(i,j+1) > 0.0 && vbed(i,j+1) > (sea_level - rhofrac*vH(i,j+1));
-      bool grounded_s = vH(i,j-1) > 0.0 && vbed(i,j-1) > (sea_level - rhofrac*vH(i,j-1));
+      bool grounded_e = vH(i+1,j)>0.0 && vbed(i+1,j)>(sea_level-rhofrac*vH(i+1,j)) && (vbed(i+1,j)+sea_level)<0;
+      bool grounded_w = vH(i-1,j)>0.0 && vbed(i-1,j)>(sea_level-rhofrac*vH(i-1,j)) && (vbed(i-1,j)+sea_level)<0;
+      bool grounded_n = vH(i,j+1)>0.0 && vbed(i,j+1)>(sea_level-rhofrac*vH(i,j+1)) && (vbed(i,j+1)+sea_level)<0;
+      bool grounded_s = vH(i,j-1)>0.0 && vbed(i,j-1)>(sea_level-rhofrac*vH(i,j-1)) && (vbed(i,j-1)+sea_level)<0;
       bool next_to_grounded = grounded_e || grounded_w || grounded_n || grounded_s;
       // ocean front is where no partially filled grid cell is in front.
       bool at_ocean_front_e = ( vH(i+1,j) == 0.0 && ((vbed(i+1,j) + sea_level) < 0 && vHrefGround(i+1,j) == 0.0) );
@@ -382,8 +383,9 @@ PetscErrorCode IceModel::groundedCalvingConst() {
 
       PetscScalar restCalvHeight = 0.0;
       bool grounded_ice = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
+      bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
       // if grounded and DiffCalv in a neighbouring cell
-      if ( grounded_ice &&
+      if ( grounded_ice && below_sealevel &&
            (vDiffCalvHeight(i + 1, j) > 0.0 || vDiffCalvHeight(i - 1, j) > 0.0 ||
             vDiffCalvHeight(i, j + 1) > 0.0 || vDiffCalvHeight(i, j - 1) > 0.0 )) {
 
