@@ -202,6 +202,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   PetscScalar my_nonneg_rule_flux = 0, my_ocean_kill_flux = 0, my_float_kill_flux = 0;
 
   PetscScalar sea_level = 0;
+  PetscScalar coeff;
 
   const PetscScalar dx = grid.dx, dy = grid.dy;
 
@@ -381,14 +382,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
         } else {
           vHnew(i, j) = 0.0; // no change from vH value, actually, vHref(i, j) not changed
         }
-
+        
       } else if ( do_part_grid_ground && mask.next_to_grounded_ice(i, j) ) {
         // calc part grid criterum from surrounding boxes
-        PetscScalar coeff;
         vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
-//         vTestVar(i,j) = coeff;
 
-      if( vHrefGround(i,j) > PetscMax(vHavgGround(i,j), vHrefThresh(i,j)) ){
+        if( vHrefGround(i,j) > PetscMax(vHavgGround(i,j), vHrefThresh(i,j)) ){
           // partial grid cell --> ice filled cell
           if ( vHnew(i, j) != 0 ){
             ierr = verbPrintf(2, grid.com,"Hnew should not be %e > 0 at  i=%d, j=%d\n",vHnew(i, j),i,j); CHKERRQ(ierr);
@@ -413,6 +412,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHrefGround(i,j) = 0.0;
           vHrefThresh(i,j) = 0.0;
         }
+
+        if ( do_part_grid_ground && mask.grounded_ice_margin(i, j) ){
+          // HavgGround is needed for grounded eigencalving in these cells.
+          vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
+        }
+        
       } else {
         // last possibility: ice-free, not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;

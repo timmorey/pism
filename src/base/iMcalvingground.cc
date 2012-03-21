@@ -130,7 +130,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
       bool at_ocean_front_s = ( vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
 
-//       vTestVar(i,j) = vbed(i,j) - (sea_level - rhofrac*vH(i,j));
+      vTestVar(i,j) = 0.0;
 
                                
       if( part_grid_cell && (at_ocean_front && below_sealevel || landeigencalving)){
@@ -191,7 +191,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg    
         dHref = calvrate * dt;
-        ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
+//         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
           vHrefGround(i,j) -= dHref;
