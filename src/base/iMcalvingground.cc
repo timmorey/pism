@@ -142,10 +142,10 @@ PetscErrorCode IceModel::groundedEigenCalving() {
         // Counting adjacent grounded boxes (with distance "offset")
         PetscInt M = 0;
 
-        if ( at_ocean_front_e ) { Face+= 1.0/dy; }
-        if ( at_ocean_front_w ) { Face+= 1.0/dy; }
-        if ( at_ocean_front_n ) { Face+= 1.0/dx; }
-        if ( at_ocean_front_s ) { Face+= 1.0/dx; }
+        if ( at_ocean_front_e ) { Face+= 1.0/dx; }
+        if ( at_ocean_front_w ) { Face+= 1.0/dx; }
+        if ( at_ocean_front_n ) { Face+= 1.0/dy; }
+        if ( at_ocean_front_s ) { Face+= 1.0/dy; }
 
         // make this less rough if in use for future.
         if ( landeigencalving ) Face = 1.0/dx;
@@ -338,10 +338,10 @@ PetscErrorCode IceModel::groundedCalvingConst() {
 
       if( part_grid_cell && at_ocean_front && below_sealevel ){
         PetscReal dHref = 0.0;
-        if ( at_ocean_front_e ) { dHref+= 1/dy; }
-        if ( at_ocean_front_w ) { dHref+= 1/dy; }
-        if ( at_ocean_front_n ) { dHref+= 1/dx; }
-        if ( at_ocean_front_s ) { dHref+= 1/dx; }
+        if ( at_ocean_front_e ) { dHref+= 1/dx; }
+        if ( at_ocean_front_w ) { dHref+= 1/dx; }
+        if ( at_ocean_front_n ) { dHref+= 1/dy; }
+        if ( at_ocean_front_s ) { dHref+= 1/dy; }
         // dHref corresponds to the height we have to cut off to mimic a
         // a constant horizontal retreat of a part grid cell.
         // volume_partgrid = Href * dx*dy

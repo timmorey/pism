@@ -306,8 +306,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
         ierr = cell_interface_diffusive_flux(*Qdiff, i, j, Q); CHKERRQ(ierr);
         // staggered grid Div(Q) for diffusive non-sliding SIA deformation part:
         //    Qdiff = - D grad h
-        divQ = ((*Qdiff)(i, j, 0) - (*Qdiff)(i - 1, j, 0)) / dx
-          + ((*Qdiff)(i, j, 1) - (*Qdiff)(i, j - 1, 1)) / dy;
+        divQ = ((*Qdiff)(i, j, 0) - (*Qdiff)(i - 1, j, 0)) / dx +
+               ((*Qdiff)(i, j, 1) - (*Qdiff)(i, j - 1, 1)) / dy;
       }
 
       // get non-diffusive velocities according to old or -part_grid scheme
