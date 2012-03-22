@@ -395,11 +395,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHnew(i,j) = vHrefGround(i,j) + (acab(i, j) - S - divQ)*dt;
           PetscSynchronizedPrintf(grid.com,"make HrefG=%e a Hnew+MB=%e at i=%d, j=%d\n",vHrefGround(i,j),vHnew(i, j),i,j);
           vHrefGround(i,j) = 0.0;
-        } else if (mask.grounded_ice_margin(i,j)){
-          // standard case
-//           vHnew(i,j) += (acab(i, j) - S - divQ) * dt;
-          vHnew(i,j) += (acab(i, j) - S) * dt;
-        } else if ( mask.next_to_grounded_ice(i, j) ){
+          vTestVar(i,j) = 1.;
+        } else{
           // no surface mass balance here
           vHrefGround(i,j) -= divQ * dt;
         }
@@ -414,11 +411,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHrefThresh(i,j) = 0.0;
         }
 
-        if ( do_part_grid_ground && mask.grounded_ice_margin(i, j) ){
-          // HavgGround is needed for grounded eigencalving in these cells.
-          vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
-        }
+//         if ( do_part_grid_ground && mask.grounded_ice_margin(i, j) ){
+//           // HavgGround is needed for grounded eigencalving in these cells.
+//           vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
+//         }
         
+        vTestVar(i,j) = 0.;
       } else {
         // last possibility: ice-free, not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;

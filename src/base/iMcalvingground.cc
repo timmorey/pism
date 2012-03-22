@@ -129,8 +129,8 @@ PetscErrorCode IceModel::groundedEigenCalving() {
       bool at_ocean_front_n = ( vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0 && vHrefGround(i,j+1) == 0.0) );
       bool at_ocean_front_s = ( vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
-
-      vTestVar(i,j) = 0.0;
+      bool justBecomeFull = vTestVar(i,j) == 1.;
+//       vTestVar(i,j) = 0.0;
 
                                
       if( part_grid_cell && (at_ocean_front && below_sealevel || landeigencalving)){
@@ -606,7 +606,7 @@ PetscErrorCode IceModel::groundedCalvingOld() {
         if ( grounded_ice_s ) { N += 1; }
         if ( N == 0 ) {
           ierr = verbPrintf(2, grid.com,"!!! PISM_WARNING: no grounded neighbour at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
-          vTestVar(i,j) += 40.0;
+//           vTestVar(i,j) += 40.0;
         }
 
         if ( grounded_ice_e ) { vDiffCalvHeight(i+1,j) += restCalv/N; }
@@ -614,7 +614,7 @@ PetscErrorCode IceModel::groundedCalvingOld() {
         if ( grounded_ice_n ) { vDiffCalvHeight(i,j+1) += restCalv/N; }
         if ( grounded_ice_s ) { vDiffCalvHeight(i,j-1) += restCalv/N; }
         vHrefGround(i,j) = 0.0;
-        vTestVar(i,j) += 20.0;
+//         vTestVar(i,j) += 20.0;
       } else if( grounded_ice && (vGroundCalvHeight(i,j) > vHnew(i,j)) ){
         ierr = verbPrintf(2, grid.com,"!!! PISM_WARNING: we should not arrive here, as this should be converted to a partial grid cell first, i=%d, j=%d\n",i,j); CHKERRQ(ierr);
       }

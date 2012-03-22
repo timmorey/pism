@@ -225,7 +225,7 @@ PetscReal IceModel::get_average_thickness_g(planeStar<int> M, planeStar<PetscSca
   if (N == 0) {
     // assume constant H_average for isolated grounded cells
     H_average = 200.0;
-    vTestVar(i,j)=1;
+//     vTestVar(i,j)=1;
 //     SETERRQ(grid.com, 1, "N == 0;  call this only if a neighbor is grounded!\n");
   }
   // average by division by grounded neighbours
