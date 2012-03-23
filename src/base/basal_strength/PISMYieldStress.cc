@@ -436,8 +436,6 @@ PetscErrorCode PISMDefaultYieldStress::topg_to_phi() {
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
       PetscScalar bed = (*bed_topography)(i, j);
-
-      if (m.grounded(i, j) || (Nparam < 5)) {
         if (bed <= topg_min) {
           till_phi(i, j) = phi_min;
         } else if (bed >= topg_max) {
@@ -445,9 +443,6 @@ PetscErrorCode PISMDefaultYieldStress::topg_to_phi() {
         } else {
           till_phi(i, j) = phi_min + (bed - topg_min) * slope;
         }
-      } else {
-        till_phi(i,j) = phi_ocean;
-      }
     }
   }
 
