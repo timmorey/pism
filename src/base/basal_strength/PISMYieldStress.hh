@@ -55,6 +55,7 @@ public:
     : PISMYieldStress(g, conf)
   {
     sliding_scale = -1.0;
+    sliding_scalePlastic = -1.0;
     basal_water_thickness = NULL;
     basal_melt_rate = NULL;
     ice_thickness = NULL;
@@ -93,8 +94,8 @@ public:
 
   virtual PetscErrorCode basal_material_yield_stress(IceModelVec2S &result);
 protected:
-  PetscReal sliding_scale;
-  IceModelVec2S till_phi;
+  PetscReal sliding_scale, sliding_scalePlastic;
+  IceModelVec2S till_phi, bwatPIK;
   IceModelVec2S *basal_water_thickness, *basal_melt_rate, *ice_thickness,
     *bed_topography;
   IceModelVec2Int *mask;
@@ -107,6 +108,7 @@ protected:
   virtual PetscScalar basal_water_pressure(PetscScalar thk, PetscScalar bwat,
                                            PetscScalar bmr, PetscScalar frac,
                                            PetscScalar hmelt_max);
+  virtual PetscErrorCode topg_to_bwatPIK();
 };
 
 class PISMConstantYieldStress : public PISMYieldStress
