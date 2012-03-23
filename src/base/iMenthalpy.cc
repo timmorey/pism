@@ -263,6 +263,8 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
                       PetscScalar* bulgeCount) {
   PetscErrorCode  ierr;
 
+  const bool do_part_grid_ground = config.get_flag("part_grid_ground");
+  
   if (config.get_flag("do_cold_ice_methods")) {
     SETERRQ(1,
       "PISM ERROR:  enthalpyAndDrainageStep() called but do_cold_ice_methods==true\n");
@@ -589,7 +591,89 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
 
   delete [] Enthnew;
 
+  if( do_part_grid_ground ){
+    ierr = fill_tempenth_front(); CHKERRQ(ierr);
+  }
+  
   *liquifiedVol = ((double) liquifiedCount) * fdz * grid.dx * grid.dy;
   return 0;
 }
 
+// Fill partgrid cells with Enth3 and temperature T3
+
+PetscErrorCode IceModel::fill_tempenth_front() {
+  PetscErrorCode ierr;
+
+  ierr = verbPrintf(4, grid.com, "######### fill_tempenth_front() start \n");
+  PetscInt        Mz=grid.Mz, Mx=grid.Mx, My=grid.My;
+  PetscInt    fMz = grid.Mz_fine;
+  PetscScalar fdz = grid.dz_fine;
+
+
+  PetscScalar *Enthrev;
+  Enthrev         = new PetscScalar[fMz];
+  //Enthrev         = new PetscScalar[grid.Mz];
+
+  PetscInt fromedge=3;
+
+  ierr = Enth3.begin_access(); CHKERRQ(ierr);
+  ierr = vH.begin_access(); CHKERRQ(ierr);
+  ierr = vTestVar.begin_access(); CHKERRQ(ierr);
+//   ierr = vMask.begin_access(); CHKERRQ(ierr);
+  ierr = vWork3d.begin_access(); CHKERRQ(ierr);
+
+  MaskQuery mask(vMask);
+
+  for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
+    for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
+
+      // if ice box was just added to computational domain
+      if ( vTestVar(i,j) == 1.0 ) {
+
+          const PetscInt kstn = static_cast<PetscInt>(floor(vH(i,j+fromedge)/fdz));
+          const PetscInt ksts = static_cast<PetscInt>(floor(vH(i,j-fromedge)/fdz));
+          const PetscInt kste = static_cast<PetscInt>(floor(vH(i+fromedge,j)/fdz));
+          const PetscInt kstw = static_cast<PetscInt>(floor(vH(i-fromedge,j)/fdz));
+
+          PetscInt kst=max(kstn,ksts);
+          kst=max(kst,kste);
+          kst=max(kst,kstw);
+
+          //ierr = verbPrintf(4, grid.com, "!!!!!!zz ks=%d, kn=%d, ke=%d, kw=%d , kmax=%d at %d, %d \n",ksts,kstn,kste,kstw,kst,i,j);
+
+
+          //const PetscInt kst = static_cast<PetscInt>(floor(vH(i,j-fromedge)/fdz));
+          //PetscScalar *Enthrev;
+          if (kst>0){
+            if (kst==kstn) {
+              ierr = Enth3.getValColumn(i,j+fromedge,kst,Enthrev); CHKERRQ(ierr);}
+            else if (kst==ksts) {
+              ierr = Enth3.getValColumn(i,j-fromedge,kst,Enthrev); CHKERRQ(ierr);}
+            else if (kst==kste) {
+              ierr = Enth3.getValColumn(i+fromedge,j,kst,Enthrev); CHKERRQ(ierr);}
+            else if (kst==kstw){
+              ierr = Enth3.getValColumn(i-fromedge,j,kst,Enthrev); CHKERRQ(ierr);}
+
+            //ierr = Enth3.getInternalColumn(i,j-5,&Enthrev); CHKERRQ(ierr);
+
+            ierr = vWork3d.setValColumnPL(i,j,Enthrev); CHKERRQ(ierr);
+            //for (PetscInt k=0; k<kst; ++k) {
+              //ierr = verbPrintf(4, grid.com, "!!!!!!x set enth3 to %.1f at %d, %d, %d \n",Enthrev[k],i,j,k);
+            //}
+          }
+
+      }
+    }
+  }
+
+
+  ierr = Enth3.end_access(); CHKERRQ(ierr);
+  ierr = vH.end_access(); CHKERRQ(ierr);
+  ierr = vTestVar.end_access(); CHKERRQ(ierr);  
+//   ierr = vMask.end_access(); CHKERRQ(ierr);
+  ierr = vWork3d.end_access(); CHKERRQ(ierr);
+
+  delete [] Enthrev;
+
+  return 0;
+}

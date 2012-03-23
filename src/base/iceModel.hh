@@ -356,6 +356,7 @@ protected:
   virtual PetscErrorCode enthalpyAndDrainageStep(
                 PetscScalar* vertSacrCount, PetscScalar* liquifiedVol,
                 PetscScalar* bulgeCount);
+  virtual PetscErrorCode fill_tempenth_front();
 
   // see iMgeometry.cc
   virtual PetscErrorCode updateSurfaceElevationAndMask();
