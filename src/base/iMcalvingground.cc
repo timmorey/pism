@@ -129,7 +129,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
       bool at_ocean_front_n = ( vH(i,j+1) == 0.0 && ((vbed(i,j+1) + sea_level) < 0 && vHrefGround(i,j+1) == 0.0) );
       bool at_ocean_front_s = ( vH(i,j-1) == 0.0 && ((vbed(i,j-1) + sea_level) < 0 && vHrefGround(i,j-1) == 0.0) );
       bool at_ocean_front   = at_ocean_front_e || at_ocean_front_w || at_ocean_front_n || at_ocean_front_s;
-      bool justBecomeFull = vTestVar(i,j) == 1.;
+
 //       vTestVar(i,j) = 0.0;
 
                                
@@ -198,10 +198,10 @@ PetscErrorCode IceModel::groundedEigenCalving() {
         } else {
         PetscInt N = 0;
         // count grounded neighbours
-        if ( grounded_e ) N++;
-        if ( grounded_w ) N++;
-        if ( grounded_n ) N++;
-        if ( grounded_s ) N++;
+        if ( grounded_e && vTestVar(i+1,j) != 1. ) N++;
+        if ( grounded_w && vTestVar(i-1,j) != 1. ) N++;
+        if ( grounded_n && vTestVar(i,j+1) != 1. ) N++;
+        if ( grounded_s && vTestVar(i,j-1) != 1. ) N++;
 //         vTestVar(i,j) = N;
         // kill partial cell and save for redistribution to grounded neighbours
         // isolated (N==0) PGG cell at ocean front is killed without redistribution.
@@ -226,7 +226,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
       bool grounded_ice   = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
       bool below_sealevel = (vbed(i,j) + sea_level) < 0;
       // if grounded and DiffCalv in a neighbouring cell
-      if ( grounded_ice && below_sealevel &&
+      if ( grounded_ice && below_sealevel && vTestVar(i,j) != 1. &&
            (vDiffCalvHeight(i + 1, j) > 0.0 || vDiffCalvHeight(i - 1, j) > 0.0 ||
             vDiffCalvHeight(i, j + 1) > 0.0 || vDiffCalvHeight(i, j - 1) > 0.0 )) {
 
@@ -348,7 +348,6 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         // volume_partgrid = Href * dx*dy
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
-        if (vHavgGround(i,j) == 0.0) vTestVar(i,j) = 1.0;
         dHref = dHref * vHavgGround(i,j) * ocean_melt_factor * dt/secpera;
         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
@@ -357,10 +356,10 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         } else {
         PetscInt N = 0;
         // count grounded neighbours
-        if ( grounded_e ) N++;
-        if ( grounded_w ) N++;
-        if ( grounded_n ) N++;
-        if ( grounded_s ) N++;
+        if ( grounded_e && vTestVar(i+1,j) != 1. ) N++;
+        if ( grounded_w && vTestVar(i-1,j) != 1. ) N++;
+        if ( grounded_n && vTestVar(i,j+1) != 1. ) N++;
+        if ( grounded_s && vTestVar(i,j-1) != 1. ) N++;
 //         vTestVar(i,j) = N;
         // kill partial cell and save for redistribution to grounded neighbours
         // isolated (N==0) PGG cell at ocean front is killed without redistribution.
@@ -385,7 +384,7 @@ PetscErrorCode IceModel::groundedCalvingConst() {
       bool grounded_ice = vH(i,j) > 0.0 && vbed(i,j) > (sea_level - rhofrac*vH(i,j));
       bool below_sealevel   = (vbed(i,j) + sea_level) < 0;
       // if grounded and DiffCalv in a neighbouring cell
-      if ( grounded_ice && below_sealevel &&
+      if ( grounded_ice && below_sealevel && vTestVar(i,j) != 1. &&
            (vDiffCalvHeight(i + 1, j) > 0.0 || vDiffCalvHeight(i - 1, j) > 0.0 ||
             vDiffCalvHeight(i, j + 1) > 0.0 || vDiffCalvHeight(i, j - 1) > 0.0 )) {
 
