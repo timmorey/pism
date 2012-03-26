@@ -109,7 +109,7 @@ PetscErrorCode IceModel::energyStep() {
     snprintf(tempstr,50, " BULGE=%d ", static_cast<int>(ceil(gBulgeCount)) );
     stdout_flags = tempstr + stdout_flags;
   }
-
+  PetscSynchronizedPrintf(grid.com,"energy timestep done\n");
   return 0;
 }
 

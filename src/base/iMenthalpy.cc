@@ -594,8 +594,10 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
   if( do_part_grid_ground ){
     ierr = fill_tempenth_front(); CHKERRQ(ierr);
   }
+  PetscSynchronizedPrintf(grid.com,"fill_tempenth done\n");
   
   *liquifiedVol = ((double) liquifiedCount) * fdz * grid.dx * grid.dy;
+  PetscSynchronizedPrintf(grid.com,"liquified done\n");
   return 0;
 }
 
@@ -635,6 +637,8 @@ PetscErrorCode IceModel::fill_tempenth_front() {
           const PetscInt kste = static_cast<PetscInt>(floor(vH(i+fromedge,j)/fdz));
           const PetscInt kstw = static_cast<PetscInt>(floor(vH(i-fromedge,j)/fdz));
 
+          PetscSynchronizedPrintf(grid.com,"kstn=%d,ksts=%d,kste=%d,kstw=%d at i=%d, j=%d\n",kstn,ksts,kste,kstw,i,j);
+          
           PetscInt kst=max(kstn,ksts);
           kst=max(kst,kste);
           kst=max(kst,kstw);
@@ -645,6 +649,7 @@ PetscErrorCode IceModel::fill_tempenth_front() {
           //const PetscInt kst = static_cast<PetscInt>(floor(vH(i,j-fromedge)/fdz));
           //PetscScalar *Enthrev;
           if (kst>0){
+            PetscSynchronizedPrintf(grid.com,"getValColumn at i=%d, j=%d\n",i,j);
             if (kst==kstn) {
               ierr = Enth3.getValColumn(i,j+fromedge,kst,Enthrev); CHKERRQ(ierr);}
             else if (kst==ksts) {
@@ -655,7 +660,8 @@ PetscErrorCode IceModel::fill_tempenth_front() {
               ierr = Enth3.getValColumn(i-fromedge,j,kst,Enthrev); CHKERRQ(ierr);}
 
             //ierr = Enth3.getInternalColumn(i,j-5,&Enthrev); CHKERRQ(ierr);
-
+            PetscSynchronizedPrintf(grid.com,"Enthrev=%f at i=%f, j=%d\n",Enthrev,i,j);
+            
             ierr = vWork3d.setValColumnPL(i,j,Enthrev); CHKERRQ(ierr);
             //for (PetscInt k=0; k<kst; ++k) {
               //ierr = verbPrintf(4, grid.com, "!!!!!!x set enth3 to %.1f at %d, %d, %d \n",Enthrev[k],i,j,k);
@@ -665,15 +671,20 @@ PetscErrorCode IceModel::fill_tempenth_front() {
       }
     }
   }
-
+  PetscSynchronizedPrintf(grid.com,"loop done\n");
 
   ierr = Enth3.end_access(); CHKERRQ(ierr);
+    PetscSynchronizedPrintf(grid.com,"Enth3 ended\n");
   ierr = vH.end_access(); CHKERRQ(ierr);
-  ierr = vTestVar.end_access(); CHKERRQ(ierr);  
+    PetscSynchronizedPrintf(grid.com,"vH ended done\n");
+  ierr = vTestVar.end_access(); CHKERRQ(ierr);
+    PetscSynchronizedPrintf(grid.com,"TestVar ended done\n");
 //   ierr = vMask.end_access(); CHKERRQ(ierr);
   ierr = vWork3d.end_access(); CHKERRQ(ierr);
+    PetscSynchronizedPrintf(grid.com,"Work3d ended done\n");
 
   delete [] Enthrev;
+    PetscSynchronizedPrintf(grid.com,"Enthrev deleted.\n");
 
   return 0;
 }
