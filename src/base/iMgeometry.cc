@@ -238,9 +238,6 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = vMask.begin_access();  CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
   ierr = vh.begin_access(); CHKERRQ(ierr);
-  ierr = vTestVar.begin_access(); CHKERRQ(ierr);
-  ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
-  ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access();  CHKERRQ(ierr);
 
   // related to PIK part_grid mechanism; see Albrecht et al 2011
@@ -257,13 +254,13 @@ PetscErrorCode IceModel::massContExplicitStep() {
   }
 
   // related to PIK part_grid mechanism at grounded margins; matthias.mengel@pik
-  const bool do_part_grid_ground = config.get_flag("part_grid_ground"),
-    do_redist_ground = config.get_flag("part_redist_ground");
+  const bool do_part_grid_ground = config.get_flag("part_grid_ground");
 
   if (do_part_grid_ground) {
     ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
-//     ierr = vTestVar.begin_access(); CHKERRQ(ierr);
-    ierr = vNoPartGridNeighbour.begin_access(); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.begin_access(); CHKERRQ(ierr);
+    ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
+    ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
   }
     
   const bool dirichlet_bc = config.get_flag("dirichlet_bc");
@@ -278,25 +275,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
   }
 
   MaskQuery mask(vMask);
-  
-  if (do_part_grid_ground) {
-    for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
-      for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
-        vNoPartGridNeighbour(i,j) = 0;
-        // check that there are no partially filled neighbours.
-        if( vHrefGround(i+1,j)==0 && vHrefGround(i-1,j)==0 && vHrefGround(i,j+1)==0 && vHrefGround(i,j-1)==0 ){
-          vNoPartGridNeighbour(i,j) = 1;
-        }
-      }
-    }
-  ierr = vNoPartGridNeighbour.beginGhostComm(vNoPartGridNeighbour); CHKERRQ(ierr);
-  ierr = vNoPartGridNeighbour.endGhostComm(vNoPartGridNeighbour); CHKERRQ(ierr);
-  }
     
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
 
-//       if (do_part_grid_ground) { vNoPartGridNeighbour(i,j) = 0.0; }
       PetscScalar divQ = 0.0;
       planeStar<PetscScalar> Q;
       planeStar<PetscScalar> Qssa;
@@ -395,7 +377,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHnew(i,j) = vHrefGround(i,j) + (acab(i, j) - S - divQ)*dt;
           PetscSynchronizedPrintf(grid.com,"make HrefG=%e a Hnew+MB=%e at i=%d, j=%d\n",vHrefGround(i,j),vHnew(i, j),i,j);
           vHrefGround(i,j) = 0.0;
-          vTestVar(i,j) = 1.;
+          vJustGotFullCell(i,j) = 1.;
         } else{
           // no surface mass balance here
           vHrefGround(i,j) -= divQ * dt;
@@ -411,12 +393,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHrefThresh(i,j) = 0.0;
         }
 
-//         if ( do_part_grid_ground && mask.grounded_ice_margin(i, j) ){
-//           // HavgGround is needed for grounded eigencalving in these cells.
-//           vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
-//         }
-        
-        vTestVar(i,j) = 0.;
+        vJustGotFullCell(i,j) = 0.;
       } else {
         // last possibility: ice-free, not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;
@@ -468,9 +445,6 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vh.end_access(); CHKERRQ(ierr);
-  ierr = vTestVar.end_access(); CHKERRQ(ierr);
-  ierr = vHavgGround.end_access(); CHKERRQ(ierr);
-  ierr = vHrefThresh.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access();  CHKERRQ(ierr);
 
   if (do_part_grid) {
@@ -482,8 +456,9 @@ PetscErrorCode IceModel::massContExplicitStep() {
   
   if (do_part_grid_ground) {
     ierr = vHrefGround.end_access(); CHKERRQ(ierr);
-//     ierr = vTestVar.end_access(); CHKERRQ(ierr);
-    ierr = vNoPartGridNeighbour.end_access(); CHKERRQ(ierr);
+    ierr = vHavgGround.end_access(); CHKERRQ(ierr);
+    ierr = vHrefThresh.end_access(); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.end_access(); CHKERRQ(ierr);
   } 
 
   if (dirichlet_bc) {

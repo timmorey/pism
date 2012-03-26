@@ -597,7 +597,6 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
   }
   
   *liquifiedVol = ((double) liquifiedCount) * fdz * grid.dx * grid.dy;
-  PetscSynchronizedPrintf(grid.com,"liquified done\n");
   return 0;
 }
 
@@ -630,7 +629,7 @@ PetscErrorCode IceModel::fill_tempenth_front() {
 
   ierr = Enth3.begin_access(); CHKERRQ(ierr);
   ierr = vH.begin_access(); CHKERRQ(ierr);
-  ierr = vTestVar.begin_access(); CHKERRQ(ierr);
+  ierr = vJustGotFullCell.begin_access(); CHKERRQ(ierr);
   ierr = vWork3d.begin_access(); CHKERRQ(ierr);
 
   MaskQuery mask(vMask);
@@ -639,7 +638,7 @@ PetscErrorCode IceModel::fill_tempenth_front() {
     for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
 
       // if ice box was just added to computational domain
-      if ( vTestVar(i,j) == 1.0 ) {
+      if ( vJustGotFullCell(i,j) == 1.0 ) {
         bool grounded_e = vH(i+1,j)>0.0 && vbed(i+1,j)>(sea_level-rhofrac*vH(i+1,j)) && (vbed(i+1,j)+sea_level)<0;
         bool grounded_w = vH(i-1,j)>0.0 && vbed(i-1,j)>(sea_level-rhofrac*vH(i-1,j)) && (vbed(i-1,j)+sea_level)<0;
         bool grounded_n = vH(i,j+1)>0.0 && vbed(i,j+1)>(sea_level-rhofrac*vH(i,j+1)) && (vbed(i,j+1)+sea_level)<0;
@@ -685,19 +684,13 @@ PetscErrorCode IceModel::fill_tempenth_front() {
       }
     }
   }
-  PetscSynchronizedPrintf(grid.com,"loop done\n");
 
   ierr = Enth3.end_access(); CHKERRQ(ierr);
-    PetscSynchronizedPrintf(grid.com,"Enth3 ended\n");
   ierr = vH.end_access(); CHKERRQ(ierr);
-    PetscSynchronizedPrintf(grid.com,"vH ended done\n");
-  ierr = vTestVar.end_access(); CHKERRQ(ierr);
-    PetscSynchronizedPrintf(grid.com,"TestVar ended done\n");
+  ierr = vJustGotFullCell.end_access(); CHKERRQ(ierr);
   ierr = vWork3d.end_access(); CHKERRQ(ierr);
-    PetscSynchronizedPrintf(grid.com,"Work3d ended done\n");
 
   delete [] Enthrev;
-    PetscSynchronizedPrintf(grid.com,"Enthrev deleted.\n");
 
   return 0;
 }
