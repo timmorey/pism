@@ -593,6 +593,7 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
   delete [] Enthnew;
 
   if( do_part_grid_ground && do_fill_tempenth_front){
+//     ierr = PetscSynchronizedPrintf(grid.com, "######### both do\n");
     ierr = fill_tempenth_front(); CHKERRQ(ierr);
   }
   
@@ -605,7 +606,7 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
 PetscErrorCode IceModel::fill_tempenth_front() {
   PetscErrorCode ierr;
 
-  ierr = verbPrintf(4, grid.com, "######### fill_tempenth_front() start \n");
+//   ierr = PetscSynchronizedPrintf(grid.com, "######### fill_tempenth_front() start \n");
 
     double ocean_rho = config.get("sea_water_density");
   double ice_rho   = config.get("ice_density");
@@ -647,9 +648,9 @@ PetscErrorCode IceModel::fill_tempenth_front() {
         const PetscInt ks = static_cast<PetscInt>(floor(vH(i,j)/fdz));
         
         ierr = Enth3.getValColumn(i,j,ks,EnthrevE); CHKERRQ(ierr);
-//         for (PetscInt k=0; k < ks; k++) {
-//           PetscSynchronizedPrintf(grid.com,"Enthrev before=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
-//         }     
+        for (PetscInt k=0; k < ks; k++) {
+          PetscSynchronizedPrintf(grid.com,"Enthrev before=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
+        }
         for (PetscInt k=0; k < ks; k++) {
           Enthrev[k] = 0;
           EnthrevE[k] = 0; EnthrevW[k] = 0; EnthrevN[k] = 0; EnthrevS[k] = 0;
@@ -676,9 +677,9 @@ PetscErrorCode IceModel::fill_tempenth_front() {
             Enthrev[k] = (EnthrevE[k] + EnthrevW[k] + EnthrevN[k] + EnthrevS[k]) / N;
           }
         }
-//         for (PetscInt k=0; k < ks; k++) {
-//           PetscSynchronizedPrintf(grid.com,"Enthrev=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
-//         }
+        for (PetscInt k=0; k < ks; k++) {
+          PetscSynchronizedPrintf(grid.com,"Enthrev after=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
+        }
         ierr = vWork3d.setValColumnPL(i,j,Enthrev); CHKERRQ(ierr);
 
       }
