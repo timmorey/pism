@@ -676,11 +676,12 @@ PetscErrorCode IceModel::fill_tempenth_front() {
           for (PetscInt k=0; k < ks; k++) {
             Enthrev[k] = (EnthrevE[k] + EnthrevW[k] + EnthrevN[k] + EnthrevS[k]) / N;
           }
+          ierr = vWork3d.setValColumnPL(i,j,Enthrev); CHKERRQ(ierr);
         }
+        
         for (PetscInt k=0; k < ks; k++) {
           PetscSynchronizedPrintf(grid.com,"Enthrev after=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
         }
-        ierr = vWork3d.setValColumnPL(i,j,Enthrev); CHKERRQ(ierr);
 
       }
     }
