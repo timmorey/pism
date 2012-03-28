@@ -232,11 +232,8 @@ protected:
         vHrefGround,    //!< accumulated mass advected to a partially filled grid cell at grounded margins
         vHrefThresh,    //!< Threshold height from calving to avoid oscillations.
         vHavgGround,    //!< height attributed to grounded partial cell from neighbouring ice thicknesses.        
-        vHresidualGround,     //!< residual ice mass of a not any longer partially (fully) filled at grounded margins
-        vTestVar,       //!< just a variable to save things for writing to netcdf.
-        vGroundCalvHeight, //!< Calve this off from grounded cell from ocean melt.
+        vJustGotFullCell, //!< saving if a partial grounded cell got full in last timestep.
         vDiffCalvHeight, //!< Calving height to be redistributed to neighbours.
-        vNoPartGridNeighbour,       //!< just a variable to save things for writing to netcdf.
         vPrinStrain1,   //!< major principal component of horizontal strain-rate tensor
         vPrinStrain2,   //!< minor principal component of horizontal strain-rate tensor
 
@@ -328,7 +325,6 @@ protected:
   virtual PetscErrorCode groundedCalving();
   virtual PetscErrorCode groundedEigenCalving();
   virtual PetscErrorCode groundedCalvingConst();
-  virtual PetscErrorCode groundedCalvingOld();
 
   // see iMenergy.cc
   virtual PetscErrorCode energyStep();
@@ -356,6 +352,7 @@ protected:
   virtual PetscErrorCode enthalpyAndDrainageStep(
                 PetscScalar* vertSacrCount, PetscScalar* liquifiedVol,
                 PetscScalar* bulgeCount);
+  virtual PetscErrorCode fill_tempenth_front();
 
   // see iMgeometry.cc
   virtual PetscErrorCode updateSurfaceElevationAndMask();

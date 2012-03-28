@@ -263,6 +263,9 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
                       PetscScalar* bulgeCount) {
   PetscErrorCode  ierr;
 
+  const bool do_part_grid_ground    = config.get_flag("part_grid_ground");
+  const bool do_fill_tempenth_front = config.get_flag("fill_tempenth_front");
+  
   if (config.get_flag("do_cold_ice_methods")) {
     SETERRQ(1,
       "PISM ERROR:  enthalpyAndDrainageStep() called but do_cold_ice_methods==true\n");
@@ -589,7 +592,107 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
 
   delete [] Enthnew;
 
+  if( do_part_grid_ground && do_fill_tempenth_front){
+//     ierr = PetscSynchronizedPrintf(grid.com, "######### both do\n");
+    ierr = fill_tempenth_front(); CHKERRQ(ierr);
+  }
+  
   *liquifiedVol = ((double) liquifiedCount) * fdz * grid.dx * grid.dy;
   return 0;
 }
 
+// Fill partgrid cells with Enth3 and temperature T3
+
+PetscErrorCode IceModel::fill_tempenth_front() {
+  PetscErrorCode ierr;
+
+//   ierr = PetscSynchronizedPrintf(grid.com, "######### fill_tempenth_front() start \n");
+
+    double ocean_rho = config.get("sea_water_density");
+  double ice_rho   = config.get("ice_density");
+  double rhofrac   = ice_rho/ocean_rho;
+  PetscReal sea_level = 0;
+  if (ocean != NULL) {
+    ierr = ocean->sea_level_elevation(sea_level); CHKERRQ(ierr);
+  } else { SETERRQ(2, "PISM ERROR: ocean == NULL"); }
+  
+  PetscInt        Mz=grid.Mz, Mx=grid.Mx, My=grid.My;
+  PetscInt    fMz = grid.Mz_fine;
+  PetscScalar fdz = grid.dz_fine;
+
+
+  PetscScalar *Enthrev, *EnthrevE, *EnthrevW, *EnthrevN, *EnthrevS;
+  Enthrev     = new PetscScalar[fMz];
+  EnthrevE    = new PetscScalar[fMz];
+  EnthrevW    = new PetscScalar[fMz];
+  EnthrevN    = new PetscScalar[fMz];
+  EnthrevS    = new PetscScalar[fMz];
+
+  ierr = Enth3.begin_access(); CHKERRQ(ierr);
+  ierr = vH.begin_access(); CHKERRQ(ierr);
+  ierr = vJustGotFullCell.begin_access(); CHKERRQ(ierr);
+  ierr = vWork3d.begin_access(); CHKERRQ(ierr);
+
+  MaskQuery mask(vMask);
+
+  for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
+    for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
+
+      // if ice box was just added to computational domain
+      if ( vJustGotFullCell(i,j) == 1.0 ) {
+        bool grounded_e = vH(i+1,j)>0.0 && vbed(i+1,j)>(sea_level-rhofrac*vH(i+1,j)) && (vbed(i+1,j)+sea_level)<0;
+        bool grounded_w = vH(i-1,j)>0.0 && vbed(i-1,j)>(sea_level-rhofrac*vH(i-1,j)) && (vbed(i-1,j)+sea_level)<0;
+        bool grounded_n = vH(i,j+1)>0.0 && vbed(i,j+1)>(sea_level-rhofrac*vH(i,j+1)) && (vbed(i,j+1)+sea_level)<0;
+        bool grounded_s = vH(i,j-1)>0.0 && vbed(i,j-1)>(sea_level-rhofrac*vH(i,j-1)) && (vbed(i,j-1)+sea_level)<0;
+        
+        const PetscInt ks = static_cast<PetscInt>(floor(vH(i,j)/fdz));
+        
+        ierr = Enth3.getValColumn(i,j,ks,EnthrevE); CHKERRQ(ierr);
+        for (PetscInt k=0; k < ks; k++) {
+          PetscSynchronizedPrintf(grid.com,"Enthrev before=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
+        }
+        for (PetscInt k=0; k < ks; k++) {
+          Enthrev[k] = 0;
+          EnthrevE[k] = 0; EnthrevW[k] = 0; EnthrevN[k] = 0; EnthrevS[k] = 0;
+        }
+
+        PetscInt N = 0;
+        
+        if ( grounded_e ){     
+          ierr = Enth3.getValColumn(i+1,j,ks,EnthrevE); CHKERRQ(ierr); N++;
+        }
+        if ( grounded_w ){
+          ierr = Enth3.getValColumn(i-1,j,ks,EnthrevW); CHKERRQ(ierr); N++;
+        }          
+        if ( grounded_n ){
+          ierr = Enth3.getValColumn(i,j+1,ks,EnthrevW); CHKERRQ(ierr); N++;
+        }
+        if ( grounded_s ){
+          ierr = Enth3.getValColumn(i,j-1,ks,EnthrevW); CHKERRQ(ierr); N++;
+        }
+
+        // only modify if neighbour around
+        if (N>0){
+          for (PetscInt k=0; k < ks; k++) {
+            Enthrev[k] = (EnthrevE[k] + EnthrevW[k] + EnthrevN[k] + EnthrevS[k]) / N;
+          }
+          ierr = vWork3d.setValColumnPL(i,j,Enthrev); CHKERRQ(ierr);
+        }
+        
+        for (PetscInt k=0; k < ks; k++) {
+          PetscSynchronizedPrintf(grid.com,"Enthrev after=%e at k=%d, i=%d, j=%d\n",Enthrev[k],k,i,j);
+        }
+
+      }
+    }
+  }
+
+  ierr = Enth3.end_access(); CHKERRQ(ierr);
+  ierr = vH.end_access(); CHKERRQ(ierr);
+  ierr = vJustGotFullCell.end_access(); CHKERRQ(ierr);
+  ierr = vWork3d.end_access(); CHKERRQ(ierr);
+
+  delete [] Enthrev;
+
+  return 0;
+}

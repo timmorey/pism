@@ -352,9 +352,9 @@ PetscErrorCode IceModel::createVecs() {
 
   
    // just for testing
-    ierr = vTestVar.create(grid, "TestVar", true); CHKERRQ(ierr);
-    ierr = vTestVar.set_attrs("diagnostic", "test variable to write any stuff to netcdf", "", ""); CHKERRQ(ierr);
-    ierr = variables.add(vTestVar); CHKERRQ(ierr);
+//     ierr = vTestVar.create(grid, "TestVar", true); CHKERRQ(ierr);
+//     ierr = vTestVar.set_attrs("diagnostic", "test variable to write any stuff to netcdf", "", ""); CHKERRQ(ierr);
+//     ierr = variables.add(vTestVar); CHKERRQ(ierr);
   if (config.get_flag("part_grid_ground") == true) {
     // Href
     ierr = vHrefGround.create(grid, "HrefGround", true); CHKERRQ(ierr);
@@ -366,22 +366,13 @@ PetscErrorCode IceModel::createVecs() {
     ierr = vHrefThresh.create(grid, "HrefThresh", true); CHKERRQ(ierr);
     ierr = vHrefThresh.set_attrs("model_state", "threshold ice thickness 5pct over calving height to avoid oscillations", "m", ""); CHKERRQ(ierr);
     ierr = variables.add(vHrefThresh); CHKERRQ(ierr);
-    ierr = vGroundCalvHeight.create(grid, "GroundCalvHeight", true); CHKERRQ(ierr);
-    ierr = vGroundCalvHeight.set_attrs("diagnostic", "test variable to write any stuff to netcdf", "", ""); CHKERRQ(ierr);
-    ierr = variables.add(vGroundCalvHeight); CHKERRQ(ierr);
-    ierr = vNoPartGridNeighbour.create(grid, "NoPartGridNeighbour", true); CHKERRQ(ierr);
-    ierr = vNoPartGridNeighbour.set_attrs("diagnostic", "this box has no neighbour that is partially filled", "", ""); CHKERRQ(ierr);
-    ierr = variables.add(vNoPartGridNeighbour); CHKERRQ(ierr);
     ierr = vDiffCalvHeight.create(grid, "DiffCalvHeight", true); CHKERRQ(ierr);
     ierr = vDiffCalvHeight.set_attrs("diagnostic", "ice mass in height redistributed to grounded neighbours", "", ""); CHKERRQ(ierr);
     ierr = variables.add(vDiffCalvHeight); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.create(grid, "JustGotFullCell", true); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.set_attrs("diagnostic", "this got a full cell from part grid ground in last timestep", "", ""); CHKERRQ(ierr);
+    ierr = variables.add(vJustGotFullCell); CHKERRQ(ierr);
 
-    if (config.get_flag("part_redist_ground") == true){
-      // Hav
-      ierr = vHresidualGround.create(grid, "HresidualGround", true); CHKERRQ(ierr);
-      ierr = vHresidualGround.set_attrs("diagnostic", "residual ice thickness in recently filled boundary grid cell at grounded margins", "m", ""); CHKERRQ(ierr);
-      ierr = variables.add(vHresidualGround); CHKERRQ(ierr);
-    }
   } 
   
 

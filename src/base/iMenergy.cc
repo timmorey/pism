@@ -109,7 +109,6 @@ PetscErrorCode IceModel::energyStep() {
     snprintf(tempstr,50, " BULGE=%d ", static_cast<int>(ceil(gBulgeCount)) );
     stdout_flags = tempstr + stdout_flags;
   }
-
   return 0;
 }
 
