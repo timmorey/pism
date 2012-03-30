@@ -393,7 +393,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHrefThresh(i,j) = 0.0;
         }
 
-        vJustGotFullCell(i,j) = 0.;
+        if ( do_part_grid_ground ) vJustGotFullCell(i,j) = 0.;
       } else {
         // last possibility: ice-free, not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;
