@@ -14,7 +14,7 @@ else
 fi
 
 NN=2  # default number of processors
-if [ $# -gt 0 ] ; then  # if user says "psg_flowline.sh 8" then NN = 8
+if [ $# -gt 0 ] ; then  # if user says "psg_3d.sh 8" then NN = 8
   NN="$1"
 fi
 
@@ -58,7 +58,7 @@ echo
 PCONFIG=psg_config.nc
 
 # cat prefix and exec together
-PISM="${PISM_PREFIX}${PISM_EXEC} -cts -config_override $PCONFIG"
+PISM="${PISM_PREFIX}${PISM_EXEC} -config_override $PCONFIG"
 
 
 DATANAME=storglaciaren_3d.nc
@@ -67,10 +67,15 @@ INNAME=$PISM_DATANAME
 
 COUPLER="-surface constant" # FIXME  should be using PSElevation as in flowline example
 
-# 40 m grid
-GRID="-Mx 94 -My 51 -Mz 151 -Mbz 1 -Lz 300 -z_spacing equal"
-GS=40
+# 100 m grid
+GRID="-Mx 38 -My 21 -Mz 51 -Mbz 1 -Lz 300 -z_spacing equal"
+GS=100
 SKIP=200
+
+# 50 m grid
+#GRID="-Mx 75 -My 41 -Mz 51 -Mbz 1 -Lz 300 -z_spacing equal"
+#GS=50
+#SKIP=200
 
 # 20 m grid
 #GRID="-Mx 186 -My 101 -Mz 301 -Mbz 1 -Lz 300 -z_spacing equal"
@@ -82,23 +87,31 @@ SKIP=200
 #GS=10
 #SKIP=500
 
+COUPLER_ELEV="-surface elevation -artm -6,0,1395,1400 -acab -3,2.5.,1200,1450,1615 -acab_limits -3,0"
+
+
 # bootstrap and do smoothing run
 OUTNAME=psg_3d_${GS}m_pre1.nc
 echo
 echo "$SCRIPTNAME  bootstrapping plus short smoothing run for 1 a"
-cmd="$PISM_MPIDO $NN $PISM -skip $SKIP -boot_file $INNAME $GRID \
+cmd="$PISM_MPIDO $NN $PISM -e 0.3 -skip $SKIP -boot_file $INNAME $GRID \
   $COUPLER -y 1 -o $OUTNAME"
 $PISM_DO $cmd
 
-# FIXME:  reasonable to run SIA somewhat longer to equilibrium to establish stable thermodynamical state before any attempt to invert surface velocities; this is the start of it
-# FIXME:  also reasonable to use hybrid model with ad hoc specification of basal yield stress
 INNAME=$OUTNAME
-incSTEADYNAME=inc_psg_3d_${GS}m_Tsteady.nc  # FIXME: missing a field because of bug
-STEADYNAME=psg_3d_${GS}m_Tsteady.nc
+OUTNAME=psg_3d_${GS}m_steady.nc
 echo
 echo "$SCRIPTNAME  running toward thermodynamical steady state"
-cmd="$PISM_MPIDO $NN $PISM -i $INNAME \
-  $COUPLER -y 200 -no_mass -o $incSTEADYNAME"
+cmd="$PISM_MPIDO $NN $PISM -e 0.1 -i $INNAME \
+  $COUPLER -y 200 -no_mass -o $OUTNAME"
+$PISM_DO $cmd
+
+INNAME=$OUTNAME
+OUTNAME=psg_3d_${GS}m_100a.nc
+echo
+echo "$SCRIPTNAME  100 a"
+cmd="$PISM_MPIDO $NN $PISM -skip $SKIP -i $INNAME \
+  $COUPLER -ssa_sliding -plastic_phi 40 -thk_eff -y 100 -o $OUTNAME"
 $PISM_DO $cmd
 
 echo
