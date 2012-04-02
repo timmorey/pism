@@ -243,13 +243,13 @@ protected:
     liqfrac_surface,    //!< ice liquid water fraction at the top surface of the ice
     shelfbtemp,		//!< ice temperature at the shelf base; no ghosts
     shelfbmassflux,	//!< ice mass flux into the ocean at the shelf base; no ghosts
-	cell_area;		//!< cell areas (computed using the WGS84 datum)
+  	cell_area;		//!< cell areas (computed using the WGS84 datum)
 
 	
  
   IceModelVec2Int vMask, //!< \brief mask for flow type with values ice_free_bedrock,
                          //!< grounded_ice, floating_ice, ice_free_ocean
-    ocean_kill_mask,     //!< mask used by the -ocean_kill code 
+    ocean_kill_mask,     //!< mask used by the -ocean_kill code
     vIcebergMask, //!< mask for iceberg identification
 
 	vBCMask; //!< mask to determine Dirichlet boundary locations
@@ -278,6 +278,7 @@ protected:
               nonneg_rule_flux,
               ocean_kill_flux,
               float_kill_flux,
+              eigencalv_flux, thkcalv_flux, eigencalv_ground_flux, thkcalv_ground_flux,
               dvoldt;  //!< d(total ice volume)/dt; m3 s-1
 
   PetscInt    skipCountDown;

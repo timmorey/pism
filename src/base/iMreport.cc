@@ -750,6 +750,28 @@ PetscErrorCode IceModel::compute_by_name(string name, PetscScalar &result) {
     result = float_kill_flux;
   }
 
+  if (name == "eigencalv_flux") {
+    errcode = 0;
+    result = eigencalv_flux;
+  }
+
+  if (name == "eigencalv_ground_flux") {
+    errcode = 0;
+    result = eigencalv_ground_flux;
+  }
+  
+  if (name == "thkcalv_flux") {
+    errcode = 0;
+    result = thkcalv_flux;
+  }
+  
+  if (name == "thkcalv_ground_flux") {
+    errcode = 0;
+    result = thkcalv_ground_flux;
+  }
+
+  
+
   return errcode;
 }
 

@@ -65,6 +65,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
   PetscErrorCode ierr;
   ierr = verbPrintf(4, grid.com, "######### groundedEigenCalving() start \n");    CHKERRQ(ierr);
 
+  PetscScalar my_eigencalv_ground_flux = 0.0;
   bool eigcalv_ground_factor_set;
   PetscReal eigcalv_ground_factor;
   ierr = PISMOptionsReal("-eigcalv_ground_factor", "specifies eigen calving factor for grounded margins.", eigcalv_ground_factor,  eigcalv_ground_factor_set); CHKERRQ(ierr);
@@ -189,7 +190,9 @@ PetscErrorCode IceModel::groundedEigenCalving() {
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg    
         dHref = calvrate * dt;
-//         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
+
+        // all further calving originates from dHref, so this line is enough.
+        my_eigencalv_ground_flux -= dHref;
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
           vHrefGround(i,j) -= dHref;
@@ -260,6 +263,13 @@ PetscErrorCode IceModel::groundedEigenCalving() {
   ierr = vPrinStrain2.end_access(); CHKERRQ(ierr);
   ierr = vMask.end_access(); CHKERRQ(ierr);
 
+  ierr = PetscGlobalSum(&my_eigencalv_ground_flux, &eigencalv_ground_flux, grid.com); CHKERRQ(ierr);
+
+  // FIXME: use corrected cell areas (when available)
+  PetscScalar ice_density = config.get("ice_density"),
+  factor = ice_density * (dx * dy) / dt;
+  eigencalv_ground_flux *= factor;
+
   return 0;
 }
 
@@ -270,6 +280,7 @@ PetscErrorCode IceModel::groundedEigenCalving() {
 */
 PetscErrorCode IceModel::groundedCalvingConst() {
   const PetscScalar   dx = grid.dx, dy = grid.dy;
+  PetscScalar my_thkcalv_ground_flux = 0.0;
   PetscErrorCode ierr;
   ierr = verbPrintf(4, grid.com, "######### groundedCalvingConst() start \n");    CHKERRQ(ierr);
 
@@ -342,6 +353,8 @@ PetscErrorCode IceModel::groundedCalvingConst() {
         // area_partgrid   = volume_partgrid/Havg = Href/Havg * dx*dy
         // calv_velocity   = const * d/dt(area_partgrid/dy) = const * dHref/dt * dx/Havg
         dHref = dHref * vHavgGround(i,j) * ocean_melt_factor * dt/secpera;
+        // all further calving originates from dHref, so this line is enough.
+        my_thkcalv_ground_flux -= dHref;        
         ierr = verbPrintf(2, grid.com,"dHref=%e at i=%d, j=%d\n",dHref,i,j); CHKERRQ(ierr);
         if( vHrefGround(i,j) > dHref ){
           // enough ice to calv from partial cell
@@ -409,6 +422,12 @@ PetscErrorCode IceModel::groundedCalvingConst() {
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
   ierr = vJustGotFullCell.end_access(); CHKERRQ(ierr);
+
+  ierr = PetscGlobalSum(&my_thkcalv_ground_flux, &thkcalv_ground_flux, grid.com); CHKERRQ(ierr);
+  // FIXME: use corrected cell areas (when available)
+  PetscScalar ice_density = config.get("ice_density"),
+  factor = ice_density * (dx * dy) / dt;
+  thkcalv_ground_flux *= factor;
   
   return 0;
 }

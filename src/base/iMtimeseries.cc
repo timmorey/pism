@@ -426,6 +426,58 @@ PetscErrorCode IceModel::create_timeseries() {
     timeseries.push_back(ts);
   }
 
+  if (find(ts_vars.begin(), ts_vars.end(), "eigencalv_flux") != ts_vars.end()) {
+    DiagnosticTimeseries *ts = new DiagnosticTimeseries(&grid, "eigencalv_flux", "t");
+
+    ts->set_units("kg s-1", "");
+    ts->set_dimension_units(time_units, "");
+    ts->output_filename = ts_filename;
+
+    ts->set_attr("long_name", "total over ice domain of ice mass gain by calving by application of -eigencalv mechanism");
+    ts->set_attr("comment", "positive means ice gain");
+
+    timeseries.push_back(ts);
+  }  
+
+  if (find(ts_vars.begin(), ts_vars.end(), "thkcalv_flux") != ts_vars.end()) {
+    DiagnosticTimeseries *ts = new DiagnosticTimeseries(&grid, "thkcalv_flux", "t");
+
+    ts->set_units("kg s-1", "");
+    ts->set_dimension_units(time_units, "");
+    ts->output_filename = ts_filename;
+
+    ts->set_attr("long_name", "total over ice domain of ice mass gain by calving by application of -thkcalv mechanism");
+    ts->set_attr("comment", "positive means ice gain");
+
+    timeseries.push_back(ts);
+  }
+
+  if (find(ts_vars.begin(), ts_vars.end(), "eigencalv_ground_flux") != ts_vars.end()) {
+    DiagnosticTimeseries *ts = new DiagnosticTimeseries(&grid, "eigencalv_ground_flux", "t");
+
+    ts->set_units("kg s-1", "");
+    ts->set_dimension_units(time_units, "");
+    ts->output_filename = ts_filename;
+
+    ts->set_attr("long_name", "total over ice domain of ice mass gain by calving by application of -eigencalv_ground mechanism");
+    ts->set_attr("comment", "positive means ice gain");
+
+    timeseries.push_back(ts);
+  }
+
+  if (find(ts_vars.begin(), ts_vars.end(), "thkcalv_ground_flux") != ts_vars.end()) {
+    DiagnosticTimeseries *ts = new DiagnosticTimeseries(&grid, "thkcalv_ground_flux", "t");
+
+    ts->set_units("kg s-1", "");
+    ts->set_dimension_units(time_units, "");
+    ts->output_filename = ts_filename;
+
+    ts->set_attr("long_name", "total over ice domain of ice mass gain by calving by application of -thkcalv_ground mechanism");
+    ts->set_attr("comment", "positive means ice gain");
+
+    timeseries.push_back(ts);
+  }
+  
   // as noted above, the variables listed in the bad_set may require a user to 
   // very carefully interpret; thus the need to add a warning
   string warning = config.get_string("ts_bad_set_warning"),

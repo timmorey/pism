@@ -40,9 +40,9 @@ PetscErrorCode IceModel::eigenCalving() {
 
   double ocean_rho = config.get("sea_water_density");
   double ice_rho = config.get("ice_density");
-
   const PetscScalar eigenCalvFactor = config.get("eigen_calving");
 
+  PetscScalar my_eigencalv_flux = 0.0;
   PetscReal sea_level = 0;
 
   if (ocean != NULL) {
@@ -163,7 +163,8 @@ PetscErrorCode IceModel::eigenCalving() {
         if (calvrate > 0.0) {
           //PetscScalar Href_old = vHref(i, j);
           //vDiffCalvRate(i, j) = 0.0;
-          vHref(i, j) -= calvrate * dt; // in m
+          vHref(i, j)       -= calvrate * dt; // in m
+          my_eigencalv_flux -= calvrate * dt;
           if(vHref(i, j) < 0.0) { // i.e. partially filled grid cell has completely calved off
             vDiffCalvRate(i, j) =  - vHref(i, j) / dt;// in m/s, means additional ice loss
             vHref(i, j) = 0.0;
@@ -223,6 +224,11 @@ PetscErrorCode IceModel::eigenCalving() {
   ierr = vPrinStrain2.end_access(); CHKERRQ(ierr);
   ierr = vDiffCalvRate.end_access(); CHKERRQ(ierr);
 
+  ierr = PetscGlobalSum(&my_eigencalv_flux, &eigencalv_flux, grid.com); CHKERRQ(ierr);
+  // FIXME: use corrected cell areas (when available)
+  PetscScalar factor = ice_rho * (dx * dy) / dt;
+  eigencalv_flux *= factor;
+
   return 0;
 }
 
@@ -234,7 +240,7 @@ PetscErrorCode IceModel::eigenCalving() {
   Requires -part_grid to be "on".
 */
 PetscErrorCode IceModel::calvingAtThickness() {
-  //const PetscScalar   dx = grid.dx, dy = grid.dy;
+  const PetscScalar   dx = grid.dx, dy = grid.dy;
   PetscErrorCode ierr;
   ierr = verbPrintf(4, grid.com, "######### callvingAtThickness is called \n");    CHKERRQ(ierr);
 
@@ -248,6 +254,8 @@ PetscErrorCode IceModel::calvingAtThickness() {
 
   //ierr = vMask.begin_access(); CHKERRQ(ierr);
   ierr = vbed.begin_access(); CHKERRQ(ierr);
+
+  PetscScalar my_thkcalv_flux = 0.0;
 
   double ocean_rho = config.get("sea_water_density"),
     ice_rho = config.get("ice_density");
@@ -271,6 +279,7 @@ PetscErrorCode IceModel::calvingAtThickness() {
 
 
       if (hereFloating && vH(i, j) <= Hcalving && icefreeOceanNeighbor) {
+        my_thkcalv_flux -= vHnew(i, j);
         vHnew(i, j) = 0.0;
       }
     }
@@ -281,6 +290,12 @@ PetscErrorCode IceModel::calvingAtThickness() {
   ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
   ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
+
+  ierr = PetscGlobalSum(&my_thkcalv_flux, &thkcalv_flux, grid.com); CHKERRQ(ierr);
+  // FIXME: use corrected cell areas (when available)
+  PetscScalar factor = ice_rho * (dx * dy) / dt;
+  thkcalv_flux *= factor;
+  
   return 0;
 }
 
