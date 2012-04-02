@@ -144,16 +144,18 @@ PetscErrorCode IceModel::groundedEigenCalving() {
                                // transition from compressive to extensive flow
                                // regime;
         // Counting adjacent grounded boxes (with distance "offset")
-        PetscInt M = 0;
+        PetscInt M = 0, N = 0;
 
-        if ( at_ocean_front_e ) { Face+= 1.0/dx; }
-        if ( at_ocean_front_w ) { Face+= 1.0/dx; }
-        if ( at_ocean_front_n ) { Face+= 1.0/dy; }
-        if ( at_ocean_front_s ) { Face+= 1.0/dy; }
-
+        // is this a good idea for non quadratic grid handling?
+        if ( at_ocean_front_e ) { Face+= 1.0/dx; N++;}
+        if ( at_ocean_front_w ) { Face+= 1.0/dx; N++;}
+        if ( at_ocean_front_n ) { Face+= 1.0/dy; N++;}
+        if ( at_ocean_front_s ) { Face+= 1.0/dy; N++;}
+        if (N > 0) Face = Face/N;
+        
         // make this less rough if in use for future.
         if ( landeigencalving ) Face = 1.0/dx;
-
+                
         if ( mask.grounded_ice(i + offset, j) && !mask.ice_margin(i + offset, j)){
           eigen1 += vPrinStrain1(i + offset, j);
           eigen2 += vPrinStrain2(i + offset, j);
