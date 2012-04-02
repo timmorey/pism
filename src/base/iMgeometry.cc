@@ -202,7 +202,6 @@ PetscErrorCode IceModel::massContExplicitStep() {
   PetscScalar my_nonneg_rule_flux = 0, my_ocean_kill_flux = 0, my_float_kill_flux = 0;
 
   PetscScalar sea_level = 0;
-  PetscScalar coeff;
 
   const PetscScalar dx = grid.dx, dy = grid.dy;
 
@@ -261,6 +260,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
     ierr = vJustGotFullCell.begin_access(); CHKERRQ(ierr);
     ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
     ierr = vHrefThresh.begin_access(); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.begin_access(); CHKERRQ(ierr);
   }
     
   const bool dirichlet_bc = config.get_flag("dirichlet_bc");
@@ -279,7 +279,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
 
-      PetscScalar divQ = 0.0;
+      PetscScalar coeff = 0.0;
+      PetscScalar divQ  = 0.0;
       planeStar<PetscScalar> Q;
       planeStar<PetscScalar> Qssa;
       
@@ -368,7 +369,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
       } else if ( do_part_grid_ground && mask.next_to_grounded_ice(i, j) ) {
         // calc part grid criterum from surrounding boxes
         vHavgGround(i,j) = get_average_thickness_fg(M, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
-
+        vPartGridCoeff(i,j) = coeff;
+        
         if( vHrefGround(i,j) > PetscMax(vHavgGround(i,j), vHrefThresh(i,j)) ){
           // partial grid cell --> ice filled cell
           if ( vHnew(i, j) != 0 ){
@@ -459,6 +461,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
     ierr = vHavgGround.end_access(); CHKERRQ(ierr);
     ierr = vHrefThresh.end_access(); CHKERRQ(ierr);
     ierr = vJustGotFullCell.end_access(); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.end_access(); CHKERRQ(ierr);
   } 
 
   if (dirichlet_bc) {

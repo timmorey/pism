@@ -140,6 +140,7 @@ PetscErrorCode IceModel::bootstrap_2d(const char *filename) {
     ierr = vHavgGround.set(0.0); CHKERRQ(ierr);
     ierr = vHrefThresh.set(0.0); CHKERRQ(ierr);
     ierr = vJustGotFullCell.set(0.0); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.set(0.0); CHKERRQ(ierr);
   }
 
   if (config.get_flag("kill_icebergs")) {

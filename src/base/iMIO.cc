@@ -372,17 +372,14 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
       ierr = verbPrintf(2, grid.com,
         "PISM WARNING: HrefGround for -part_grid_ground not found in %s. Setting it to zero...\n",
         filename); CHKERRQ(ierr);
-
       ierr = vHrefGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
       ierr = vHrefGround.set(0.0); CHKERRQ(ierr);
-    }
-    
+    }    
     ierr = nc.find_variable("HavgGround", NULL, exists); CHKERRQ(ierr);
     if (!exists) {
       ierr = verbPrintf(2, grid.com,
         "PISM WARNING: HavgGround for -part_grid_ground not found in %s. Setting it to zero...\n",
         filename); CHKERRQ(ierr);
-
       ierr = vHavgGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
       ierr = vHavgGround.set(0.0); CHKERRQ(ierr);
     }
@@ -391,16 +388,22 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
       ierr = verbPrintf(2, grid.com,
         "PISM WARNING: HrefThresh for -part_grid_ground not found in %s. Setting it to zero...\n",
         filename); CHKERRQ(ierr);
-
       ierr = vHrefThresh.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
       ierr = vHrefThresh.set(0.0); CHKERRQ(ierr);
     }
+    ierr = nc.find_variable("PartGridCoeff", NULL, exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: PartGridCoeff for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename); CHKERRQ(ierr);
+      ierr = vPartGridCoeff.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vPartGridCoeff.set(0.0); CHKERRQ(ierr);
+    }    
     ierr = nc.find_variable("JustGotFullCell", NULL, exists); CHKERRQ(ierr);
     if (!exists) {
       ierr = verbPrintf(2, grid.com,
         "PISM WARNING: JustGotFullCell for -part_grid_ground not found in %s. Setting it to zero...\n",
         filename); CHKERRQ(ierr);
-
       ierr = vJustGotFullCell.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
       ierr = vJustGotFullCell.set(0.0); CHKERRQ(ierr);
     }
@@ -491,6 +494,7 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
     ierr = vHrefGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
     ierr = vHavgGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
     ierr = vHrefThresh.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
     ierr = vJustGotFullCell.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
   }
   

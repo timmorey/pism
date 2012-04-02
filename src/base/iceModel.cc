@@ -372,7 +372,9 @@ PetscErrorCode IceModel::createVecs() {
     ierr = vJustGotFullCell.create(grid, "JustGotFullCell", true); CHKERRQ(ierr);
     ierr = vJustGotFullCell.set_attrs("diagnostic", "this got a full cell from part grid ground in last timestep", "", ""); CHKERRQ(ierr);
     ierr = variables.add(vJustGotFullCell); CHKERRQ(ierr);
-
+    ierr = vPartGridCoeff.create(grid, "PartGridCoeff", true); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.set_attrs("diagnostic", "coefficient that determines HavgGround", "", ""); CHKERRQ(ierr);
+    ierr = variables.add(vPartGridCoeff); CHKERRQ(ierr);
   } 
   
 
