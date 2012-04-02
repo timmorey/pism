@@ -36,6 +36,7 @@ PetscErrorCode IceModel::groundedCalving() {
   set<string> GroundCalv_choices;
   GroundCalv_choices.insert("constant");
   GroundCalv_choices.insert("eigen");
+  GroundCalv_choices.insert("eigen_and_const");
   ierr = PISMOptionsList(grid.com,"-grounded_calving", "specifies the grounded calving calculation method",
          GroundCalv_choices, "constant", GroundedCalvingMethod, calvMethod_set); CHKERRQ(ierr);
   if (!calvMethod_set) {
@@ -50,6 +51,10 @@ PetscErrorCode IceModel::groundedCalving() {
   }
   if (GroundedCalvingMethod == "eigen"){
     ierr = groundedEigenCalving(); CHKERRQ(ierr);
+  }
+  if (GroundedCalvingMethod == "eigen_and_const"){
+    ierr = groundedEigenCalving(); CHKERRQ(ierr);
+    ierr = groundedCalvingConst(); CHKERRQ(ierr);    
   }
   
   return 0;
