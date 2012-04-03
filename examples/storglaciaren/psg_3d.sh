@@ -87,31 +87,44 @@ SKIP=200
 #GS=10
 #SKIP=500
 
-COUPLER_ELEV="-surface elevation -artm -6,0,1395,1400 -acab -3,2.5.,1200,1450,1615 -acab_limits -3,0"
+REGRIDVARS="litho_temp,enthalpy,bwat,bmelt,thk"
 
-
-# bootstrap and do smoothing run
-OUTNAME=psg_3d_${GS}m_pre1.nc
+RUNLENGTH=200
+OUTNAME=psg_3d_${GS}m_${RUNLENGTH}a.nc
 echo
 echo "$SCRIPTNAME  bootstrapping plus short smoothing run for 1 a"
-cmd="$PISM_MPIDO $NN $PISM -e 0.3 -skip $SKIP -boot_file $INNAME $GRID \
-  $COUPLER -y 1 -o $OUTNAME"
-$PISM_DO $cmd
-
-INNAME=$OUTNAME
-OUTNAME=psg_3d_${GS}m_steady.nc
-echo
-echo "$SCRIPTNAME  running toward thermodynamical steady state"
-cmd="$PISM_MPIDO $NN $PISM -e 0.1 -i $INNAME \
-  $COUPLER -y 200 -no_mass -o $OUTNAME"
-$PISM_DO $cmd
-
-INNAME=$OUTNAME
-OUTNAME=psg_3d_${GS}m_100a.nc
-echo
-echo "$SCRIPTNAME  100 a"
-cmd="$PISM_MPIDO $NN $PISM -skip $SKIP -i $INNAME \
+cmd="$PISM_MPIDO $NN $PISM -e 0.3 -skip -skip_max $SKIP -boot_file $INNAME $GRID \
   $COUPLER -ssa_sliding -plastic_phi 40 -thk_eff -y 100 -o $OUTNAME"
+$PISM_DO $cmd
+
+
+# 50 m grid
+GRID="-Mx 75 -My 41 -Mz 51 -Mbz 1 -Lz 300 -z_spacing equal"
+GS=50
+SKIP=200
+
+
+INNAME=$OUTNAME
+RUNLENGTH=20
+OUTNAME=psg_3d_${GS}m_${RUNLENGTH}a.nc
+echo
+echo "$SCRIPTNAME  bootstrapping plus short smoothing run for 1 a"
+cmd="$PISM_MPIDO $NN $PISM -e 0.3 -skip -skip_max $SKIP -boot_file $INNAME $GRID \
+  -regrid_file $INNAME -regrid_vars $REGRIDVARS $COUPLER -ssa_sliding -plastic_phi 40 -thk_eff -y 20 -o $OUTNAME"
+$PISM_DO $cmd
+
+# 20 m grid
+GRID="-Mx 186 -My 101 -Mz 101 -Mbz 1 -Lz 300 -z_spacing equal"
+GS=20
+SKIP=500
+
+INNAME=$OUTNAME
+RUNLENGTH=5
+OUTNAME=psg_3d_${GS}m_${RUNLENGTH}a.nc
+echo
+echo "$SCRIPTNAME  bootstrapping plus short smoothing run for 1 a"
+cmd="$PISM_MPIDO $NN $PISM -e 0.3 -skip -skip_max $SKIP -boot_file $INNAME $GRID \
+  -regrid_file $INNAME -regrid_vars $REGRIDVARS $COUPLER -ssa_sliding -plastic_phi 40 -thk_eff -y 20 -o $OUTNAME"
 $PISM_DO $cmd
 
 echo
