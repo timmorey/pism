@@ -97,6 +97,13 @@ PetscErrorCode IceModel::groundedEigenCalving() {
     ierr = ocean->sea_level_elevation(sea_level); CHKERRQ(ierr);
   } else { SETERRQ(2, "PISM ERROR: ocean == NULL"); }
 
+  if (PetscAbs(dx - dy)/PetscMin(dx,dy) > 1e-2) {
+    ierr = PetscPrintf(grid.com,
+      "PISMPIK_ERROR: -eigen_calving using a non-square grid cell does not work (yet);\n"
+                       "  since it has no direction!!!\n, dx = %f, dy = %f, rel. diff = %f",dx,dy,PetscAbs(dx - dy)/PetscMax(dx,dy));
+    PISMEnd();
+  }
+
   MaskQuery mask(vMask);
 
   IceModelVec2S vHnew = vWork2d[0];
@@ -145,13 +152,14 @@ PetscErrorCode IceModel::groundedEigenCalving() {
                                // regime;
         // Counting adjacent grounded boxes (with distance "offset")
         PetscInt M = 0, N = 0;
-
+        
+        Face = 1.0/dx;
         // is this a good idea for non quadratic grid handling?
-        if ( at_ocean_front_e ) { Face+= 1.0/dx; N++;}
-        if ( at_ocean_front_w ) { Face+= 1.0/dx; N++;}
-        if ( at_ocean_front_n ) { Face+= 1.0/dy; N++;}
-        if ( at_ocean_front_s ) { Face+= 1.0/dy; N++;}
-        if (N > 0) Face = Face/N;
+//         if ( at_ocean_front_e ) { Face+= 1.0/dx; N++;}
+//         if ( at_ocean_front_w ) { Face+= 1.0/dx; N++;}
+//         if ( at_ocean_front_n ) { Face+= 1.0/dy; N++;}
+//         if ( at_ocean_front_s ) { Face+= 1.0/dy; N++;}
+//         if (N > 0) Face = Face/N;
         
         // make this less rough if in use for future.
         if ( landeigencalving ) Face = 1.0/dx;
