@@ -254,7 +254,8 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // case" below.
           rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
           rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;
-
+          ierr = verbPrintf(2, grid.com,"ssa rhs u=%e at i=%d, j=%d\n",rhs_uv[i][j].u,i,j); CHKERRQ(ierr);
+          ierr = verbPrintf(2, grid.com,"ssa rhs v=%e at i=%d, j=%d\n",rhs_uv[i][j].v,i,j); CHKERRQ(ierr);
           continue;
         } // end of "if (is_marginal(i, j))"
 
