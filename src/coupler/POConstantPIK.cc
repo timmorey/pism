@@ -45,6 +45,8 @@ PetscErrorCode POConstantPIK::init(PISMVars &vars) {
 
   ice_thickness = dynamic_cast<IceModelVec2S*>(vars.get("land_ice_thickness"));
   if (!ice_thickness) { SETERRQ(1, "ERROR: ice thickness is not available"); }
+  latitude = dynamic_cast<IceModelVec2S*>(vars.get("latitude"));
+  if (!latitude) { SETERRQ(1, "ERROR: ice thickness is not available"); }
 
   return 0;
 }
@@ -98,6 +100,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
 
   PetscReal meltfactor = 5e-3;  
   bool meltfactorSet;
+
   double meltfactor_pik;
   ierr = PISMOptionsReal("-meltfactor_pik",
                            "Uses as a meltfactor as in sub-shelf-melting parameterization of martin_winkelmann11",
@@ -105,10 +108,19 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   if (meltfactorSet) {
     meltfactor = meltfactor_pik; //default is 5e-3 as in martin_winkelmann11 
   }
+  PetscInt    Nparam=2;
+  PetscReal   inarray[2] = {meltfactor, meltfactor};
+  PetscTruth meltLatitutdeDependent_set;
+  ierr = PetscOptionsGetRealArray(PETSC_NULL, "-meltLatitudeDependent", inarray, &Nparam, &meltLatitutdeDependent_set);
+  CHKERRQ(ierr);
+  PetscReal melt_min = inarray[0], melt_max = inarray[1];
+  
 //   ierr = verbPrintf(2, grid.com,"meltfactor=%f\n",meltfactor); CHKERRQ(ierr);
 
-  PetscScalar **H;
+  PetscScalar **H, **lat;
+  PetscScalar oceanheatflux = 0.0;
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
+  ierr = latitude->get_array(lat);   CHKERRQ(ierr);
   ierr = result.begin_access(); CHKERRQ(ierr);
 
 
@@ -121,17 +133,22 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
 
           // compute ocean_heat_flux according to beckmann_goosse03
           // positive, if T_oc > T_ice ==> heat flux FROM ocean TO ice
-    	  PetscScalar oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);  // in W/m^2 //TODO T_ocean -> field!
-
-      	  // shelfbmassflux is positive if ice is freezing on; here it is always negative:
-      	  // same sign as OceanHeatFlux... positive if massflux FROM ice TO ocean
-      	  //result(i,j) = oceanheatflux / (L * rho_ice) * secpera; // m a-1
-      	  result(i,j) = oceanheatflux / (L * rho_ice); // m s-1
+        if(meltLatitutdeDependent_set){
+          // this is hard coded for LeBrocq Antarctica setups with northernmost lat=-50deg
+          meltfactor = (melt_max-melt_min)/(-50.+90.0)*( lat[i][j]+90.0 ) + melt_min;
+        }
+        
+        oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);  // in W/m^2 //TODO T_ocean -> field!
+        // shelfbmassflux is positive if ice is freezing on; here it is always negative:
+        // same sign as OceanHeatFlux... positive if massflux FROM ice TO ocean
+        //result(i,j) = oceanheatflux / (L * rho_ice) * secpera; // m a-1
+        result(i,j) = oceanheatflux / (L * rho_ice); // m s-1
 
       }
     }
 
     ierr = ice_thickness->end_access(); CHKERRQ(ierr);
+    ierr = latitude->end_access(); CHKERRQ(ierr);
     ierr = result.end_access(); CHKERRQ(ierr);
 
   return 0;
