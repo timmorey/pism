@@ -516,7 +516,7 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
        *    (i.e. on left side of SSA eqns).  */
       PetscReal beta = 0.0;
       if (include_basal_shear) {
-        if (M.grounded_ice(M_ij)) {
+        if ( M.grounded_ice(M_ij) && !is_grounded_margin(i,j) ) {
           beta = basal.drag((*tauc)(i,j), vel(i,j).u, vel(i,j).v);
         } else if (M.ice_free_land(M_ij)) {
           // apply drag even in this case, to help with margins; note ice free
@@ -1111,3 +1111,15 @@ bool SSAFD::is_marginal(int i, int j) {
      M.ice_free(M_ne) || M.ice_free(M_se) || M.ice_free(M_nw) || M.ice_free(M_sw));
 }
 
+bool SSAFD::is_grounded_margin(int i, int j) {
+  const PetscInt M_ij = mask->as_int(i,j),
+    // direct neighbors
+    M_e = mask->as_int(i + 1,j),
+    M_w = mask->as_int(i - 1,j),
+    M_n = mask->as_int(i,j + 1),
+    M_s = mask->as_int(i,j - 1);
+
+  Mask M;
+  return (M.grounded_ice(M_ij)) &&
+    (M.ice_free(M_e) || M.ice_free(M_w) || M.ice_free(M_n) || M.ice_free(M_s));
+}

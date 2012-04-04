@@ -76,7 +76,7 @@ protected:
                                                    PetscScalar value);
 
   virtual bool is_marginal(int i, int j);
-
+  virtual bool is_grounded_margin(int i, int j);
   // objects used internally
   IceModelVec2Stag hardness, nuH, nuH_old;
   KSP SSAKSP;
