@@ -367,6 +367,15 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
   const PetscScalar   beta_ice_free_bedrock = config.get("beta_ice_free_bedrock");
   const bool use_cfbc = config.get_flag("calving_front_stress_boundary_condition");
 
+  bool beta_margin_factor_set;
+  PetscReal beta_margin_factor;
+  ierr = PISMOptionsReal("-beta_margin_factor", "specifies the factor we scale tauc at the grounded margins of the ice sheet.", beta_margin_factor,  beta_margin_factor_set); CHKERRQ(ierr);
+  if (!beta_margin_factor_set) {
+    ierr = PetscPrintf(grid.com, "PISM ERROR: Please specify beta_margin_factor.\n");
+    CHKERRQ(ierr);
+    PISMEnd();
+  }
+
   // shortcut:
   IceModelVec2V &vel = velocity;
 
@@ -519,8 +528,9 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
        *    (i.e. on left side of SSA eqns).  */
       PetscReal beta = 0.0;
       if (include_basal_shear) {
-        if ( M.grounded_ice(M_ij) && !is_grounded_margin(i,j) ) {
+        if ( M.grounded_ice(M_ij) ) {
           beta = basal.drag((*tauc)(i,j), vel(i,j).u, vel(i,j).v);
+          if (is_grounded_margin(i,j) && beta_margin_factor_set) beta *= beta_margin_factor;
         } else if (M.ice_free_land(M_ij)) {
           // apply drag even in this case, to help with margins; note ice free
           // areas already have a strength extension
