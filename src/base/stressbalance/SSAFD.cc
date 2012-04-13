@@ -369,13 +369,8 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
   const bool use_cfbc = config.get_flag("calving_front_stress_boundary_condition");
 
   bool beta_margin_factor_set;
-  PetscReal beta_margin_factor;
+  PetscReal beta_margin_factor = 1.0;
   ierr = PISMOptionsReal("-beta_margin_factor", "specifies the factor we scale tauc at the grounded margins of the ice sheet.", beta_margin_factor,  beta_margin_factor_set); CHKERRQ(ierr);
-  if (!beta_margin_factor_set) {
-    ierr = PetscPrintf(grid.com, "PISM ERROR: Please specify beta_margin_factor.\n");
-    CHKERRQ(ierr);
-    PISMEnd();
-  }
 
   // shortcut:
   IceModelVec2V &vel = velocity;
