@@ -220,7 +220,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
             h_ij = (1.0 - ice.rho / ocean_rho) * H_ij;
-            ierr = verbPrintf(2, grid.com,"floating front: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
+//             ierr = verbPrintf(2, grid.com,"floating front: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
           } else {
             if( (*bed)(i,j) >= sea_level) {
               // boundary condition for a "cliff" (grounded ice next to
@@ -229,13 +229,13 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
               // this is not 'zero' because the isotrop.normal stresses
               // (=pressure) from within the ice figures on RHS
 	            h_ij = H_ij;
-              ierr = verbPrintf(2, grid.com,"cliff: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
+//               ierr = verbPrintf(2, grid.com,"cliff: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
             } else {
               // boundary condition for marine terminating glacier
               ocean_pressure = 0.5 * ice.rho * standard_gravity *
                 (H_ij2 - (ocean_rho / ice.rho)*(sea_level - (*bed)(i,j))*(sea_level - (*bed)(i,j)));
 	            h_ij = H_ij + (*bed)(i,j) - sea_level;
-              ierr = verbPrintf(2, grid.com,"marine glacier: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
+//               ierr = verbPrintf(2, grid.com,"marine glacier: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
             }
           }
 
@@ -254,8 +254,8 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // case" below.
           rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
           rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;
-          ierr = verbPrintf(2, grid.com,"ssa rhs u=%e at i=%d, j=%d\n",rhs_uv[i][j].u,i,j); CHKERRQ(ierr);
-          ierr = verbPrintf(2, grid.com,"ssa rhs v=%e at i=%d, j=%d\n",rhs_uv[i][j].v,i,j); CHKERRQ(ierr);
+//           ierr = verbPrintf(2, grid.com,"ssa rhs u=%e at i=%d, j=%d\n",rhs_uv[i][j].u,i,j); CHKERRQ(ierr);
+//           ierr = verbPrintf(2, grid.com,"ssa rhs v=%e at i=%d, j=%d\n",rhs_uv[i][j].v,i,j); CHKERRQ(ierr);
           continue;
         } // end of "if (is_marginal(i, j))"
 
