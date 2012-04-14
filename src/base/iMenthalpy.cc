@@ -265,6 +265,7 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
 
   const bool do_part_grid_ground    = config.get_flag("part_grid_ground");
   const bool do_fill_tempenth_front = config.get_flag("fill_tempenth_front");
+  const bool do_lowBwatMarginFix    = config.get_flag("lowBwatMarginFix");
   
   if (config.get_flag("do_cold_ice_methods")) {
     SETERRQ(1,
@@ -561,6 +562,11 @@ PetscErrorCode IceModel::enthalpyAndDrainageStep(
           // limit Hmelt to be in [0.0, hmelt_max]
           // UNACCOUNTED MASS & ENERGY (LATENT) LOSS (TO INFINITY AND BEYOND)!!
           vHmelt(i,j) = PetscMax(0.0, PetscMin(hmelt_max, Hmeltnew) );
+          // at grounded margin, force high melt.
+          if(mask.grounded_ice_margin(i,j) && do_lowBwatMarginFix){
+//             PetscSynchronizedPrintf(grid.com,"fix vHmelt from %e to %e at i=%d, j=%d\n",vHmelt(i,j),hmelt_max,i,j);
+            vHmelt(i,j) = hmelt_max;
+          }
         }
 
       } // end explicit scoping

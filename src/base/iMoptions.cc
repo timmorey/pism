@@ -207,7 +207,7 @@ PetscErrorCode  IceModel::setFromOptions() {
   ierr = config.flag_from_option("part_grid_ground", "part_grid_ground"); CHKERRQ(ierr);  
   ierr = config.flag_from_option("grounded_calving", "grounded_calving"); CHKERRQ(ierr);  
   ierr = config.flag_from_option("fill_tempenth_front", "fill_tempenth_front"); CHKERRQ(ierr);
-
+  ierr = config.flag_from_option("lowBwatMarginFix", "lowBwatMarginFix"); CHKERRQ(ierr);
   // plastic_till_c_0 is a parameter in the computation of the till yield stress tau_c
   // from the thickness of the basal melt water; see updateYieldStressFromHmelt()
   // Note: option is given in kPa.

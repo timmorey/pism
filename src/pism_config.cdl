@@ -54,6 +54,9 @@ netcdf pism_config {
 
     pism_config:fill_tempenth_front = "no";
     pism_config:fill_tempenth_front_doc = "give new full cells at margin the temperature from neighbouring ice";
+
+    pism_config:lowBwatMarginFix = "no";
+    pism_config:lowBwatMarginFix_doc = "force high melt when grounded ice is at ocean margin.";
     
     pism_config:grounded_calving = "no";
     pism_config:grounded_calving_doc = "melting at grounded margins from ocean temperature; still testing";
