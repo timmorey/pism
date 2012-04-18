@@ -137,6 +137,8 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   ierr = PetscOptionsGetRealArray(PETSC_NULL, "-meltLatitudeDependent", inarray, &Nparam, &meltLatitutdeDependent_set);
   CHKERRQ(ierr);
   PetscReal melt_min = inarray[0], melt_max = inarray[1];
+
+  const bool do_meltWithOceanTemperatures    = config.get_flag("meltWithOceanTemperatures");
   
 //   ierr = verbPrintf(2, grid.com,"meltfactor=%f\n",meltfactor); CHKERRQ(ierr);
 
@@ -145,7 +147,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
   ierr = latitude->get_array(lat);   CHKERRQ(ierr);
   ierr = result.begin_access(); CHKERRQ(ierr);
-
+  ierr = oceantemp.begin_access(); CHKERRQ(ierr);
 
     for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
       for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
@@ -160,6 +162,9 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
           // this is hard coded for LeBrocq Antarctica setups with northernmost lat=-50deg
           meltfactor = (melt_max-melt_min)/(-50.+90.0)*( lat[i][j]+90.0 ) + melt_min;
         }
+        if(do_meltWithOceanTemperatures){
+          meltfactor = meltfactor * oceantemp(i,j);
+        }
         
         oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);  // in W/m^2 //TODO T_ocean -> field!
         // shelfbmassflux is positive if ice is freezing on; here it is always negative:
@@ -173,6 +178,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
     ierr = ice_thickness->end_access(); CHKERRQ(ierr);
     ierr = latitude->end_access(); CHKERRQ(ierr);
     ierr = result.end_access(); CHKERRQ(ierr);
+    ierr = oceantemp.end_access(); CHKERRQ(ierr);
 
   return 0;
 }
