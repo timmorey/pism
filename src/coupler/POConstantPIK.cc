@@ -34,13 +34,36 @@ POConstantPIK::POConstantPIK(IceGrid &g, const NCConfigVariable &conf)
   shelfbtemp.set_string("long_name",
                         "absolute temperature at ice shelf base");
   shelfbtemp.set_units("Kelvin");
+  
 }
 
 PetscErrorCode POConstantPIK::init(PISMVars &vars) {
   PetscErrorCode ierr;
+  bool regrid = false;
+  int start = -1;
 
   if (!config.get_flag("is_dry_simulation")) {
     ierr = verbPrintf(2, grid.com, "* Initializing the constant ocean model...\n"); CHKERRQ(ierr);
+  }
+
+  ierr = oceantemp.create(grid, "oceantemp", false); CHKERRQ(ierr);
+  ierr = oceantemp.set_attrs("climate_state", "mean ocean temperature",
+                          "K", "ocean_temperature"); CHKERRQ(ierr);
+  ierr = oceantemp.set_glaciological_units("K"); CHKERRQ(ierr);
+  oceantemp.write_in_glaciological_units = true;
+  oceantemp.time_independent = true;
+
+  // find PISM input file to read data from:
+  ierr = find_pism_input(input_file, regrid, start); CHKERRQ(ierr);
+
+  ierr = verbPrintf(2, grid.com,
+        "    reading ocean temperatures\n"
+        "    from %s ... \n",
+        input_file.c_str()); CHKERRQ(ierr);
+  if (regrid) {
+    ierr = oceantemp.regrid(input_file.c_str(), true); CHKERRQ(ierr); // fails if not found!
+  } else {
+    ierr = oceantemp.read(input_file.c_str(), start); CHKERRQ(ierr); // fails if not found!
   }
 
   ice_thickness = dynamic_cast<IceModelVec2S*>(vars.get("land_ice_thickness"));
@@ -158,6 +181,7 @@ void POConstantPIK::add_vars_to_output(string keyword, set<string> &result) {
   if (keyword != "small") {
     result.insert("shelfbtemp");
     result.insert("shelfbmassflux");
+    result.insert("oceantemp");
   }
 }
 
@@ -172,6 +196,10 @@ PetscErrorCode POConstantPIK::define_variables(set<string> vars, const NCTool &n
 
   if (set_contains(vars, "shelfbmassflux")) {
     ierr = shelfbmassflux.define(nc, varid, nctype, true); CHKERRQ(ierr);
+  }
+
+  if (set_contains(vars, "oceantemp")) {
+    ierr = oceantemp.define(nc, nctype); CHKERRQ(ierr);
   }
 
   return 0;
@@ -200,6 +228,10 @@ PetscErrorCode POConstantPIK::write_variables(set<string> vars, string filename)
     tmp.write_in_glaciological_units = true;
     ierr = shelf_base_mass_flux(tmp); CHKERRQ(ierr);
     ierr = tmp.write(filename.c_str()); CHKERRQ(ierr);
+  }
+
+  if (set_contains(vars, "oceantemp")) {
+    ierr = oceantemp.write(filename.c_str()); CHKERRQ(ierr);
   }
 
   return 0;

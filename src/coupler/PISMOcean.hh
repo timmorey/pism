@@ -87,6 +87,8 @@ public:
                                           nc_type nctype);
   virtual PetscErrorCode write_variables(set<string> vars, string filename);
 protected:
+  string input_file;
+  IceModelVec2S oceantemp;
   IceModelVec2S *ice_thickness, *latitude;	// is not owned by this class
   NCSpatialVariable shelfbmassflux, shelfbtemp;
 };
