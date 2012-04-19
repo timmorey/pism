@@ -163,15 +163,16 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
           meltfactor = (melt_max-melt_min)/(-50.+90.0)*( lat[i][j]+90.0 ) + melt_min;
         }
         if(do_meltWithOceanTemperatures){
-          meltfactor = meltfactor * oceantemp(i,j);
+          oceanheatflux = oceantemp(i,j) * meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
+        } else{
+          oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
+          // in W/m^2
         }
-        
-        oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);  // in W/m^2 //TODO T_ocean -> field!
-        // shelfbmassflux is positive if ice is freezing on; here it is always negative:
-        // same sign as OceanHeatFlux... positive if massflux FROM ice TO ocean
-        //result(i,j) = oceanheatflux / (L * rho_ice) * secpera; // m a-1
-        result(i,j) = oceanheatflux / (L * rho_ice); // m s-1
-
+          // shelfbmassflux is positive if ice is freezing on; here it is always negative:
+          // same sign as OceanHeatFlux... positive if massflux FROM ice TO ocean
+          //result(i,j) = oceanheatflux / (L * rho_ice) * secpera; // m a-1
+          result(i,j) = oceanheatflux / (L * rho_ice); // m s-1
+//           ierr = verbPrintf(2, grid.com, "ocean temperature=%e,meltfactor=%e,heatflux=%e,shelfbmassflux=%e at i=%d,j=%d...\n",oceantemp(i,j),meltfactor, oceanheatflux,result(i,j),i,j); CHKERRQ(ierr);
       }
     }
 
