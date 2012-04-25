@@ -45,25 +45,27 @@ PetscErrorCode POConstantPIK::init(PISMVars &vars) {
   if (!config.get_flag("is_dry_simulation")) {
     ierr = verbPrintf(2, grid.com, "* Initializing the constant ocean model...\n"); CHKERRQ(ierr);
   }
+  
+  if( config.get_flag("meltWithOceanTemperatures") ){
+    ierr = oceantemp.create(grid, "oceantemp", false); CHKERRQ(ierr);
+    ierr = oceantemp.set_attrs("climate_state", "mean ocean temperature",
+                            "K", "ocean_temperature"); CHKERRQ(ierr);
+    ierr = oceantemp.set_glaciological_units("K"); CHKERRQ(ierr);
+    oceantemp.write_in_glaciological_units = true;
+    oceantemp.time_independent = true;
 
-  ierr = oceantemp.create(grid, "oceantemp", false); CHKERRQ(ierr);
-  ierr = oceantemp.set_attrs("climate_state", "mean ocean temperature",
-                          "K", "ocean_temperature"); CHKERRQ(ierr);
-  ierr = oceantemp.set_glaciological_units("K"); CHKERRQ(ierr);
-  oceantemp.write_in_glaciological_units = true;
-  oceantemp.time_independent = true;
-
-  // find PISM input file to read data from:
-  ierr = find_pism_input(input_file, regrid, start); CHKERRQ(ierr);
-
-  ierr = verbPrintf(2, grid.com,
-        "    reading ocean temperatures\n"
-        "    from %s ... \n",
-        input_file.c_str()); CHKERRQ(ierr);
-  if (regrid) {
-    ierr = oceantemp.regrid(input_file.c_str(), true); CHKERRQ(ierr); // fails if not found!
-  } else {
-    ierr = oceantemp.read(input_file.c_str(), start); CHKERRQ(ierr); // fails if not found!
+    // find PISM input file to read data from:
+    ierr = find_pism_input(input_file, regrid, start); CHKERRQ(ierr);
+    
+    ierr = verbPrintf(2, grid.com,
+          "    reading ocean temperatures\n"
+          "    from %s ... \n",
+          input_file.c_str()); CHKERRQ(ierr);
+    if (regrid) {
+      ierr = oceantemp.regrid(input_file.c_str(), true); CHKERRQ(ierr); // fails if not found!
+    } else {
+      ierr = oceantemp.read(input_file.c_str(), start); CHKERRQ(ierr); // fails if not found!
+    }
   }
 
   ice_thickness = dynamic_cast<IceModelVec2S*>(vars.get("land_ice_thickness"));
@@ -138,7 +140,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   CHKERRQ(ierr);
   PetscReal melt_min = inarray[0], melt_max = inarray[1];
 
-  const bool do_meltWithOceanTemperatures    = config.get_flag("meltWithOceanTemperatures");
+  const bool do_meltWithOceanTemperatures = config.get_flag("meltWithOceanTemperatures");
   
 //   ierr = verbPrintf(2, grid.com,"meltfactor=%f\n",meltfactor); CHKERRQ(ierr);
 
@@ -147,7 +149,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
   ierr = latitude->get_array(lat);   CHKERRQ(ierr);
   ierr = result.begin_access(); CHKERRQ(ierr);
-  ierr = oceantemp.begin_access(); CHKERRQ(ierr);
+  if(do_meltWithOceanTemperatures){ ierr = oceantemp.begin_access(); CHKERRQ(ierr); }
 
     for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
       for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
@@ -179,7 +181,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
     ierr = ice_thickness->end_access(); CHKERRQ(ierr);
     ierr = latitude->end_access(); CHKERRQ(ierr);
     ierr = result.end_access(); CHKERRQ(ierr);
-    ierr = oceantemp.end_access(); CHKERRQ(ierr);
+    if(do_meltWithOceanTemperatures){ ierr = oceantemp.end_access(); CHKERRQ(ierr); }
 
   return 0;
 }
@@ -188,7 +190,9 @@ void POConstantPIK::add_vars_to_output(string keyword, set<string> &result) {
   if (keyword != "small") {
     result.insert("shelfbtemp");
     result.insert("shelfbmassflux");
-    result.insert("oceantemp");
+    if( config.get_flag("meltWithOceanTemperatures") ){
+      result.insert("oceantemp");
+    }
   }
 }
 
