@@ -48,8 +48,8 @@ PetscErrorCode POConstantPIK::init(PISMVars &vars) {
   
   if( config.get_flag("meltWithOceanTemperatures") ){
     ierr = oceantemp.create(grid, "oceantemp", false); CHKERRQ(ierr);
-    ierr = oceantemp.set_attrs("climate_state", "mean ocean temperature",
-                            "K", "ocean_temperature"); CHKERRQ(ierr);
+    ierr = oceantemp.set_attrs("climate_state", "ocean temperature anomalies",
+                            "K", "ocean_temperature_anomaly"); CHKERRQ(ierr);
     ierr = oceantemp.set_glaciological_units("K"); CHKERRQ(ierr);
     oceantemp.write_in_glaciological_units = true;
     oceantemp.time_independent = true;
@@ -58,7 +58,7 @@ PetscErrorCode POConstantPIK::init(PISMVars &vars) {
     ierr = find_pism_input(input_file, regrid, start); CHKERRQ(ierr);
     
     ierr = verbPrintf(2, grid.com,
-          "    reading ocean temperatures\n"
+          "    reading ocean temperature anomalies\n"
           "    from %s ... \n",
           input_file.c_str()); CHKERRQ(ierr);
     if (regrid) {
@@ -165,7 +165,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
           meltfactor = (melt_max-melt_min)/(-50.+90.0)*( lat[i][j]+90.0 ) + melt_min;
         }
         if(do_meltWithOceanTemperatures){
-          oceanheatflux = oceantemp(i,j) * meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
+          oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean +  oceantemp(i,j) - T_f);
         } else{
           oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
           // in W/m^2
