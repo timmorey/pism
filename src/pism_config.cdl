@@ -57,6 +57,9 @@ netcdf pism_config {
 
     pism_config:lowBwatMarginFix = "no";
     pism_config:lowBwatMarginFix_doc = "force high melt when grounded ice is at ocean margin.";
+
+    pism_config:meltWithOceanTemperatures = "no";
+    pism_config:meltWithOceanTemperatures_doc = "adapt meltfactor dependent on ocean temperatures.";
     
     pism_config:grounded_calving = "no";
     pism_config:grounded_calving_doc = "melting at grounded margins from ocean temperature; still testing";

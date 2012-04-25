@@ -34,13 +34,38 @@ POConstantPIK::POConstantPIK(IceGrid &g, const NCConfigVariable &conf)
   shelfbtemp.set_string("long_name",
                         "absolute temperature at ice shelf base");
   shelfbtemp.set_units("Kelvin");
+  
 }
 
 PetscErrorCode POConstantPIK::init(PISMVars &vars) {
   PetscErrorCode ierr;
+  bool regrid = false;
+  int start = -1;
 
   if (!config.get_flag("is_dry_simulation")) {
     ierr = verbPrintf(2, grid.com, "* Initializing the constant ocean model...\n"); CHKERRQ(ierr);
+  }
+  
+  if( config.get_flag("meltWithOceanTemperatures") ){
+    ierr = oceantemp.create(grid, "oceantemp", false); CHKERRQ(ierr);
+    ierr = oceantemp.set_attrs("climate_state", "mean ocean temperature",
+                            "K", "ocean_temperature"); CHKERRQ(ierr);
+    ierr = oceantemp.set_glaciological_units("K"); CHKERRQ(ierr);
+    oceantemp.write_in_glaciological_units = true;
+    oceantemp.time_independent = true;
+
+    // find PISM input file to read data from:
+    ierr = find_pism_input(input_file, regrid, start); CHKERRQ(ierr);
+    
+    ierr = verbPrintf(2, grid.com,
+          "    reading ocean temperatures\n"
+          "    from %s ... \n",
+          input_file.c_str()); CHKERRQ(ierr);
+    if (regrid) {
+      ierr = oceantemp.regrid(input_file.c_str(), true); CHKERRQ(ierr); // fails if not found!
+    } else {
+      ierr = oceantemp.read(input_file.c_str(), start); CHKERRQ(ierr); // fails if not found!
+    }
   }
 
   ice_thickness = dynamic_cast<IceModelVec2S*>(vars.get("land_ice_thickness"));
@@ -114,6 +139,8 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   ierr = PetscOptionsGetRealArray(PETSC_NULL, "-meltLatitudeDependent", inarray, &Nparam, &meltLatitutdeDependent_set);
   CHKERRQ(ierr);
   PetscReal melt_min = inarray[0], melt_max = inarray[1];
+
+  const bool do_meltWithOceanTemperatures = config.get_flag("meltWithOceanTemperatures");
   
 //   ierr = verbPrintf(2, grid.com,"meltfactor=%f\n",meltfactor); CHKERRQ(ierr);
 
@@ -122,7 +149,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
   ierr = latitude->get_array(lat);   CHKERRQ(ierr);
   ierr = result.begin_access(); CHKERRQ(ierr);
-
+  if(do_meltWithOceanTemperatures){ ierr = oceantemp.begin_access(); CHKERRQ(ierr); }
 
     for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
       for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
@@ -137,19 +164,24 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
           // this is hard coded for LeBrocq Antarctica setups with northernmost lat=-50deg
           meltfactor = (melt_max-melt_min)/(-50.+90.0)*( lat[i][j]+90.0 ) + melt_min;
         }
-        
-        oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);  // in W/m^2 //TODO T_ocean -> field!
-        // shelfbmassflux is positive if ice is freezing on; here it is always negative:
-        // same sign as OceanHeatFlux... positive if massflux FROM ice TO ocean
-        //result(i,j) = oceanheatflux / (L * rho_ice) * secpera; // m a-1
-        result(i,j) = oceanheatflux / (L * rho_ice); // m s-1
-
+        if(do_meltWithOceanTemperatures){
+          oceanheatflux = oceantemp(i,j) * meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
+        } else{
+          oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
+          // in W/m^2
+        }
+          // shelfbmassflux is positive if ice is freezing on; here it is always negative:
+          // same sign as OceanHeatFlux... positive if massflux FROM ice TO ocean
+          //result(i,j) = oceanheatflux / (L * rho_ice) * secpera; // m a-1
+          result(i,j) = oceanheatflux / (L * rho_ice); // m s-1
+//           ierr = verbPrintf(2, grid.com, "ocean temperature=%e,meltfactor=%e,heatflux=%e,shelfbmassflux=%e at i=%d,j=%d...\n",oceantemp(i,j),meltfactor, oceanheatflux,result(i,j),i,j); CHKERRQ(ierr);
       }
     }
 
     ierr = ice_thickness->end_access(); CHKERRQ(ierr);
     ierr = latitude->end_access(); CHKERRQ(ierr);
     ierr = result.end_access(); CHKERRQ(ierr);
+    if(do_meltWithOceanTemperatures){ ierr = oceantemp.end_access(); CHKERRQ(ierr); }
 
   return 0;
 }
@@ -158,6 +190,9 @@ void POConstantPIK::add_vars_to_output(string keyword, set<string> &result) {
   if (keyword != "small") {
     result.insert("shelfbtemp");
     result.insert("shelfbmassflux");
+    if( config.get_flag("meltWithOceanTemperatures") ){
+      result.insert("oceantemp");
+    }
   }
 }
 
@@ -172,6 +207,10 @@ PetscErrorCode POConstantPIK::define_variables(set<string> vars, const NCTool &n
 
   if (set_contains(vars, "shelfbmassflux")) {
     ierr = shelfbmassflux.define(nc, varid, nctype, true); CHKERRQ(ierr);
+  }
+
+  if (set_contains(vars, "oceantemp")) {
+    ierr = oceantemp.define(nc, nctype); CHKERRQ(ierr);
   }
 
   return 0;
@@ -200,6 +239,10 @@ PetscErrorCode POConstantPIK::write_variables(set<string> vars, string filename)
     tmp.write_in_glaciological_units = true;
     ierr = shelf_base_mass_flux(tmp); CHKERRQ(ierr);
     ierr = tmp.write(filename.c_str()); CHKERRQ(ierr);
+  }
+
+  if (set_contains(vars, "oceantemp")) {
+    ierr = oceantemp.write(filename.c_str()); CHKERRQ(ierr);
   }
 
   return 0;
