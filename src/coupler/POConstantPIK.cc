@@ -141,6 +141,7 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
   PetscReal melt_min = inarray[0], melt_max = inarray[1];
 
   const bool do_meltWithOceanTemperatures = config.get_flag("meltWithOceanTemperatures");
+  const bool do_meltFactorField = config.get_flag("meltFactorField");
   
 //   ierr = verbPrintf(2, grid.com,"meltfactor=%f\n",meltfactor); CHKERRQ(ierr);
 
@@ -166,6 +167,8 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
         }
         if(do_meltWithOceanTemperatures){
           oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean +  oceantemp(i,j) - T_f);
+        } else if(do_meltFactorField){
+          oceanheatflux = oceantemp(i,j) * meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
         } else{
           oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
           // in W/m^2
