@@ -88,20 +88,18 @@ PetscReal IceModel::get_average_thickness_fg(planeStar<int> M, planeStar<PetscSc
 
   PetscReal Qssa_max      = 0.0;
   PetscReal sum_max       = 0.0;
-//   PetscReal sia_ssa_coeff = 0.0;
-  if( sum_max < PetscAbs(Q.e + Qssa.e) ) sum_max = PetscAbs(Q.e + Qssa.e); Qssa_max = PetscAbs(Qssa.e);
-  if( sum_max < PetscAbs(Q.w + Qssa.w) ) sum_max = PetscAbs(Q.w + Qssa.w); Qssa_max = PetscAbs(Qssa.w);
-  if( sum_max < PetscAbs(Q.n + Qssa.n) ) sum_max = PetscAbs(Q.n + Qssa.n); Qssa_max = PetscAbs(Qssa.n);
-  if( sum_max < PetscAbs(Q.s + Qssa.s) ) sum_max = PetscAbs(Q.s + Qssa.s); Qssa_max = PetscAbs(Qssa.s);
 
-  if (sum_max > 0) {
-    sia_ssa_coeff = margin_coeff + PetscMin(Qssa_max/sum_max,1)*(1-margin_coeff);
+  if( sum_max < PetscAbs(Q.e + Qssa.e) ){ sum_max = PetscAbs(Q.e + Qssa.e); Qssa_max = PetscAbs(Qssa.e);}
+  if( sum_max < PetscAbs(Q.w + Qssa.w) ){ sum_max = PetscAbs(Q.w + Qssa.w); Qssa_max = PetscAbs(Qssa.w);}
+  if( sum_max < PetscAbs(Q.n + Qssa.n) ){ sum_max = PetscAbs(Q.n + Qssa.n); Qssa_max = PetscAbs(Qssa.n);}
+  if( sum_max < PetscAbs(Q.s + Qssa.s) ){ sum_max = PetscAbs(Q.s + Qssa.s); Qssa_max = PetscAbs(Qssa.s);}
+
+  if (sum_max > 0.0) {
+    sia_ssa_coeff = margin_coeff + PetscMin(Qssa_max/sum_max,1.0)*(1.0-margin_coeff);
   } else {
     sia_ssa_coeff = 1.0;
   }
 
-//   vTestVar(i,j) = sia_ssa_coeff;
-//   ierr = vTestVar.end_access(); CHKERRQ(ierr);
   return H_average * sia_ssa_coeff;
 }
 
