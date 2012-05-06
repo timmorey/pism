@@ -165,10 +165,10 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
           // this is hard coded for LeBrocq Antarctica setups with northernmost lat=-50deg
           meltfactor = (melt_max-melt_min)/(-50.+90.0)*( lat[i][j]+90.0 ) + melt_min;
         }
-        if(do_meltWithOceanTemperatures){
-          oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean +  oceantemp(i,j) - T_f);
-        } else if(do_meltFactorField){
+        if(do_meltWithOceanTemperatures && do_meltFactorField){
           oceanheatflux = oceantemp(i,j) * meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
+        } else if(do_meltWithOceanTemperatures){
+          oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean +  oceantemp(i,j) - T_f);
         } else{
           oceanheatflux = meltfactor * rho_ocean * c_p_ocean * gamma_T * (T_ocean - T_f);
           // in W/m^2
