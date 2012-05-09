@@ -124,6 +124,7 @@ add_library (pismboundary
   coupler/PASLapseRates.cc
   coupler/PASDirectForcing.cc
   coupler/PODirectForcing.cc
+  coupler/PODirectForcingPIK.cc
   coupler/PScalarForcing.cc
   coupler/PAYearlyCycle.cc
   coupler/PCFactory.cc

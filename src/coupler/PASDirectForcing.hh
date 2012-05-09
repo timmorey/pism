@@ -169,7 +169,7 @@ protected:
     mass_flux.set_n_records(mass_flux_n_records);
 
     temp.strict_timestep_limit = ! enable_time_averaging;
-    smb.strict_timestep_limit   = ! enable_time_averaging;
+    mass_flux.strict_timestep_limit   = ! enable_time_averaging;
 
     return 0;
   }
