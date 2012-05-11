@@ -103,7 +103,7 @@ PetscErrorCode PISMDefaultYieldStress::init(PISMVars &vars)
 
   basal_water_thickness = dynamic_cast<IceModelVec2S*>(vars.get("bwat"));
   if (basal_water_thickness == NULL) SETERRQ(1, "bwat is not available");
-
+  
   basal_melt_rate = dynamic_cast<IceModelVec2S*>(vars.get("bmelt"));
   if (basal_melt_rate == NULL) SETERRQ(1, "bmelt is not available");
 
@@ -123,6 +123,9 @@ PetscErrorCode PISMDefaultYieldStress::init(PISMVars &vars)
                             "Use the till friction angle parameterization", topg_to_phi_set); CHKERRQ(ierr);
     ierr = PISMOptionsIsSet("-topg_to_bwatPIK",
                             "Use the bwatPIK parameterization", topg_to_bwatPIK_set); CHKERRQ(ierr);
+    if(topg_to_bwatPIK_set){
+      ierr = topg_to_bwatPIK(); CHKERRQ(ierr);
+    }
     ierr = PISMOptionsIsSet("-i", "PISM input file", i_set); CHKERRQ(ierr);
     ierr = PISMOptionsIsSet("-boot_file", "PISM bootstrapping file",
                             bootstrap); CHKERRQ(ierr);
@@ -247,7 +250,7 @@ PetscErrorCode PISMDefaultYieldStress::regrid() {
     return 0;
 
   ierr = bwatPIK.regrid(regrid_file, true); CHKERRQ(ierr);
-  
+
   return 0;
 }
 
@@ -272,6 +275,7 @@ PetscErrorCode PISMDefaultYieldStress::define_variables(set<string> vars, const 
    if (set_contains(vars, "bwatPIK")) {
     PetscErrorCode ierr = bwatPIK.define(nc, nctype); CHKERRQ(ierr);
   } 
+  
   return 0;
 }
 
@@ -320,6 +324,10 @@ PetscErrorCode PISMDefaultYieldStress::basal_material_yield_stress(IceModelVec2S
   PetscErrorCode ierr;
 
   bool use_ssa_when_grounded = config.get_flag("use_ssa_when_grounded");
+  
+  bool topg_to_bwatPIK_set;
+  ierr = PISMOptionsIsSet("-topg_to_bwatPIK",
+                            "Use the bwatPIK parameterization", topg_to_bwatPIK_set); CHKERRQ(ierr);
 
   bool topg_to_bwatPIK_set;
   ierr = PISMOptionsIsSet("-topg_to_bwatPIK",
@@ -337,6 +345,7 @@ PetscErrorCode PISMDefaultYieldStress::basal_material_yield_stress(IceModelVec2S
   ierr = result.begin_access(); CHKERRQ(ierr);
   ierr = ice_thickness->begin_access(); CHKERRQ(ierr);
   ierr = basal_water_thickness->begin_access(); CHKERRQ(ierr);
+  ierr = bwatPIK.begin_access(); CHKERRQ(ierr);
   ierr = basal_melt_rate->begin_access(); CHKERRQ(ierr);
   ierr = till_phi.begin_access(); CHKERRQ(ierr);
   ierr = bwatPIK.begin_access(); CHKERRQ(ierr);
@@ -392,6 +401,7 @@ PetscErrorCode PISMDefaultYieldStress::basal_material_yield_stress(IceModelVec2S
   ierr = bwatPIK.end_access(); CHKERRQ(ierr);
   ierr = basal_melt_rate->end_access(); CHKERRQ(ierr);
   ierr = basal_water_thickness->end_access(); CHKERRQ(ierr);
+  ierr = bwatPIK.end_access(); CHKERRQ(ierr);
 
 /* scale tauc if desired:
 A scale factor of \f$A\f$ is intended to increase basal sliding rate by
@@ -684,7 +694,8 @@ PetscScalar PISMDefaultYieldStress::basal_water_pressure(PetscScalar thk, PetscS
 
   // the model; note 0 <= p_pw <= frac * p_overburden because  0 <= bwat <= hmelt_max
   const PetscScalar p_overburden = p.ice_density * p.standard_gravity * thk; // FIXME task #7297
-  PetscScalar p_pw = frac * (bwat / hmelt_max) * p_overburden;
+    PetscScalar p_pw = frac * (bwat / hmelt_max) * p_overburden;
+
 
   if (p.usebmr) {
     // add to pressure from instantaneous basal melt rate;
@@ -709,7 +720,8 @@ PetscScalar PISMDefaultYieldStress::basal_water_pressure(PetscScalar thk, PetscS
       }
     }
   }
-
+    
+  
   return p_pw;
 }
 

@@ -29,6 +29,8 @@
 #include "PASLapseRates.hh"
 #include "PASDirectForcing.hh"
 #include "PScalarForcing.hh"
+#include "PODirectForcing.hh"
+#include "PODirectForcingPIK.hh"
 
 // Atmosphere
 static void create_pa_constant(IceGrid& g, const NCConfigVariable& conf, PISMAtmosphereModel* &result) {
@@ -68,9 +70,8 @@ void PAFactory::add_standard_types() {
   add_model("searise_greenland", &create_pa_searise_greenland);
   add_model("pik",               &create_pa_constant_pik);
   set_default("constant");
-
   add_modifier("anomaly",    &create_pa_anomalies);
-  add_modifier("dTforcing",    &create_pa_dTforcing);
+  add_modifier("dTforcing",  &create_pa_dTforcing);
   add_modifier("lapse_rate", &create_pa_lapse_rates);
 }
 
@@ -78,6 +79,14 @@ void PAFactory::add_standard_types() {
 // Ocean
 static void create_po_constant(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
   result = new POConstant(g, conf);
+}
+
+static void create_po_given(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
+  result = new PODirectForcing(g, conf);
+}
+
+static void create_po_givenpik(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
+  result = new PODirectForcingPIK(g, conf);
 }
 
 static void create_po_pik(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
@@ -90,7 +99,9 @@ static void create_po_forcing(IceGrid& g, const NCConfigVariable& conf, PISMOcea
 
 void POFactory::add_standard_types() {
   add_model("constant", &create_po_constant);
+  add_model("given",    &create_po_given);
   add_model("pik",      &create_po_pik);
+  add_model("givenpik", &create_po_givenpik);
   set_default("constant");
 
   add_modifier("dSLforcing", &create_po_forcing);

@@ -106,6 +106,7 @@ PetscErrorCode PSConstantPIK::ice_surface_temperature(IceModelVec2S &result) {
 
       result(i,j) = 273.15 + 30 - 0.0075 * (*usurf)(i,j) - 0.68775 * (*lat)(i,j)*(-1.0) ;
       artm(i,j)=result(i,j);
+
     }
   }
   ierr = usurf->end_access();   CHKERRQ(ierr);

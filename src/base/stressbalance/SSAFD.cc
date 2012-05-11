@@ -220,7 +220,6 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
             h_ij = (1.0 - ice.rho / ocean_rho) * H_ij;
-//             ierr = verbPrintf(2, grid.com,"floating front: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
           } else {
             if( (*bed)(i,j) >= sea_level) {
               // boundary condition for a "cliff" (grounded ice next to
@@ -228,14 +227,12 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
               ocean_pressure = 0.5 * ice.rho * standard_gravity * H_ij2;
               // this is not 'zero' because the isotrop.normal stresses
               // (=pressure) from within the ice figures on RHS
-	            h_ij = H_ij;
-//               ierr = verbPrintf(2, grid.com,"cliff: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
+	      h_ij = H_ij;
             } else {
               // boundary condition for marine terminating glacier
               ocean_pressure = 0.5 * ice.rho * standard_gravity *
                 (H_ij2 - (ocean_rho / ice.rho)*(sea_level - (*bed)(i,j))*(sea_level - (*bed)(i,j)));
-	            h_ij = H_ij + (*bed)(i,j) - sea_level;
-//               ierr = verbPrintf(2, grid.com,"marine glacier: pressure=%e, h_ij=%e at i=%d, j=%d\n",ocean_pressure, h_ij,i,j); CHKERRQ(ierr);
+	      h_ij = H_ij + (*bed)(i,j) - sea_level;
             }
           }
 

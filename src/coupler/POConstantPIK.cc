@@ -125,7 +125,6 @@ PetscErrorCode POConstantPIK::shelf_base_mass_flux(IceModelVec2S &result) {
 
   PetscReal meltfactor = 5e-3;  
   bool meltfactorSet;
-
   double meltfactor_pik;
   ierr = PISMOptionsReal("-meltfactor_pik",
                            "Uses as a meltfactor as in sub-shelf-melting parameterization of martin_winkelmann11",
