@@ -94,7 +94,7 @@ public:
 
   virtual PetscErrorCode basal_material_yield_stress(IceModelVec2S &result);
 protected:
-  PetscReal sliding_scale;
+  PetscReal sliding_scale, sliding_scalePlastic;
   IceModelVec2S till_phi, bwatPIK;
   IceModelVec2S *basal_water_thickness, *basal_melt_rate, *ice_thickness,
     *bed_topography;

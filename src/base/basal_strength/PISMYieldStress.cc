@@ -329,10 +329,6 @@ PetscErrorCode PISMDefaultYieldStress::basal_material_yield_stress(IceModelVec2S
   ierr = PISMOptionsIsSet("-topg_to_bwatPIK",
                             "Use the bwatPIK parameterization", topg_to_bwatPIK_set); CHKERRQ(ierr);
 
-  bool topg_to_bwatPIK_set;
-  ierr = PISMOptionsIsSet("-topg_to_bwatPIK",
-                            "Use the bwatPIK parameterization", topg_to_bwatPIK_set); CHKERRQ(ierr);
-
   const PetscScalar
     till_pw_fraction = config.get("till_pw_fraction"),
     till_c_0 = config.get("till_c_0") * 1e3, // convert from kPa to Pa
