@@ -70,6 +70,9 @@ netcdf pism_config {
     pism_config:do_rift = "false";
     pism_config:do_rift_doc = "apply removal of ice along rift";
 
+    pism_config:do_constant_thickness = "no";
+    pism_config:do_constant_thickness_doc = "Prescribe ice thickness in MassContExplicitStep";
+
     pism_config:kill_icebergs = "no";
     pism_config:kill_icebergs_doc = "identify and kill detached ice-shelf areas";
 

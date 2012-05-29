@@ -219,6 +219,15 @@ dimassdt = surface_ice_flux + basal_ice_flux + sub_shelf_ice_flux + discharge_fl
 */
 PetscErrorCode IceModel::massContExplicitStep() {
   PetscErrorCode ierr;
+  
+  const bool constant_thickness = config.get_flag("do_constant_thickness");
+  if (constant_thickness) {//no mass
+	  if (config.get_flag("do_fracture_density") && config.get_flag("use_ssa_velocity")) {
+	    ierr = calculateFractureDensity(); CHKERRQ(ierr);
+	  }
+  	  return 0;
+  }
+
   PetscScalar
     // totals over the processor's domain:
     my_basal_ice_flux = 0,

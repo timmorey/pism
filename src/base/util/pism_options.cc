@@ -663,6 +663,8 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("write_fd_fields", "write_fd_fields"); CHKERRQ(ierr);
   
   ierr = config.flag_from_option("rift", "do_rift"); CHKERRQ(ierr);
+  
+  ierr = config.flag_from_option("constant_thickness", "do_constant_thickness"); CHKERRQ(ierr);
 
 
   // Calving
