@@ -167,6 +167,13 @@ public:
   virtual PetscErrorCode compute_principal_strain_rates(
                 IceModelVec2S &result_e1, IceModelVec2S &result_e2);
 
+
+  using ShallowStressBalance::compute_2D_stresses;
+  virtual PetscErrorCode compute_2D_stresses(
+                IceModelVec2S &result_Txx, IceModelVec2S &result_Tyy, IceModelVec2S &result_Txy);
+
+
+
 protected:
   virtual PetscErrorCode allocate();
 
@@ -188,6 +195,7 @@ protected:
   IceModelVec2S *driving_stress_y;
   IceModelVec2V taud, velocity_old;
   IceModelVec3 *enthalpy;
+  IceModelVec2S *fracdens;
 
   string stdout_ssa;
 

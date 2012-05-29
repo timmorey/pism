@@ -219,7 +219,15 @@ protected:
         vLatitude,	//!< Latitude; ghosted to compute cell areas
         vbed,		//!< bed topography; ghosted
         vuplift,	//!< bed uplift rate; no ghosts
-        vGhf,		//!< geothermal flux; no ghosts
+        vGhf,		//!< geothermal flux; no ghosts     
+        vFD,		//!< fracture density
+				vFG,		//!< fracture growth rate
+				vFH,		//!< fracture healing rate
+				vFE,		//!< fracture flow enhancement
+				vFA,		//!< fracture age
+				txx,   //!< deviatoric stress component xx
+    		tyy,   //!< deviatoric stress component yy
+    		txy,   //!< deviatoric shear stress component xy      
         bedtoptemp,     //!< temperature seen by bedrock thermal layer, if present; no ghosts
                         //!< ghosted to be able to compute tauc "redundantly"
 
@@ -338,6 +346,9 @@ protected:
   virtual PetscErrorCode enthalpyAndDrainageStep(
                 PetscScalar* vertSacrCount, PetscScalar* liquifiedVol,
                 PetscScalar* bulgeCount);
+                
+  // see iMfractures.cc
+  virtual PetscErrorCode calculateFractureDensity();
 
   // see iMgeometry.cc
   virtual PetscErrorCode updateSurfaceElevationAndMask();

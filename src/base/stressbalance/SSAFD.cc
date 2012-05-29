@@ -1105,6 +1105,35 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
   ierr = velocity.get_array(uv); CHKERRQ(ierr);
   ierr = hardness.begin_access(); CHKERRQ(ierr);
   ierr = thickness->begin_access(); CHKERRQ(ierr);
+  
+  /////////////////////////////////////////////////////////////////////
+
+  IceModelVec2S &fd = *fracdens; // to improve readability (below)
+  bool dofd = (config.get_flag("do_fracture_density") && config.get_flag("use_ssa_velocity"));
+  if (dofd) 
+    ierr = fd.begin_access(); CHKERRQ(ierr);
+  
+  //get options
+  PetscInt    Nparam=3;
+  PetscReal   inarray[3] = {0.0,0.0,1.0};//phi_init, soft_rate, soft_offset
+
+  PetscBool sd_set;
+  ierr = PetscOptionsGetRealArray(PETSC_NULL, "-fracture_softening", inarray, &Nparam, &sd_set);
+  CHKERRQ(ierr);
+
+  PetscReal phi_init= inarray[0], soft_rate = inarray[1], soft_offset = inarray[2];
+
+  if (sd_set) {
+    if ((Nparam > 3) || (Nparam < 3)) {
+      ierr = verbPrintf(1, grid.com,
+	"PISM ERROR: option -fracture_softening provided with more or fewer than 3\n"
+        "            arguments ... ENDING ...\n");CHKERRQ(ierr);
+      PISMEnd();
+    }
+    ierr = verbPrintf(2, grid.com,"PISM-PIK INFO: fracture_softening mode is set with phi_min=%.2f, ms=%.2f and ns=%.2f\n", phi_init,soft_rate,soft_offset); CHKERRQ(ierr);
+  }
+				
+  /////////////////////////////////////////////////////////  
 
   PetscScalar ssa_enhancement_factor = flow_law->enhancement_factor(),
     n_glen = flow_law->exponent(),
@@ -1140,7 +1169,20 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
           v_y = (uv[i][j+1].v - uv[i][j].v) / dy;
         }
 
-        result(i,j,o) = H * flow_law->effective_viscosity(hardness(i,j,o), u_x, u_y, v_x, v_y);
+        if (sd_set && fd(i,j)>phi_init && dofd) {
+    	  PetscScalar frdens=0.0;
+    	  if (o == 0) {
+    	    frdens = 0.5*(fd(i+1,j)+fd(i,j));
+    	  } else {
+    	    frdens = 0.5*(fd(i,j+1)+fd(i,j));
+    	  }
+
+    	  PetscScalar softening = soft_offset + soft_rate*frdens;
+
+    	  result(i,j,o) = H * flow_law->effective_viscosity(hardness(i,j,o)/pow(softening,1/n_glen), u_x, u_y, v_x, v_y);
+    	}
+    	else
+          result(i,j,o) = H * flow_law->effective_viscosity(hardness(i,j,o), u_x, u_y, v_x, v_y);
 
         if (! finite(result(i,j,o)) || false) {
           ierr = PetscPrintf(grid.com, "nuH[%d][%d][%d] = %e\n", o, i, j, result(i,j,o));
@@ -1165,6 +1207,8 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
   ierr = hardness.end_access(); CHKERRQ(ierr);
   ierr = result.end_access(); CHKERRQ(ierr);
   ierr = velocity.end_access(); CHKERRQ(ierr);
+  
+  if (dofd) { ierr = fd.end_access(); CHKERRQ(ierr); }
 
   // Some communication
   ierr = result.beginGhostComm(); CHKERRQ(ierr);

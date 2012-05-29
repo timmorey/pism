@@ -61,6 +61,12 @@ netcdf pism_config {
     pism_config:part_redist = "no";
     pism_config:part_redist_doc = "for partially filled grid cell scheme, redistribute residuals Hresidual";
 
+    pism_config:do_fracture_density = "no";
+    pism_config:do_fracture_density_doc = "Calculation of fracture density according to stresses and strain rate field.";
+
+    pism_config:write_fd_fields = "no";
+    pism_config:write_fd_fields_doc = "Writing of fracture density related fields to nc-file.";
+
     pism_config:kill_icebergs = "no";
     pism_config:kill_icebergs_doc = "identify and kill detached ice-shelf areas";
 

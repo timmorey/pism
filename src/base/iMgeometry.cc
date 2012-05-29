@@ -517,6 +517,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
   // There is no reporting of single ice fluxes yet in comparison to total ice
   // thickness change.
 
+  if (config.get_flag("do_fracture_density") && config.get_flag("use_ssa_velocity")) {
+    ierr = calculateFractureDensity(); CHKERRQ(ierr);
+  }
+
   // distribute residual ice mass if desired
   if (do_redist) {
     ierr = redistResiduals(); CHKERRQ(ierr);

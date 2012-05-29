@@ -83,6 +83,11 @@ public:
   virtual PetscErrorCode compute_principal_strain_rates(
                 IceModelVec2S &/*result_e1*/, IceModelVec2S &/*result_e2*/)
   { SETERRQ(grid.com, 1,"not implemented in base class"); return 0; }
+  
+  virtual PetscErrorCode compute_2D_stresses(
+                IceModelVec2S &/*result_Txx*/, IceModelVec2S &/*result_Tyy*/, IceModelVec2S &/*result_Txy*/)
+  { SETERRQ(grid.com, 1,"not implemented in base class"); return 0; }
+  
 
   // helpers:
 
