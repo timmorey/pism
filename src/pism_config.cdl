@@ -67,6 +67,9 @@ netcdf pism_config {
     pism_config:write_fd_fields = "no";
     pism_config:write_fd_fields_doc = "Writing of fracture density related fields to nc-file.";
 
+    pism_config:do_rift = "false";
+    pism_config:do_rift_doc = "apply removal of ice along rift";
+
     pism_config:kill_icebergs = "no";
     pism_config:kill_icebergs_doc = "identify and kill detached ice-shelf areas";
 

@@ -23,6 +23,7 @@
 #include "pism_signal.h"
 #include "Mask.hh"
 #include "PISMStressBalance.hh"
+#include "PISMTime.hh"
 
 
 //! \file iMfractures.cc implementing calculation of fracture density with PIK options -fractures.
@@ -31,7 +32,7 @@
 PetscErrorCode IceModel::calculateFractureDensity() {
   const PetscScalar   dx = grid.dx, dy = grid.dy, Mx = grid.Mx, My = grid.My;
   PetscErrorCode ierr;
-  ierr = verbPrintf(2, grid.com, "######### calculateFractureDensity() start \n");    CHKERRQ(ierr);
+  ierr = verbPrintf(4, grid.com, "######### calculateFractureDensity() start \n");    CHKERRQ(ierr);
 
   IceModelVec2S vFDnew = vWork2d[0];
   IceModelVec2S vFAnew = vWork2d[1];
@@ -85,10 +86,6 @@ PetscErrorCode IceModel::calculateFractureDensity() {
    ierr = stress_balance->get_advective_2d_velocity(vel_advective); CHKERRQ(ierr);
    //IceModelVec2V vel = *vel_advective; // just an alias
    ierr = vel_advective->begin_access(); CHKERRQ(ierr);
-  
-   const bool do_part_grid = config.get_flag("part_grid");
-   if  (do_part_grid == 0)
-     ierr = verbPrintf(2, grid.com,"!!! PISM_WARNING: Fracture density only with -part_grid\n"); CHKERRQ(ierr);
   
    MaskQuery M(vMask);
    PetscScalar tempFD;
@@ -265,3 +262,107 @@ PetscErrorCode IceModel::calculateFractureDensity() {
  
   return 0;
 }
+
+
+/*!
+This routine provides the user to apply a icefree rift into a shelfsystem
+*/
+PetscErrorCode IceModel::applyRift() {
+  PetscErrorCode ierr;
+  const PetscScalar   dx = grid.dx, dy = grid.dy, Mx = grid.Mx, My = grid.My;
+  ierr = verbPrintf(4,grid.com,"######### applyRift is called \n");    CHKERRQ(ierr);
+
+
+  // -rift[riftnumber,time1,time2]
+  // option -rift asks for three parameters, namely the rift number in the code as well as the initial and finish time of rift application
+  
+  const PetscBool  DEFAULT_DO_RIFT = PETSC_FALSE;
+  const PetscInt DEFAULT_RIFT_NUMBER = 0;
+  const PetscScalar DEFAULT_RIFT_TIME1 =0.0;
+  const PetscScalar DEFAULT_RIFT_TIME2 =0.0;
+  PetscScalar current_time = grid.time->current()/secpera;
+  PetscInt rift_number = DEFAULT_RIFT_NUMBER;
+  PetscScalar rift_time1 = DEFAULT_RIFT_TIME1;
+  PetscScalar rift_time2 = DEFAULT_RIFT_TIME2;
+  PetscInt    NparamRift=3;
+  PetscReal   inarrayRift[3] = {DEFAULT_RIFT_NUMBER, DEFAULT_RIFT_TIME1,DEFAULT_RIFT_TIME2};
+  PetscBool  RiftSet;
+
+  ierr = PetscOptionsGetRealArray(PETSC_NULL, "-rift", inarrayRift, &NparamRift, &RiftSet); CHKERRQ(ierr);
+  if (RiftSet == PETSC_TRUE){
+    rift_number = inarrayRift[0];
+    rift_time1 = inarrayRift[1];
+    rift_time2 = inarrayRift[2];
+  }
+
+  if (current_time>rift_time1 && current_time<rift_time2) {
+    ierr = vH.begin_access(); CHKERRQ(ierr);
+
+    //PetscScalar **Riftmask; 
+    //ierr = vRiftmask.get_array(Riftmask); CHKERRQ(ierr);
+    PetscBool RiftHere = PETSC_FALSE;
+
+	
+    for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) { 
+      for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+	RiftHere=PETSC_FALSE;
+	//Test 50km:
+	if(rift_number==1){
+	  if(i==floor(95*Mx/101) && j<floor(80*My/101)){ 
+	    RiftHere= PETSC_TRUE;}}
+
+       //Larsen 2km:
+       //FIXME: define rift position more generally in terms of grid dimensions in order to use it for different resolutions
+       if(rift_number==201) {//larsenA north and south
+	  if((j<0.6*j+125 && i>0.6*i+122 && j>38)||( i<189 && i>186  && j>14)) { 
+	    RiftHere= PETSC_TRUE; }}
+       if(rift_number==202){//larsenB sorth north
+	  if( i<0.8*j+85 && i>0.8*j+82 && j>60){  
+	    RiftHere= PETSC_TRUE;}}
+       if(rift_number==203){//larsenB north longer
+	  if((i<2.0*j+14 && i>2.0*j+9 && j<62 && j>44)|| (i<0.8*j+85 && i>0.8*j+82 && j>60)) { 
+	    RiftHere= PETSC_TRUE;}}
+       if(rift_number==204){//larsenB south short
+	  if(i<1.7*j-147 && i>1.7*j-151 && j>116){ 
+	    RiftHere= PETSC_TRUE;}}	
+       if(rift_number==205){//larsenB south longer
+	  if((i<19*j-2130 && i>19*j-2165 && i>28 && i<51)||(i<1.7*j-147 && i>1.7*j-151 && j>116)) { 
+	    RiftHere= PETSC_TRUE;}}
+       if(rift_number==206){//larsenA south long
+	  if(i<1.0*j+99 && i>1.0*j+94 && j>38){ 
+	    RiftHere= PETSC_TRUE;}}
+       if(rift_number==207){//larsenB north long
+	  if(i<0.8*j+87 && i>0.8*j+83 && j>42){ 
+	    RiftHere= PETSC_TRUE;}}
+       if(rift_number==208){//larsenB south long
+	  if(i<1.3*j-91 && i>1.3*j-95 && j>96){ 
+	    RiftHere= PETSC_TRUE;}}
+       if(rift_number==209){//larsenB north and south long
+	  if((i<1.3*j-91 && i>1.3*j-95 && j>96)||(i<0.8*j+87 && i>0.8*j+83 && j>40)){ 
+	    RiftHere= PETSC_TRUE;}}
+      
+
+       //ross 6,1km:
+       if(rift_number==301) {//ross right up to byrd
+	  if(i<2.684*j-283 && i>2.684*j-288 && i<85) { 
+	    RiftHere= PETSC_TRUE; }}
+       if(rift_number==302) {//ross right of ice rise
+	  if(j==39 && i<90) { 
+	    RiftHere= PETSC_TRUE; }}
+
+
+       if(RiftHere)
+          vH(i,j)=0.0;       
+      }
+    }
+ 
+
+    RiftIsCut = PETSC_TRUE; // this ensures that a rift is cut ONLY on one single timestep
+    ierr = verbPrintf(1,grid.com,"PISMPIK_INFO: Rift number %d is cut at year %f between %f and %f\n",rift_number,current_time,rift_time1,rift_time2);
+    ierr = vH.end_access(); CHKERRQ(ierr); 
+  }
+
+  return 0;
+}
+
+

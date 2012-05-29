@@ -287,6 +287,7 @@ protected:
   // flags
   PetscBool  shelvesDragToo, allowAboveMelting;
   PetscBool  repeatRedist, putOnTop;
+  PetscBool  RiftIsCut;
   char        adaptReasonFlag;
 
   string      stdout_flags, stdout_ssa;
@@ -349,6 +350,7 @@ protected:
                 
   // see iMfractures.cc
   virtual PetscErrorCode calculateFractureDensity();
+  virtual PetscErrorCode applyRift();
 
   // see iMgeometry.cc
   virtual PetscErrorCode updateSurfaceElevationAndMask();

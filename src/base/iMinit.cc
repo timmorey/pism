@@ -509,6 +509,10 @@ PetscErrorCode IceModel::model_state_setup() {
   if (basal_yield_stress) {
     ierr = basal_yield_stress->init(variables); CHKERRQ(ierr);
   }
+  
+  if (config.get_flag("do_rift")) {
+			RiftIsCut=PETSC_FALSE;
+	}
 
   if (config.get_flag("compute_cumulative_acab")) {
     ierr = acab_cumulative.set(0.0); CHKERRQ(ierr);

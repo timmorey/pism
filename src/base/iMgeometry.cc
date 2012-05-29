@@ -520,6 +520,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
   if (config.get_flag("do_fracture_density") && config.get_flag("use_ssa_velocity")) {
     ierr = calculateFractureDensity(); CHKERRQ(ierr);
   }
+  
+  if (config.get_flag("do_rift")) {
+		if (RiftIsCut==PETSC_FALSE) {
+    	ierr = applyRift(); CHKERRQ(ierr); 
+		}
+  }
 
   // distribute residual ice mass if desired
   if (do_redist) {
