@@ -196,6 +196,7 @@ protected:
   IceModelVec2V taud, velocity_old;
   IceModelVec3 *enthalpy;
   IceModelVec2S *fracdens;
+  IceModelVec2S *gl_mask;
 
   string stdout_ssa;
 
