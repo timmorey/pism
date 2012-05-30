@@ -203,6 +203,8 @@ PetscErrorCode  IceModel::setFromOptions() {
     config.set_flag("part_redist", true);
     config.set_flag("kill_icebergs", true);
   }
+  // grounding line interpolation by torsten.albrecht@pik
+  ierr = config.flag_from_option("subgl", "sub_groundingline"); CHKERRQ(ierr);
   
   ierr = config.flag_from_option("part_grid_ground", "part_grid_ground"); CHKERRQ(ierr);  
   ierr = config.flag_from_option("grounded_calving", "grounded_calving"); CHKERRQ(ierr);  
