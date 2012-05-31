@@ -219,7 +219,16 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // this is not really the ocean_pressure, but the difference between
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
-            h_ij = (1.0 - ice.rho / ocean_rho) * H_ij;
+	    h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
+	    //ierr = verbPrintf(1,grid.com,"!!!PISM-INFO oceanpressure shelf = %f, driving stress = %f, ratio = %f.\n",ocean_pressure/dx,ice_pressure*h_ij/dx,ocean_pressure/(ice_pressure*h_ij)); CHKERRQ(ierr);
+						
+	    // what is the force balance of an iceshelf facing a bedrock wall?! 
+	    // this is not relevant as long as we ask only for ice_free_ocean neighbors
+	    //if ((aPP==0 && (*bed)(i+1,j)>h_ij) || (aMM==0 && (*bed)(i-1,j)>h_ij) ||
+	    //    (bPP==0 && (*bed)(i,j+1)>h_ij) || (bMM==0 && (*bed)(i,j-1)>h_ij)){
+	    //  ocean_pressure = 0.0; 
+	    //}
+
           } else {
             if( (*bed)(i,j) >= sea_level) {
               // boundary condition for a "cliff" (grounded ice next to
@@ -228,11 +237,13 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
               // this is not 'zero' because the isotrop.normal stresses
               // (=pressure) from within the ice figures on RHS
 	      h_ij = H_ij;
+	       //ierr = verbPrintf(1,grid.com,"!!!PISM-INFO oceanpressure cliff = %f, driving stress = %f, ratio = %f.\n",ocean_pressure/dx,ice_pressure*h_ij/dx,ocean_pressure/(ice_pressure*h_ij)); CHKERRQ(ierr);
             } else {
               // boundary condition for marine terminating glacier
               ocean_pressure = 0.5 * ice.rho * standard_gravity *
                 (H_ij2 - (ocean_rho / ice.rho)*(sea_level - (*bed)(i,j))*(sea_level - (*bed)(i,j)));
 	      h_ij = H_ij + (*bed)(i,j) - sea_level;
+	          //ierr = verbPrintf(1,grid.com,"!!!PISM-INFO oceanpressure marine = %f, driving stress = %f, ratio = %f.\n",ocean_pressure/dx,ice_pressure*h_ij/dx,ocean_pressure/(ice_pressure*h_ij)); CHKERRQ(ierr);
             }
           }
 
@@ -535,6 +546,7 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
           // areas already have a strength extension
           beta = beta_ice_free_bedrock;
         }
+        
         if (sub_gl){
           // if grounding line interpolation apply here reduced basal drag
           if (M.icy(M_ij)) {
