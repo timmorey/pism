@@ -1130,7 +1130,7 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
         "            arguments ... ENDING ...\n");CHKERRQ(ierr);
       PISMEnd();
     }
-    ierr = verbPrintf(2, grid.com,"PISM-PIK INFO: fracture_softening mode is set with phi_min=%.2f, ms=%.2f and ns=%.2f\n", phi_init,soft_rate,soft_offset); CHKERRQ(ierr);
+    //ierr = verbPrintf(2, grid.com,"PISM-PIK INFO: fracture_softening mode is set with phi_min=%.2f, ms=%.2f and ns=%.2f\n", phi_init,soft_rate,soft_offset); CHKERRQ(ierr);
   }
 				
   /////////////////////////////////////////////////////////  
