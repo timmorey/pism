@@ -31,6 +31,7 @@
 #include "PScalarForcing.hh"
 #include "PODirectForcing.hh"
 #include "PODirectForcingPIK.hh"
+#include "POMeltingParam.hh"
 
 // Atmosphere
 static void create_pa_constant(IceGrid& g, const NCConfigVariable& conf, PISMAtmosphereModel* &result) {
@@ -97,11 +98,16 @@ static void create_po_forcing(IceGrid& g, const NCConfigVariable& conf, PISMOcea
   result = new POdSLforcing(g, conf, input);
 }
 
+static void create_po_meltparam3eqn(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
+  result = new POMeltingParam3eqn(g, conf);
+}
+
 void POFactory::add_standard_types() {
   add_model("constant", &create_po_constant);
   add_model("given",    &create_po_given);
   add_model("pik",      &create_po_pik);
   add_model("givenpik", &create_po_givenpik);
+  add_model("meltparam3eqn",&create_po_meltparam3eqn);
   set_default("constant");
 
   add_modifier("dSLforcing", &create_po_forcing);
