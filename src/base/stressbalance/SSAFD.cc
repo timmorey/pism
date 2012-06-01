@@ -396,7 +396,7 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
   
   const bool sub_gl = config.get_flag("sub_groundingline");
   if (sub_gl){
-//     ierr = gl_mask->begin_access(); CHKERRQ(ierr);
+    ierr = gl_mask->begin_access(); CHKERRQ(ierr);
    }
 
   for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
@@ -545,7 +545,7 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
         if (sub_gl){
           // if grounding line interpolation apply here reduced basal drag
           if (M.icy(M_ij)) {
-//             beta = (*gl_mask)(i,j) * basal.drag((*tauc)(i,j), vel(i,j).u, vel(i,j).v);
+            beta = (*gl_mask)(i,j) * basal.drag((*tauc)(i,j), vel(i,j).u, vel(i,j).v);
           }
         }
       }
