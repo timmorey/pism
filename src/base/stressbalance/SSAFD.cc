@@ -978,35 +978,6 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
   ierr = hardness.begin_access(); CHKERRQ(ierr);
   ierr = thickness->begin_access(); CHKERRQ(ierr);
   
-  /////////////////////////////////////////////////////////////////////
-
-  IceModelVec2S &fd = *fracdens; // to improve readability (below)
-  bool dofd = (config.get_flag("do_fracture_density") && config.get_flag("use_ssa_velocity"));
-  if (dofd) 
-    ierr = fd.begin_access(); CHKERRQ(ierr);
-  
-  //get options
-  PetscInt    Nparam=3;
-  PetscReal   inarray[3] = {0.0,0.0,1.0};//phi_init, soft_rate, soft_offset
-
-  PetscBool sd_set;
-  ierr = PetscOptionsGetRealArray(PETSC_NULL, "-fracture_softening", inarray, &Nparam, &sd_set);
-  CHKERRQ(ierr);
-
-  PetscReal phi_init= inarray[0], soft_rate = inarray[1], soft_offset = inarray[2];
-
-  if (sd_set) {
-    if ((Nparam > 3) || (Nparam < 3)) {
-      ierr = verbPrintf(1, grid.com,
-	"PISM ERROR: option -fracture_softening provided with more or fewer than 3\n"
-        "            arguments ... ENDING ...\n");CHKERRQ(ierr);
-      PISMEnd();
-    }
-    //ierr = verbPrintf(2, grid.com,"PISM-PIK INFO: fracture_softening mode is set with phi_min=%.2f, ms=%.2f and ns=%.2f\n", phi_init,soft_rate,soft_offset); CHKERRQ(ierr);
-  }
-				
-  /////////////////////////////////////////////////////////  
-
   PetscScalar ssa_enhancement_factor=1.0;
   double n_glen  = ice.exponent();
   if (config.get_flag("do_ssa_enhancement"))

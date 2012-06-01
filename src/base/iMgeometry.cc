@@ -570,7 +570,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
 PetscErrorCode IceModel::sub_gl_position() {
   PetscErrorCode ierr;
 
-  if (ocean == PETSC_NULL) {  SETERRQ(grid.com, 1, "PISM ERROR: ocean == PETSC_NULL");  }
+  if (ocean == PETSC_NULL) {  SETERRQ(1, "PISM ERROR: ocean == PETSC_NULL");  }
   PetscReal sea_level;
   ierr = ocean->sea_level_elevation(sea_level); CHKERRQ(ierr);
 
