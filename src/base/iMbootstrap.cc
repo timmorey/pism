@@ -135,7 +135,7 @@ PetscErrorCode IceModel::bootstrap_2d(const char *filename) {
   }
 
   if (config.get_flag("sub_groundingline")) {
-    ierr = gl_mask.set(1.0); CHKERRQ(ierr);
+    ierr = gl_mask.set(0.0); CHKERRQ(ierr);
   }
 
  if (config.get_flag("part_grid_ground")) {
