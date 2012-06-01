@@ -362,6 +362,20 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
       ierr = vHref.set(0.0); CHKERRQ(ierr);
     }
   }
+
+  if (config.get_flag("sub_groundingline")) {
+    bool exists;
+    ierr = nc.find_variable("gl_mask", NULL, exists); CHKERRQ(ierr);
+
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: gl_mask for grounding line interpolation not fount in %s. Setting it to zero...\n",
+        filename); CHKERRQ(ierr);
+
+      ierr = gl_mask.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = gl_mask.set(0.0); CHKERRQ(ierr);
+    }
+  }
   
   // check if the input file has HrefGround; set its pism_intent to "diagnostic" and
   // set the field itself to 0 if it is not present

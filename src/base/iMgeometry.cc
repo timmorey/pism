@@ -582,7 +582,12 @@ PetscErrorCode IceModel::sub_gl_position() {
             rhoq = ice_rho/ocean_rho;
 
   IceModelVec2S gl_mask_new = vWork2d[0];
-  //ierr = gl_mask.copy_to(gl_mask_new); CHKERRQ(ierr);
+  ierr = gl_mask.copy_to(gl_mask_new); CHKERRQ(ierr);
+
+//   IceModelVec2S gl_mask_new = vWork2d[0];
+//   ierr = gl_mask.copy_to(gl_mask_new); CHKERRQ(ierr);
+//   ierr = gl_mask.beginGhostComm(gl_mask_new); CHKERRQ(ierr);
+//   ierr = gl_mask.endGhostComm(gl_mask_new); CHKERRQ(ierr);
   
   ierr =    vH.begin_access(); CHKERRQ(ierr);
   ierr =  vbed.begin_access(); CHKERRQ(ierr);
@@ -649,7 +654,8 @@ PetscErrorCode IceModel::sub_gl_position() {
         else
           gl_mask_new(i,j-1)+=(interpol-0.5);
           
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr); 
+        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+//         ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: gl_mask=%f at i=%d, j=%d\n",gl_mask_new(i,j),i,j); CHKERRQ(ierr);
       }
       if (mask.grounded(i, j))
         gl_mask_new(i,j) = gl_mask_x * gl_mask_y;
@@ -663,10 +669,10 @@ PetscErrorCode IceModel::sub_gl_position() {
   ierr =     gl_mask_new.end_access(); CHKERRQ(ierr);
   
   // finally copy gl_mask_new into gl_mask and communicate ghosted values
-  //ierr = gl_mask_new.beginGhostComm(gl_mask); CHKERRQ(ierr);
-  //ierr = gl_mask_new.endGhostComm(gl_mask); CHKERRQ(ierr);
+//   ierr = gl_mask_new.beginGhostComm(gl_mask); CHKERRQ(ierr);
+//   ierr = gl_mask_new.endGhostComm(gl_mask); CHKERRQ(ierr);
   
-  ierr = gl_mask_new.copy_to(gl_mask); CHKERRQ(ierr);
+//   ierr = gl_mask_new.copy_to(gl_mask); CHKERRQ(ierr);
 
   return 0;
 }

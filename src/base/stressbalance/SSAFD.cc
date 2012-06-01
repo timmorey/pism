@@ -219,7 +219,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // this is not really the ocean_pressure, but the difference between
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
-	    h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
+	    h_ij = (1.0 - ice.rho / ocean_rho) * H_ij;
 	    // what is the force balance of an iceshelf facing a bedrock wall?! 
 	    // this is not relevant as long as we ask only for ice_free_ocean neighbors
 	    //if ((aPP==0 && (*bed)(i+1,j)>h_ij) || (aMM==0 && (*bed)(i-1,j)>h_ij) ||
@@ -390,14 +390,13 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
 
   Mask M;
 
-  const bool bedrock_boundary = config.get_flag("ssa_dirichlet_bc");
   if (vel_bc && bc_locations) {
     ierr = bc_locations->begin_access(); CHKERRQ(ierr);
   }
   
   const bool sub_gl = config.get_flag("sub_groundingline");
   if (sub_gl){
-    ierr = gl_mask->begin_access(); CHKERRQ(ierr);
+//     ierr = gl_mask->begin_access(); CHKERRQ(ierr);
    }
 
   for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
@@ -546,7 +545,7 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
         if (sub_gl){
           // if grounding line interpolation apply here reduced basal drag
           if (M.icy(M_ij)) {
-            beta = (*gl_mask)(i,j) * basal.drag((*tauc)(i,j), vel(i,j).u, vel(i,j).v);
+//             beta = (*gl_mask)(i,j) * basal.drag((*tauc)(i,j), vel(i,j).u, vel(i,j).v);
           }
         }
       }
