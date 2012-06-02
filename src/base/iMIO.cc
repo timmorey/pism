@@ -511,7 +511,7 @@ PetscErrorCode IceModel::initFromFile(const char *filename) {
     ierr = vPartGridCoeff.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
     ierr = vJustGotFullCell.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
   }
-  
+
   string history;
   ierr = nc.get_att_text(NC_GLOBAL, "history", history); CHKERRQ(ierr);
   global_attributes.prepend_history(history);
