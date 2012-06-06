@@ -47,12 +47,12 @@ public:
 
   virtual PetscErrorCode shelf_base_mass_flux(IceModelVec2S &result);
 
-  virtual PetscErrorCode cavity_heat_water_fluxes_3eq(PetscReal temp,
-               PetscReal sal, PetscReal tin, PetscReal zice, PetscReal rhow,
+  virtual PetscErrorCode cavity_heat_water_fluxes_3eq(PetscReal thetao,
+               PetscReal sal, PetscReal temp_insitu, PetscReal zice, PetscReal rhow,
                PetscReal rhoi, PetscReal rho, PetscReal &meltrate);
-  virtual PetscErrorCode adlprt(PetscReal salz,PetscReal temp,PetscReal pres);
-  virtual PetscErrorCode pttmpr(PetscReal salz,PetscReal temp,PetscReal pres,PetscReal rfpres);
-  virtual PetscErrorCode potit(PetscReal salz,PetscReal pt,PetscReal pres,PetscReal rfpres);
+  virtual PetscErrorCode adlprt(PetscReal salz, PetscReal temp_insitu, PetscReal pres, PetscReal &adlprt_out);
+  virtual PetscErrorCode pttmpr(PetscReal salz, PetscReal temp_insitu, PetscReal pres,PetscReal rfpres, PetscReal &thetao);
+  virtual PetscErrorCode potit(PetscReal salz,PetscReal thetao,PetscReal pres,PetscReal rfpres, PetscReal &temp_insitu_out);
   protected:
     IceModelVec2S *ice_thickness, *bed; // is not owned by this class
 
