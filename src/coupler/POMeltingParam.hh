@@ -50,7 +50,9 @@ public:
   virtual PetscErrorCode cavity_heat_water_fluxes_3eq(PetscReal temp,
                PetscReal sal, PetscReal tin, PetscReal zice, PetscReal rhow,
                PetscReal rhoi, PetscReal rho, PetscReal &meltrate);
-
+  virtual PetscErrorCode adlprt(PetscReal salz,PetscReal temp,PetscReal pres);
+  virtual PetscErrorCode pttmpr(PetscReal salz,PetscReal temp,PetscReal pres,PetscReal rfpres);
+  virtual PetscErrorCode potit(PetscReal salz,PetscReal pt,PetscReal pres,PetscReal rfpres);
   protected:
     IceModelVec2S *ice_thickness, *bed; // is not owned by this class
 

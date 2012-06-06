@@ -95,7 +95,9 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
 //   PetscReal L = config.get("water_latent_heat_fusion"),
     PetscReal rho_ocean = config.get("sea_water_density"),
               rho_ice   = config.get("ice_density"),
-              meltrate_3eqn;
+              meltrate_3eqn, meltrate_dummy;
+
+  PetscReal reference_pressure = 10.1325; // pressure of atmosphere in dbar
 
   PetscScalar **H, **topgg;
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
@@ -117,9 +119,13 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
       PetscScalar shelfbaseelev = - (rho_ice / rho_ocean) * H[i][j];
       PetscReal oceantemp = temp(i,j); 
       // in situ temperature
-      PetscReal tin  = temp(i,j);
+//       PetscReal tin  = temp(i,j);
       PetscReal sal  = mass_flux(i,j); //35.;
-
+      // pres in dbar
+      PetscReal press = rho_ocean * -1.*shelfbaseelev/100. + reference_pressure;
+//       PetscReal sal  = 40;
+//       PetscReal press = 100.;
+      PetscReal tin  = potit(sal,temp(i,j),press,reference_pressure);
       PetscReal rhow = rho_ocean;
       PetscReal rhoi = rho_ice;
       PetscReal rho  = rho_ocean;
@@ -134,11 +140,12 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
       
 //       ierr = verbPrintf(2, grid.com, "H=%e,shelfbaseelev=%e\n",H[i][j],shelfbaseelev); CHKERRQ(ierr);
       cavity_heat_water_fluxes_3eq(oceantemp, sal, tin, zice, rhow, rhoi, rho, meltrate_3eqn);
-      
-//       if( H[i][j] > 0. && topgg[i][j] < -1*(rho_ice/rho_ocean)*H[i][j]){
-//         ierr = verbPrintf(2, grid.com, "H=%e,shelfbaseelev=%e, meltrate=%e, zice=%e\n",
-//                           H[i][j],shelfbaseelev,meltrate_3eqn,zice); CHKERRQ(ierr);
-//       }
+      cavity_heat_water_fluxes_3eq(oceantemp, sal, oceantemp, zice, rhow, rhoi, rho, meltrate_dummy);
+      if( H[i][j] > 0. && topgg[i][j] < -1*(rho_ice/rho_ocean)*H[i][j]){
+        ierr = verbPrintf(2, grid.com, "H=%e,shelfbaseelev=%e, meltrate=%e, zice=%e,meltr_pot=%e,pres=%e,pott=%e,inst=%e\n",
+                          H[i][j],shelfbaseelev,meltrate_3eqn,zice,meltrate_dummy,press,
+                          temp(i,j),tin); CHKERRQ(ierr);
+      }
       result(i,j) = -1*meltrate_3eqn;
 
     }
@@ -255,4 +262,97 @@ PetscErrorCode POMeltingParam3eqn::cavity_heat_water_fluxes_3eq(PetscReal temp,
 //   ierr = verbPrintf(2, grid.com, "meltrate is %e, ep5=%e,sal=%e,sf=%e,sr1=%e,sr2=%e\n",
 //                     meltrate, ep5, sal, sf, sr1, sr2); CHKERRQ(ierr);
   return 0;
+}
+
+PetscErrorCode POMeltingParam3eqn::adlprt(PetscReal salz,PetscReal temp,PetscReal pres){
+// Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
+// (TEMP) und dem in-situ Druck/dbar (PRES) den adiabatischen Temperatur-
+// gradienten/(K Dbar^-1) ADLPRT.
+// Checkwert: ADLPRT =     3.255976E-4 K dbar^-1
+//       fuer SALZ   =    40.0 psu
+//            TEMP   =    40.0 DegC
+//            PRES   = 10000.000 dbar
+
+  //real salz,temp,pres
+  PetscReal s0,a0,a1,a2,a3,b0,b1,c0,c1,c2,c3,d0,d1,e0,e1,e2,ds;
+
+  s0          = 35.0;
+  a0,a1,a2,a3 = 3.5803E-5, 8.5258E-6, -6.8360E-8, 6.6228E-10;
+  b0,b1       = 1.8932E-6, -4.2393E-8;
+  c0,c1,c2,c3 = 1.8741E-8, -6.7795E-10, 8.7330E-12, -5.4481E-14;
+  d0,d1       = -1.1351E-10, 2.7759E-12;
+  e0,e1,e2    = -4.6206E-13,  1.8676E-14, -2.1687E-16;
+
+  ds = salz-s0;
+  return (( ( (e2*temp + e1)*temp + e0 )*pres + ( (d1*temp + d0)*ds
+           + ( (c3*temp + c2)*temp + c1 )*temp + c0 ) )*pres
+          + (b1*temp + b0)*ds +  ( (a3*temp + a2)*temp + a1 )*temp + a0);
+}
+
+PetscErrorCode POMeltingParam3eqn::pttmpr(PetscReal salz,PetscReal temp,PetscReal pres,PetscReal rfpres){
+// Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
+// (TEMP) und dem in-situ Druck/dbar (PRES) die potentielle Temperatur/
+// degC (PTTMPR) bezogen auf den Referenzdruck/dbar (RFPRES). Es wird
+// ein Runge-Kutta Verfahren vierter Ordnung verwendet.
+// Checkwert: PTTMPR = 36.89073 DegC
+//       fuer SALZ   =    40.0 psu
+//            TEMP   =    40.0 DegC
+//            PRES   = 10000.000 dbar
+//            RFPRES =     0.000 dbar
+
+  PetscReal ct2  = 0.29289322 , ct3  = 1.707106781;
+  PetscReal cq2a = 0.58578644 , cq2b = 0.121320344;
+  PetscReal cq3a = 3.414213562, cq3b = -4.121320344;
+
+  //real salz,temp,pres,rfpres
+  PetscReal p,t,dp,dt,q;
+  //real adlprt
+
+  p  = pres;
+  t  = temp;
+  dp = rfpres-pres;
+  dt = dp*adlprt(salz,t,p);
+  t  = t +0.5*dt;
+  q = dt;
+  p  = p +0.5*dp;
+  dt = dp*adlprt(salz,t,p);
+  t  = t + ct2*(dt-q);
+  q  = cq2a*dt + cq2b*q;
+  dt = dp*adlprt(salz,t,p);
+  t  = t + ct3*(dt-q);
+  q  = cq3a*dt + cq3b*q;
+  p  = rfpres;
+  dt = dp*adlprt(salz,t,p);
+
+  return t+ (dt-q-q)/6.0;
+}
+
+PetscErrorCode POMeltingParam3eqn::potit(PetscReal salz,PetscReal pt,PetscReal pres,PetscReal rfpres){
+  // *********************************************************************
+  // Berechnet aus dem Salzgehalt[psu] (SALZ), der pot. Temperatur[oC]
+  // (PT) und dem Referenzdruck[dbar] (REFPRES) die in-situ Temperatur
+  // [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
+  // eines Iterationsverfahrens aus.
+
+  //integer iter
+  //real salz,pt,pres,rfpres,tin
+  //real epsi,tpmd,pt1,ptd,pttmpr
+
+  //tpmd / 0.001 /
+  PetscReal tpmd = 0.001, epsi = 0., tin, pt1, ptd;
+  
+  for (PetscInt iter=0; iter<100; ++iter) {
+  //do iter=1,100
+    tin  = pt+epsi;
+//     print "tin=" + str(tin)
+    pt1  = pttmpr(salz,tin,pres,rfpres);
+//     print "pt1=" + str(pt1)
+    ptd  = pt1-pt;
+//     print "ptd=" + str(ptd)
+    if(PetscAbs(ptd) < tpmd){
+      return tin;
+    }else{
+      epsi = epsi-ptd;
+    }
+  }
 }
