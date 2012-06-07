@@ -28,7 +28,7 @@ public:
   POMeltingParam3eqn(IceGrid &g, const NCConfigVariable &conf)
     : PDirectForcing<PISMOceanModel>(g, conf)
   {
-    temp_name       = "oceantemp";
+    temp_name       = "thetao";
     mass_flux_name  = "salinity";
     bc_option_name = "-ocean_bc_file";
   }

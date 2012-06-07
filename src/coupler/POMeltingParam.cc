@@ -97,7 +97,7 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
               rho_ice   = config.get("ice_density"),
               meltrate_3eqn, meltrate_dummy, temp_insitu;
 
-  PetscReal reference_pressure = 10.1325; // pressure of atmosphere in dbar
+  PetscReal reference_pressure = 1.01325; // pressure of atmosphere in bar
 
   PetscScalar **H, **topgg;
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
@@ -121,8 +121,8 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
       // in situ temperature
 //       PetscReal tin  = temp(i,j);
       PetscReal sal  = mass_flux(i,j); //35.;      
-      // pres in dbar
-      PetscReal press = rho_ocean * -1.*shelfbaseelev/100. + reference_pressure;
+      // press in bar
+      PetscReal press = rho_ocean * -1.*shelfbaseelev/1000. + reference_pressure;
 //       ierr = verbPrintf(2, grid.com, "sal=%e, press=%e,temp=%e,\n",
 //                     sal,press,temp(i,j)); CHKERRQ(ierr);
 //       PetscReal sal  = 40;
@@ -132,26 +132,9 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
       PetscReal rhoi = rho_ice;
       PetscReal rho  = rho_ocean;
       PetscReal zice = -1*PetscAbs(shelfbaseelev);
-//       temp =-2.4;
-//       tin  =-1.7;
-//       sal  = 35.;
-//       zice = 800.;
-//       rhow = 1028.;
-//       rhoi = 920.;
-//       rho  = 1028.;
-//       PetscReal dm1, dm2;
-//       adlprt(40.,40.,10000.,dm1);
-//       pttmpr(40.,40.,10000.,0.,dm2);
-//       ierr = verbPrintf(2, grid.com, "adlprt=%e\n",dm1); CHKERRQ(ierr);
-//       ierr = verbPrintf(2, grid.com, "pttmpr=%e\n",dm2); CHKERRQ(ierr);
       
       cavity_heat_water_fluxes_3eq(oceantemp, sal, temp_insitu, zice, rhow, rhoi, rho, meltrate_3eqn);
-//       cavity_heat_water_fluxes_3eq(oceantemp, sal, oceantemp, zice, rhow, rhoi, rho, meltrate_dummy);
-//       if( H[i][j] > 0. && topgg[i][j] < -1*(rho_ice/rho_ocean)*H[i][j]){
-//         ierr = verbPrintf(2, grid.com, "H=%e,shelfbaseelev=%e, meltrate=%e, zice=%e,meltr_pot=%e,pres=%e,pott=%e,inst=%e\n",
-//                           H[i][j],shelfbaseelev,meltrate_3eqn,zice,meltrate_dummy,press,
-//                           temp(i,j),temp_insitu); CHKERRQ(ierr);
-//       }
+
       result(i,j) = -1*meltrate_3eqn;
 
     }
