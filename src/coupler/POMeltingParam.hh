@@ -28,7 +28,7 @@ public:
   POMeltingParam3eqn(IceGrid &g, const NCConfigVariable &conf)
     : PDirectForcing<PISMOceanModel>(g, conf)
   {
-    temp_name       = "oceantemp";
+    temp_name       = "thetao";
     mass_flux_name  = "salinity";
     bc_option_name = "-ocean_bc_file";
   }
@@ -47,7 +47,7 @@ public:
 
   virtual PetscErrorCode shelf_base_mass_flux(IceModelVec2S &result);
 
-  virtual PetscErrorCode cavity_heat_water_fluxes_3eq(PetscReal thetao,
+  virtual PetscErrorCode cavity_heat_water_fluxes_3eq(
                PetscReal sal, PetscReal temp_insitu, PetscReal zice, PetscReal rhow,
                PetscReal rhoi, PetscReal rho, PetscReal &meltrate);
   virtual PetscErrorCode adlprt(PetscReal salz, PetscReal temp_insitu, PetscReal pres, PetscReal &adlprt_out);

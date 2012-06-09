@@ -117,24 +117,23 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
       // Pressure Melting Temperature, see beckmann_goosse03 eq. 2 for
       // details]
       PetscScalar shelfbaseelev = - (rho_ice / rho_ocean) * H[i][j];
-      PetscReal oceantemp = temp(i,j); 
-      // in situ temperature
-//       PetscReal tin  = temp(i,j);
-      PetscReal sal  = mass_flux(i,j); //35.;      
+      PetscReal thetao = temp(i,j) - 273.15; // in degC
+      PetscReal sal  = mass_flux(i,j);
       // press in bar
       PetscReal press = rho_ocean * -1.*shelfbaseelev/1000. + reference_pressure;
 //       ierr = verbPrintf(2, grid.com, "sal=%e, press=%e,temp=%e,\n",
 //                     sal,press,temp(i,j)); CHKERRQ(ierr);
-//       PetscReal sal  = 40;
-//       PetscReal press = 100.;
-      potit(sal,temp(i,j),press,reference_pressure, temp_insitu);
+
+      potit(sal,thetao,press,reference_pressure, temp_insitu);
       PetscReal rhow = rho_ocean;
       PetscReal rhoi = rho_ice;
       PetscReal rho  = rho_ocean;
       PetscReal zice = -1*PetscAbs(shelfbaseelev);
-      
-      cavity_heat_water_fluxes_3eq(oceantemp, sal, temp_insitu, zice, rhow, rhoi, rho, meltrate_3eqn);
 
+//       ierr = verbPrintf(2, grid.com, "temp=%e, salt=%e\n",
+//                         temp_insitu, sal); CHKERRQ(ierr);
+      
+      cavity_heat_water_fluxes_3eq(sal, temp_insitu, zice, rhow, rhoi, rho, meltrate_3eqn);
       result(i,j) = -1*meltrate_3eqn;
 
     }
@@ -149,8 +148,8 @@ PetscErrorCode POMeltingParam3eqn::shelf_base_mass_flux(IceModelVec2S &result) {
   return 0;
 }
 
-PetscErrorCode POMeltingParam3eqn::cavity_heat_water_fluxes_3eq(PetscReal thetao,
-               PetscReal sal, PetscReal temp_insitu, PetscReal zice, PetscReal rhow,
+PetscErrorCode POMeltingParam3eqn::cavity_heat_water_fluxes_3eq( PetscReal sal,
+               PetscReal temp_insitu, PetscReal zice, PetscReal rhow,
                PetscReal rhoi, PetscReal rho, PetscReal &meltrate){
 
   // The three-equation model of ice-shelf ocean interaction (Hellmer and Olbers, 1989).
@@ -187,14 +186,6 @@ PetscErrorCode POMeltingParam3eqn::cavity_heat_water_fluxes_3eq(PetscReal thetao
   PetscReal cpi =  152.5+7.122*(atk+tob);     //Paterson:"The Physics of Glaciers"
 
   PetscReal L    = 334000.;                   // [J/Kg]
-
-// FIXME: need to calculate in situ if we have potential temperatuer
-// Calculate the in-situ temperature tin
-//call potit(s(i,j,N,lrhs)+35.0,t(i,j,N,lrhs),-zice(i,j),rp,tin)
-
-// mm@pik: lets use brios tin as a first try
-//  call potit(sal,thetao,abs(zice),rp,tin)
-//  PetscReal tin = temp;
 
 // Prescribe the turbulent heat and salt transfer coeff. GAT and GAS
 
