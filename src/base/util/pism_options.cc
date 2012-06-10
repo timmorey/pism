@@ -18,6 +18,7 @@
 
 #include <sstream>
 #include <algorithm>
+#include <string.h>
 
 #include "pism_options.hh"
 #include "NCVariable.hh"
@@ -108,220 +109,6 @@ PetscErrorCode stop_if_set(MPI_Comm com, const char name[]) {
   return 0;
 }
 
-
-//! Parses a MATLAB-style range (a:delta:b).
-PetscErrorCode parse_range(MPI_Comm com, string str, double *a, double *delta, double *b, string &keyword) {
-  PetscErrorCode ierr;
-  istringstream arg(str);
-  vector<string> numbers;
-  double doubles[3];
-
-  // Split the string:
-  string tmp;
-  while (getline(arg, tmp, ':'))
-    numbers.push_back(tmp);
-
-  // Check if we have 3 numbers:
-  if (numbers.size() != 3) {
-      ierr = PetscPrintf(com,
-			 "PISM ERROR: A range has to consist of exactly three numbers, separated by colons.\n");
-      CHKERRQ(ierr);
-      return 1;
-  }
-
-  keyword = "simple";
-
-  // Convert each number from a string to double:
-  for (int j = 0; j < 3; ++j) {
-    double d;
-    char *endptr;
-
-    // take care of daily, monthly and yearly keywords:
-    if (j == 1 && (numbers[j] == "daily" ||
-                   numbers[j] == "monthly" ||
-                   numbers[j] == "yearly")) {
-      keyword = numbers[j];
-      doubles[j] = 0;
-      continue;
-    }
-
-    d = strtod(numbers[j].c_str(), &endptr);
-    if (*endptr != '\0') {
-      ierr = PetscPrintf(com, "PISM ERROR: Can't parse %s (%s is not a number).\n",
-			 str.c_str(), numbers[j].c_str()); CHKERRQ(ierr);
-      return 1;
-    }
-    else
-      doubles[j] = d;
-  }
-
-  if (a) *a = doubles[0];
-  if (delta) *delta = doubles[1];
-  if (b) *b = doubles[2];
-
-  return 0;
-}
-
-vector<double> compute_times(MPI_Comm com, const NCConfigVariable &config,
-                             int a, int b, string keyword) {
-  utUnit unit;
-  string unit_str = "seconds since " + config.get_string("reference_date");
-  vector<double> result;
-  double a_offset, b_offset;
-
-  // scan the units:
-  int err = utScan(unit_str.c_str(), &unit);
-  if (err != 0) {
-    PetscPrintf(com, "PISM ERROR: invalid units specification: %s\n",
-                unit_str.c_str());
-    PISMEnd();
-  }
-
-  // get the 'year' out of the reference date:
-  int reference_year, tmp1;
-  float tmp2;
-  utCalendar(0, &unit, &reference_year,
-             &tmp1, &tmp1, &tmp1, &tmp1, &tmp2);
-
-  // compute the number of seconds-since-the-reference date 'a' corresponds to:
-  utInvCalendar(reference_year + a, // year
-                1, 1,               // month, day
-                0, 0, 0,            // hour, minute, second
-                &unit,
-                &a_offset);
-
-  // compute the number of seconds-since-the-reference date 'b' corresponds to:
-  utInvCalendar(reference_year + b, // year
-                1, 1,               // month, day
-                0, 0, 0,            // hour, minute, second
-                &unit,
-                &b_offset);
-
-  if (keyword == "daily") {
-
-    double t = a_offset, delta = 60*60*24; // seconds per day
-    int year;
-
-    do {
-      result.push_back(t);
-      t += delta;
-      utCalendar(t, &unit, &year, &tmp1, &tmp1, &tmp1, &tmp1, &tmp2);
-    } while (year <= reference_year + b);
-
-    // add the last record:
-    result.push_back(t);
-
-  } else if (keyword == "monthly") {
-
-    double t;
-    int y, m;
-    for (y = a; y <= b; y++) {
-      for (m = 1; m <= 12; m++) {
-        utInvCalendar(reference_year + y,   // year
-                      m, 1,                 // month, day
-                      0, 0, 0,              // hour, minute, second
-                      &unit,
-                      &t);
-        result.push_back(t);
-      }
-    }
-
-    // add the last record:
-    utInvCalendar(reference_year + b + 1,   // year
-                  1, 1,                     // month, day
-                  0, 0, 0,                  // hour, minute, second
-                  &unit,
-                  &t);
-    result.push_back(t);
-
-  } else if (keyword == "yearly") {
-
-    double t;
-    for (int y = a; y <= b+1; y++) {    // note the "b + 1"
-      utInvCalendar(reference_year + y,   // year
-                    1, 1,                 // month, day
-                    0, 0, 0,              // hour, minute, second
-                    &unit,
-                    &t);
-      result.push_back(t);
-    }
-
-  } else {
-    PetscPrintf(com,
-                "PISM ERROR: unknown time-step keyword: %s\n"
-                "            (only 'daily', 'monthly' and 'yearly' are implemented).\n",
-                keyword.c_str());
-    PISMEnd();
-  }
-  
-  return result;
-}
-
-//! Parses a time specification.
-/*!
-  If it is a MATLAB-style range, then calls parse_range and computes all the points.
-
-  If it is a comma-separated list, converts to double (with error-checking).
- */
-PetscErrorCode parse_times(MPI_Comm com, const NCConfigVariable &config, string str, vector<double> &result) {
-  PetscErrorCode ierr;
-  int N;
-
-  if (str.find(':') != string::npos) { // it's a range specification
-    
-    double a, delta, b;
-    string keyword;
-    ierr = parse_range(com, str, &a, &delta, &b, keyword);
-    if (ierr != 0) return 1;
-
-    if (a >= b) {
-      ierr = PetscPrintf(com, "PISM ERROR: a >= b in the range specification %s.\n",
-			 str.c_str()); CHKERRQ(ierr);
-      return 1;
-    }
-
-    if (keyword != "simple") {
-
-      result = compute_times(com, config, (int)a, (int)b, keyword);
-
-    } else {
-      if (delta <= 0) {
-        ierr = PetscPrintf(com, "PISM ERROR: delta <= 0 in the range specification %s.\n",
-                           str.c_str()); CHKERRQ(ierr);
-        return 1;
-      }
-
-      N = (int)floor((b - a)/delta) + 1; // number of points in the range
-      result.resize(N);
-
-      for (int j = 0; j < N; ++j)
-        result[j] = convert(a + delta*j, "years", "seconds");
-    }
-
-  } else {			// it's a list of times
-    istringstream arg(str);
-    string tmp;
-
-    result.clear();
-    while(getline(arg, tmp, ',')) {
-      double d;
-      char *endptr;
-
-      d = strtod(tmp.c_str(), &endptr);
-      if (*endptr != '\0') {
-	ierr = PetscPrintf(com, "PISM ERROR: Can't parse %s (%s is not a number).\n",
-			   str.c_str(), tmp.c_str()); CHKERRQ(ierr);
-	return 1;
-      }
-      else
-	result.push_back(convert(d, "years", "seconds"));
-    }
-    sort(result.begin(), result.end());
-  }
-
-  return 0;
-}
-
 //! \brief Stop if at least one of -version and -pismversion is set.
 PetscErrorCode stop_on_version_option() {
   PetscErrorCode ierr;
@@ -351,9 +138,9 @@ PetscErrorCode just_show_usage(
       "       http://www.pism-docs.org/wiki/lib/exe/fetch.php?media=manual.pdf\n"
       "  2. read browser for technical details:\n"
       "       http://www.pism-docs.org/doxy/html/index.html\n"
-      "  3. search bugs and tasks source host: https://gna.org/projects/pism\n"
+      "  3. view issues/bugs at source host: https://github.com/pism/pism/issues\n"
       "  4. do '%s -help | grep foo' to see PISM and PETSc options with 'foo'.\n"
-      "  5. email:  help@pism-docs.org\n", 
+      "  5. email for help:  help@pism-docs.org\n", 
       execname,execname);  CHKERRQ(ierr);
   return 0;
 }
@@ -582,7 +369,10 @@ PetscErrorCode PISMOptionsReal(string option, string text,
   PetscBool flag;
   char *endptr;
 
-  ierr = PetscOptionsString(option.c_str(), text.c_str(), "", "none", str,
+  memset(str, 0, TEMPORARY_STRING_LENGTH);
+  snprintf(str, TEMPORARY_STRING_LENGTH, "%f", result);
+
+  ierr = PetscOptionsString(option.c_str(), text.c_str(), "", str, str,
 			    TEMPORARY_STRING_LENGTH, &flag); CHKERRQ(ierr);
 
   is_set = (flag == PETSC_TRUE);
@@ -777,6 +567,11 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("sia", "do_sia"); CHKERRQ(ierr);
 
   // Time-stepping
+  ierr = config.keyword_from_option("calendar", "calendar",
+                                    "365_day,gregorian"); CHKERRQ(ierr);
+
+  ierr = config.string_from_option("reference_date", "reference_date"); CHKERRQ(ierr);
+
   ierr = config.scalar_from_option("adapt_ratio",
 				   "adaptive_timestepping_ratio"); CHKERRQ(ierr);
 
@@ -807,7 +602,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   // Decide on the algorithm for solving the SSA
   ierr = config.keyword_from_option("ssa_method", "ssa_method", "fd,fem"); CHKERRQ(ierr);
 
-  ierr = config.scalar_from_option("ssa_eps",  "epsilon_ssafd"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("ssa_eps",  "epsilon_ssa"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("ssa_maxi", "max_iterations_ssafd"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("ssa_rtol", "ssafd_relative_convergence"); CHKERRQ(ierr);
 
@@ -890,7 +685,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
                                     "xyz,yxz,zyx"); CHKERRQ(ierr);
 
   ierr = config.keyword_from_option("o_format", "output_format",
-                                    "netcdf3,netcdf4_parallel"); CHKERRQ(ierr);
+                                    "netcdf3,netcdf4_parallel,pnetcdf"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("summary_volarea_scale_factor_log10",
                                    "summary_volarea_scale_factor_log10"); CHKERRQ(ierr);
@@ -918,6 +713,10 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
     config.set_flag("kill_icebergs", true);
   }
 
+  // kill_icebergs requires part_grid
+  if (config.get_flag("kill_icebergs")) {
+    config.set_flag("part_grid", true);
+  }
   
   ierr = PISMOptionsIsSet("-ssa_floating_only", flag);  CHKERRQ(ierr);
   if (flag) {

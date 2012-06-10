@@ -95,7 +95,7 @@ PetscErrorCode SSA::init(PISMVars &vars) {
 
     ierr = PISMOptionsIsSet("-dontreadSSAvels", dont_read_initial_guess); CHKERRQ(ierr);
 
-    ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+    ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
     ierr = nc.inq_var("u_ssa", u_ssa_found); CHKERRQ(ierr); 
     ierr = nc.inq_var("v_ssa", v_ssa_found); CHKERRQ(ierr); 
     ierr = nc.inq_nrecords(start); CHKERRQ(ierr);
@@ -427,7 +427,7 @@ PetscErrorCode SSA::compute_driving_stress(IceModelVec2V &result) {
 
   for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
     for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
-      const PetscScalar pressure = ice_rho * standard_gravity * thk(i,j); // FIXME task #7297
+      const PetscScalar pressure = ice_rho * standard_gravity * thk(i,j); // FIXME issue #15
       if (pressure <= 0.0) {
         result(i,j).u = 0.0;
         result(i,j).v = 0.0;
@@ -541,12 +541,12 @@ PetscErrorCode SSA::set_initial_guess(IceModelVec2V &guess) {
 }
 
 
-void SSA::add_vars_to_output(string /*keyword*/, set<string> &result) {
-  result.insert("vel_ssa");
+void SSA::add_vars_to_output(string /*keyword*/, map<string,NCSpatialVariable> &result) {
+  result["vel_ssa"] = velocity.get_metadata();
 }
 
 
-PetscErrorCode SSA::define_variables(set<string> vars, const PIO &nc, nc_type nctype) {
+PetscErrorCode SSA::define_variables(set<string> vars, const PIO &nc, PISM_IO_Type nctype) {
   PetscErrorCode ierr;
 
   if (set_contains(vars, "vel_ssa")) {

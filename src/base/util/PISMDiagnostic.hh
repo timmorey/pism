@@ -54,7 +54,7 @@ class PISMDiagnostic
 public:
   PISMDiagnostic(IceGrid &g, PISMVars &my_vars)
     : variables(my_vars), grid(g) {
-    output_datatype = NC_FLOAT;
+    output_datatype = PISM_FLOAT;
     dof = 1;
     vars.resize(dof);
   }
@@ -76,11 +76,11 @@ public:
   virtual int get_nvars() { return dof; }
 
   //! Get a pointer to a metadata object corresponding to variable number N.
-  virtual NCSpatialVariable* get_metadata(int N = 0)
+  virtual NCSpatialVariable get_metadata(int N = 0)
   {
-    if (N >= dof) return NULL;
+    if (N >= dof) return NCSpatialVariable();
 
-    return &(vars[N]);
+    return vars[N];
   }
 
   //! Define NetCDF variables corresponding to a diagnostic quantity.
@@ -126,7 +126,7 @@ protected:
   PISMVars &variables;          //!< dictionary of variables
   IceGrid &grid;                //!< the grid
   int dof;                      //!< number of degrees of freedom; 1 for scalar fields, 2 for vector fields
-  nc_type output_datatype;      //!< data type to use in the file
+  PISM_IO_Type output_datatype;      //!< data type to use in the file
   vector<NCSpatialVariable> vars; //!< metadata corresponding to NetCDF variables
 };
 
@@ -174,6 +174,11 @@ public:
       return ts->init(filename);
     return 0;
   }
+
+  virtual string get_string(string name) {
+    return ts->get_string(name);
+  }
+
 protected:
   PISMVars &variables;          //!< dictionary of variables
   IceGrid &grid;                //!< the grid
@@ -186,7 +191,7 @@ class PISMTSDiag : public PISMTSDiagnostic
 public:
   PISMTSDiag(Model *m, IceGrid &g, PISMVars &my_vars)
     : PISMTSDiagnostic(g, my_vars), model(m) {
-    time_units = grid.time->units();
+    time_units = grid.time->CF_units();
     time_dimension_name = grid.config.get_string("time_dimension_name");
   }
 protected:

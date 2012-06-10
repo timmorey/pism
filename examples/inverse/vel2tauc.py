@@ -147,7 +147,7 @@ class Vel2Tauc(PISM.ssa.SSAFromInputFile):
     mask_values=[0,1]
     zeta_fixed_mask.set_attr("flag_values", mask_values);
     zeta_fixed_mask.set_attr("flag_meanings","tauc_changable tauc_unchangeable");
-    zeta_fixed_mask.output_data_type = PISM.NC_BYTE;
+    zeta_fixed_mask.output_data_type = PISM.PISM_BYTE;
     
     zeta_fixed_mask.set(1);
     with PISM.util.Access(comm=zeta_fixed_mask,nocomm=mask):
@@ -204,7 +204,7 @@ class Vel2TaucPlotListener(PlotListener):
       vecs = inverse_solver.forward_problem.ssarun.modeldata.vecs;
       self.l2_weight=self.tz_scalar.communicate(vecs.vel_misfit_weight)
       self.l2_weight_init = True
-    PlotListener.__call__(self,solver,count,x,y,d,r,*args)
+    PlotListener.__call__(self,inverse_solver,count,x,y,d,r,*args)
 
   def iteration(self,inverse_solver,count,x,Fx,y,d,r,arg_extra,*args):      
 
@@ -422,6 +422,7 @@ if __name__ == "__main__":
     Vmax = PISM.optionsReal("-inv_plot_vmax","maximum velocity for plotting residuals",default=30)
     monitor_adjoint = PISM.optionsFlag("-inv_monitor_adjoint","Track accuracy of the adjoint during computation",default=False)
     is_regional = PISM.optionsFlag("-regional","Compute SIA/SSA using regional model semantics",default=False)
+    prep_module = PISM.optionsString("-inv_prep_module","Python module used to do final setup of inverse solver",default=None)
     
   if output_filename is None:
     output_filename = "vel2tauc_"+os.path.basename(input_filename)    
@@ -594,6 +595,14 @@ if __name__ == "__main__":
     solver.addIterationListener(pauseListener)            
   # Saving the current iteration
   solver.addXUpdateListener(ZetaSaver(output_filename)) 
+
+  # Solver is set up.  Give the user's prep module a chance to do any final
+  # setup.
+  
+  if prep_module is not None:
+    exec "import %s as user_prep_module" % prep_module
+    user_prep_module.prep_solver(solver,method)
+
 
   # Run the inverse solver!
   if do_restart:

@@ -45,7 +45,7 @@ void Timeseries::private_constructor(MPI_Comm c, PetscMPIInt r, string name, str
 
 
 //! Read timeseries data from a NetCDF file \c filename.
-PetscErrorCode Timeseries::read(const char filename[]) {
+PetscErrorCode Timeseries::read(string filename, bool use_reference_date) {
   PetscErrorCode ierr;
 
   PIO nc(com, rank, "netcdf3");
@@ -54,14 +54,14 @@ PetscErrorCode Timeseries::read(const char filename[]) {
   string time_name, standard_name = var.get_string("standard_name"),
     name_found;
 
-  ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+  ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
   ierr = nc.inq_var(short_name, standard_name,
                     exists, name_found, found_by_standard_name); CHKERRQ(ierr);
 
   if (!exists) {
     ierr = PetscPrintf(com,
 		      "PISM ERROR: Can't find '%s' ('%s') in '%s'.\n",
-		       short_name.c_str(), standard_name.c_str(), filename);
+		       short_name.c_str(), standard_name.c_str(), filename.c_str());
     CHKERRQ(ierr);
     PISMEnd();
   }
@@ -72,7 +72,7 @@ PetscErrorCode Timeseries::read(const char filename[]) {
     ierr = PetscPrintf(com,
 		       "PISM ERROR: Variable '%s' in '%s' depends on %d dimensions,\n"
 		       "            but a time-series variable can only depend on 1 dimension.\n",
-		       short_name.c_str(), filename, dims.size()); CHKERRQ(ierr);
+		       short_name.c_str(), filename.c_str(), dims.size()); CHKERRQ(ierr);
     PISMEnd();
   }
 
@@ -82,7 +82,7 @@ PetscErrorCode Timeseries::read(const char filename[]) {
 
   dimension.init(time_name, time_name, com, rank);
 
-  ierr = dimension.read(filename, time); CHKERRQ(ierr);
+  ierr = dimension.read(filename, use_reference_date, time); CHKERRQ(ierr);
   bool is_increasing = true;
   for (unsigned int j = 1; j < time.size(); ++j) {
     if (time[j] - time[j-1] < 1e-16) {
@@ -92,7 +92,7 @@ PetscErrorCode Timeseries::read(const char filename[]) {
   }
   if (!is_increasing) {
     ierr = PetscPrintf(com, "PISM ERROR: dimension '%s' has to be strictly increasing (read from '%s').\n",
-		       dimension.short_name.c_str(), filename);
+		       dimension.short_name.c_str(), filename.c_str());
     PISMEnd();
   }
 
@@ -105,18 +105,21 @@ PetscErrorCode Timeseries::read(const char filename[]) {
     bounds.init(time_bounds_name, time_name, com, rank);
     ierr = bounds.set_units(dimension.get_string("units")); CHKERRQ(ierr);
 
-    ierr = bounds.read(filename, time_bounds); CHKERRQ(ierr);
+    ierr = bounds.read(filename, use_reference_date, time_bounds); CHKERRQ(ierr);
   } else {
     use_bounds = false;
   }
 
-  ierr = var.read(filename, values); CHKERRQ(ierr);
+  // Do not use the reference date. This may be a problem if someone needs to
+  // read a time-series with the meaning of "time depending on time", but this is
+  // not likely.
+  ierr = var.read(filename, false, values); CHKERRQ(ierr);
 
   if (time.size() != values.size()) {
     ierr = PetscPrintf(com, "PISM ERROR: variables %s and %s in %s have different numbers of values.\n",
 		       dimension.short_name.c_str(),
 		       var.short_name.c_str(),
-		       filename); CHKERRQ(ierr);
+		       filename.c_str()); CHKERRQ(ierr);
     PISMEnd();
   }
 
@@ -126,7 +129,7 @@ PetscErrorCode Timeseries::read(const char filename[]) {
 }
 
 //! Write timeseries data to a NetCDF file \c filename.
-PetscErrorCode Timeseries::write(const char filename[]) {
+PetscErrorCode Timeseries::write(string filename) {
   PetscErrorCode ierr;
 
   // write the dimensional variable; this call should go first
@@ -263,6 +266,11 @@ PetscErrorCode Timeseries::set_attr(string name, string value) {
   return 0;
 }
 
+//! Get a string attribute.
+string Timeseries::get_string(string name) {
+  return var.get_string(name);
+}
+
 //! Set a single-valued scalar attribute.
 PetscErrorCode Timeseries::set_attr(string name, double value) {
   var.set(name, value);
@@ -390,7 +398,7 @@ PetscErrorCode DiagnosticTimeseries::init(string filename) {
   ierr = MPI_Bcast(&file_exists, 1, MPI_INT, 0, com); CHKERRQ(ierr);
 
   if (file_exists == 1) {
-    ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+    ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
     ierr = nc.inq_dimlen(dimension.short_name, len); CHKERRQ(ierr);
     ierr = nc.close(); CHKERRQ(ierr);
   }
@@ -416,7 +424,7 @@ PetscErrorCode DiagnosticTimeseries::init(string filename) {
     if (time.empty())
       return 0;
 
-    ierr = nc.open(output_filename, NC_NOWRITE); CHKERRQ(ierr);
+    ierr = nc.open(output_filename, PISM_NOWRITE); CHKERRQ(ierr);
     ierr = nc.inq_dimlen(dimension.short_name, len); CHKERRQ(ierr);
 
     if (len > 0) {

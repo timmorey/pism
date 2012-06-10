@@ -257,8 +257,8 @@ int main(int argc, char *argv[]) {
     PetscReal TT, FF; // Test K:  use FF, ignore TT
     ierr = exactK(grid.time->end(), 0.0, &TT, &FF, 0); CHKERRQ(ierr);
     ierr = verbPrintf(2,com,
-        "  exact Test K reports upward heat flux at z=0, at end year %.2f, as G_0 = %.7f W m-2;\n",
-                      grid.time->end_year(), FF); CHKERRQ(ierr);
+        "  exact Test K reports upward heat flux at z=0, at end time %s, as G_0 = %.7f W m-2;\n",
+                      grid.time->end_date().c_str(), FF); CHKERRQ(ierr);
 
     // compute numerical error
     PetscReal maxghferr, avghferr;
@@ -279,17 +279,24 @@ int main(int argc, char *argv[]) {
                       maxghferr,100.0*maxghferr/FF,avghferr); CHKERRQ(ierr);
     ierr = verbPrintf(1,grid.com, "NUM ERRORS DONE\n");  CHKERRQ(ierr);
 
+    map<string, NCSpatialVariable> list;
     set<string> vars;
-    btu.add_vars_to_output("big", vars); // "write everything you can"
+    btu.add_vars_to_output("big", list); // "write everything you can"
+
+    map<string, NCSpatialVariable>::iterator j = list.begin();
+    while (j != list.end()) {
+      vars.insert(j->first);
+      ++j;
+    }
 
     PIO pio(grid.com, grid.rank, grid.config.get_string("output_format"));
 
     string time_name = config.get_string("time_dimension_name");
-    ierr = pio.open(outname, NC_WRITE); CHKERRQ(ierr);
+    ierr = pio.open(outname, PISM_WRITE); CHKERRQ(ierr);
     ierr = pio.def_time(time_name, config.get_string("calendar"),
-                        grid.time->units()); CHKERRQ(ierr);
+                        grid.time->CF_units()); CHKERRQ(ierr);
     ierr = pio.append_time(time_name, grid.time->end()); CHKERRQ(ierr);
-    ierr = btu.define_variables(vars, pio, NC_DOUBLE); CHKERRQ(ierr);
+    ierr = btu.define_variables(vars, pio, PISM_DOUBLE); CHKERRQ(ierr);
     ierr = pio.close(); CHKERRQ(ierr);
 
     ierr = btu.write_variables(vars, outname); CHKERRQ(ierr);

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) 2011 Andy Aschwanden and Ed Bueler
+# Copyright (C) 2011, 2012 Andy Aschwanden and Ed Bueler
 
 set -e # exit on error
 
@@ -65,7 +65,7 @@ DATANAME=storglaciaren_3d.nc
 PISM_DATANAME=pism_$DATANAME
 INNAME=$PISM_DATANAME
 
-COUPLER="-surface constant" # FIXME  should be using PSElevation as in flowline example
+COUPLER="-surface given" # FIXME  should be using PSElevation as in flowline example
 
 # 100 m grid
 GRID="-Mx 38 -My 21 -Mz 51 -Mbz 1 -Lz 300 -z_spacing equal"

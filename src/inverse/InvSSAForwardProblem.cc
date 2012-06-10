@@ -21,6 +21,7 @@
 #include "basal_resistance.hh"
 #include "PISMVars.hh"
 #include <unistd.h> // for 'access'
+#include <errno.h>
 #include <sstream>
 #include "PIO.hh"
 
@@ -232,7 +233,7 @@ PetscErrorCode InvSSAForwardProblem::solveF_core()
 
   // FIXME (DAM 10/25/11): All this lousy code duplication with SSAFEM::solve.  Why
   // didn't I just call it when I wrote this in the first place???
-  m_epsilon_ssa = config.get("epsilon_ssafd");
+  m_epsilon_ssa = config.get("epsilon_ssa");
   const PetscScalar DEFAULT_EPSILON_MULTIPLIER_SSA = 4.0;
 
   if(m_forward_F_needed)
@@ -287,10 +288,10 @@ PetscErrorCode InvSSAForwardProblem::solveF_core()
       std::string ncfile = os_ncfile.str();
 
       PIO pio(grid.com, grid.rank, grid.config.get_string("output_format"));
-      pio.open(ncfile, NC_WRITE);
+      pio.open(ncfile, PISM_WRITE);
       pio.def_time(grid.config.get_string("time_dimension_name"),
                    grid.config.get_string("calendar"),
-                   grid.time->units());
+                   grid.time->CF_units());
       pio.append_time(grid.config.get_string("time_dimension_name"),0.0);
       pio.close();
 

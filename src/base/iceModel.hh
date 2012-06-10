@@ -122,7 +122,7 @@ class IceModel {
   friend class IceModel_cumulative_float_kill_flux;
   friend class IceModel_discharge_flux;
   friend class IceModel_cumulative_discharge_flux;
-  
+  friend class IceModel_max_hor_vel;
 public:
   // see iceModel.cc for implementation of constructor and destructor:
   IceModel(IceGrid &g, NCConfigVariable &config, NCConfigVariable &overrides);
@@ -149,6 +149,8 @@ public:
   virtual PetscErrorCode misc_setup();
   virtual PetscErrorCode init_diagnostics();
   virtual PetscErrorCode init_ocean_kill();
+
+  virtual PetscErrorCode list_diagnostics();
 
   // see iceModel.cc
   PetscErrorCode init();
@@ -182,7 +184,7 @@ public:
   virtual PetscErrorCode write_model_state(string filename);
   virtual PetscErrorCode write_metadata(string filename, bool write_mapping = true);
   virtual PetscErrorCode write_variables(string filename, set<string> vars,
-					 nc_type nctype);
+					 PISM_IO_Type nctype);
 protected:
 
   IceGrid               &grid;
@@ -378,7 +380,7 @@ protected:
   virtual PetscErrorCode summary(bool tempAndAge);
   virtual PetscErrorCode summaryPrintLine(
               PetscBool printPrototype, bool tempAndAge,
-              PetscScalar year, PetscScalar delta_t, 
+              string date, PetscScalar delta_t, 
               PetscScalar volume, PetscScalar area,
               PetscScalar meltfrac, PetscScalar max_diffusivity);
 
@@ -486,6 +488,7 @@ private:
     event_age,			//!< age computation
     event_beddef,		//!< bed deformation step
     event_output,		//!< time spent writing the output file
+    event_output_define,        //!< time spent defining variables
     event_snapshots,            //!< time spent writing snapshots
     event_backups;              //!< time spent writing backups files
 };

@@ -107,7 +107,7 @@ class LocalInterpCtx;
  ierr = nc.open(filename, NC_WRITE); CHKERRQ(ierr);
  ierr = nc.def_time(config.get_string("time_dimension_name"),
                     config.get_string("calendar"),
-                    grid.time->units()); CHKERRQ(ierr);
+                    grid.time->CF_units()); CHKERRQ(ierr);
  ierr = nc.append_time(grid.time->current()); CHKERRQ(ierr);
  ierr = nc.close(); CHKERRQ(ierr);
  \endcode
@@ -198,12 +198,12 @@ public:
                                  const string &standard_name, int component = 0);
   virtual PetscErrorCode  set_intent(string pism_intent, int component = 0);
   virtual PetscErrorCode  read_attributes(string filename, int component = 0);
-  virtual NCSpatialVariable get_metadata(int N);
+  virtual NCSpatialVariable get_metadata(int N = 0);
   virtual PetscErrorCode  set_metadata(NCSpatialVariable &var, int N);
   virtual bool            is_valid(PetscScalar a, int component = 0);
-  virtual PetscErrorCode  define(const PIO &nc, nc_type output_datatype);
+  virtual PetscErrorCode  define(const PIO &nc, PISM_IO_Type output_datatype);
   virtual PetscErrorCode  write(string filename);
-  virtual PetscErrorCode  write(string filename, nc_type nctype);
+  virtual PetscErrorCode  write(string filename, PISM_IO_Type nctype);
   virtual PetscErrorCode  dump(const char filename[]);
   virtual PetscErrorCode  read(string filename, unsigned int time);
   virtual PetscErrorCode  regrid(string filename, bool critical, int start = 0);
@@ -227,7 +227,7 @@ public:
     time_independent;                  //!< \brief If true, corresponding
                                        //!< NetCDF variables do not depend on
                                        //!< the 't' dimension.
-  nc_type output_data_type;            //!< Corresponding NetCDF data type.
+  PISM_IO_Type output_data_type;            //!< Corresponding NetCDF data type.
 protected:
   vector<double> zlevels;
   int n_levels;                 //!< number of vertical levels
@@ -285,7 +285,7 @@ public:
   virtual PetscErrorCode view(PetscInt viewer_size);
   virtual PetscErrorCode view(PetscViewer v1, PetscViewer v2);
   using IceModelVec::write;
-  virtual PetscErrorCode write(string filename, nc_type nctype);
+  virtual PetscErrorCode write(string filename, PISM_IO_Type nctype);
   virtual PetscErrorCode read(string filename, const unsigned int time);
   virtual PetscErrorCode regrid(string filename, bool critical, int start = 0);
   virtual PetscErrorCode regrid(string filename, PetscScalar default_value);

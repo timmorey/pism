@@ -99,7 +99,7 @@ PetscErrorCode PISMSurfaceModel::ice_surface_liquid_water_fraction(IceModelVec2S
   return 0;
 }
 
-PetscErrorCode PISMSurfaceModel::define_variables(set<string> vars, const PIO &nc, nc_type nctype) {
+PetscErrorCode PISMSurfaceModel::define_variables(set<string> vars, const PIO &nc, PISM_IO_Type nctype) {
   PetscErrorCode ierr;
 
   if (atmosphere != NULL) {
@@ -132,3 +132,8 @@ PetscErrorCode PISMSurfaceModel::max_timestep(PetscReal my_t, PetscReal &my_dt, 
   return 0;
 }
 
+void PISMSurfaceModel::add_vars_to_output(string keyword, map<string,NCSpatialVariable> &result) {
+  if (atmosphere != NULL) {
+    atmosphere->add_vars_to_output(keyword, result);
+  }
+}

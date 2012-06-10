@@ -728,7 +728,7 @@ PetscErrorCode SSAFD::solve() {
   stdout_ssa.clear();
 
   PetscReal ssaRelativeTolerance = config.get("ssafd_relative_convergence"),
-            epsilon              = config.get("epsilon_ssafd");
+            epsilon              = config.get("epsilon_ssa");
   PetscInt ssaMaxIterations = static_cast<PetscInt>(config.get("max_iterations_ssafd"));
   // this has no units; epsilon goes up by this ratio when previous value failed
   const PetscScalar DEFAULT_EPSILON_MULTIPLIER_SSA = 4.0;
@@ -761,7 +761,7 @@ PetscErrorCode SSAFD::solve() {
         if (getVerbosityLevel() > 2)
           stdout_ssa += "A:";
 
-        // call PETSc to solve linear system by iterative method; "inner linear iteration"
+        // call PETSc to solve linear system by iterative method; "inner iteration"
         ierr = KSPSetOperators(SSAKSP, A, A, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
         ierr = KSPSolve(SSAKSP, SSARHS, SSAX); CHKERRQ(ierr); // SOLVE
 
@@ -772,23 +772,26 @@ PetscErrorCode SSAFD::solve() {
           ierr = verbPrintf(1,grid.com,
               "\nPISM WARNING:  KSPSolve() reports 'diverged'; reason = %d = '%s'\n",
               reason,KSPConvergedReasons[reason]); CHKERRQ(ierr);
-          // for now, always write a file with a fixed filename  (FIXME: may want other mechanism?)
+          // write a file with a fixed filename; avoid zillions of files
           char filename[PETSC_MAX_PATH_LEN] = "SSAFD_kspdivergederror.petsc";
           ierr = verbPrintf(1,grid.com,
-              "  writing linear system to PETSc binary file %s ...\n",filename); CHKERRQ(ierr);
+              "  writing linear system to PETSc binary file %s ...\n",filename);
+              CHKERRQ(ierr);
           PetscViewer    viewer;
-          ierr = PetscViewerBinaryOpen(grid.com, filename, FILE_MODE_WRITE, &viewer); CHKERRQ(ierr);
+          ierr = PetscViewerBinaryOpen(grid.com, filename, FILE_MODE_WRITE, 
+                                       &viewer); CHKERRQ(ierr);
           ierr = MatView(A,viewer); CHKERRQ(ierr);
           ierr = VecView(SSARHS,viewer); CHKERRQ(ierr);
           ierr = PetscViewerDestroy(&viewer); CHKERRQ(ierr);
           // attempt recovery by same mechanism as for outer iteration
           //   (FIXME: could force direct solve on subdomains?)
           if (epsilon <= 0.0) {
-            ierr = verbPrintf(1,grid.com,"KSP diverged AND epsilon<=0.0.\n  ENDING ...\n"); CHKERRQ(ierr);
+            ierr = verbPrintf(1,grid.com,
+                "KSP diverged AND epsilon<=0.0.\n  ENDING ...\n"); CHKERRQ(ierr);
             PISMEnd();
           }
           ierr = verbPrintf(1,grid.com,
-            "  KSP diverged with epsilon=%8.2e.  Retrying with epsilon multiplied by %8.2e.\n\n",
+              "  KSP diverged with epsilon=%8.2e.  Retrying with epsilon multiplied by %8.2e.\n\n",
             epsilon, DEFAULT_EPSILON_MULTIPLIER_SSA); CHKERRQ(ierr);
           epsilon *= DEFAULT_EPSILON_MULTIPLIER_SSA;
           // recovery requires recompute on nuH  (FIXME: could be implemented by max(eps,nuH) here?)
@@ -898,7 +901,7 @@ PetscErrorCode SSAFD::writeSSAsystemMatlab() {
                            "Save the linear system to an ASCII .m file. Sets the file prefix.",
                            prefix, flag); CHKERRQ(ierr);
 
-  snprintf(yearappend, PETSC_MAX_PATH_LEN, "_y%.0f.m", grid.time->year());
+  snprintf(yearappend, PETSC_MAX_PATH_LEN, "_y%.0f.m", grid.time->seconds_to_years(grid.time->current()));
   file_name = prefix + string(yearappend);
 
   ierr = verbPrintf(2, grid.com,
@@ -938,7 +941,7 @@ PetscErrorCode SSAFD::writeSSAsystemMatlab() {
   ierr = VecView(SSAX, viewer);CHKERRQ(ierr);
 
   // save coordinates (for viewing, primarily)
-  ierr = PetscViewerASCIIPrintf(viewer,"\nyear=%10.6f;\n",grid.time->year());  CHKERRQ(ierr);
+  ierr = PetscViewerASCIIPrintf(viewer,"\nyear=%10.6f;\n",grid.time->seconds_to_years(grid.time->current()));  CHKERRQ(ierr);
   ierr = PetscViewerASCIIPrintf(viewer,
             "x=%12.3f + (0:%d)*%12.3f;\n"
             "y=%12.3f + (0:%d)*%12.3f;\n",
@@ -1151,7 +1154,8 @@ PetscErrorCode SSAFD::compute_nuH_staggered(IceModelVec2Stag &result, PetscReal 
         result(i,j,o) *= nu_enhancement_scaling;
 
         // We ensure that nuH is bounded below by a positive constant.
-        result(i,j,o) = PetscMax(epsilon,result(i,j,o));
+//OLD WAY before 4/5/12:       result(i,j,o) = PetscMax(epsilon,result(i,j,o));
+        result(i,j,o) += epsilon;
 
       } // j
     } // i

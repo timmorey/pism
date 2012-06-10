@@ -48,12 +48,12 @@ public:
   { t = my_t; dt = my_dt; return 0; } // do nothing
   virtual PetscErrorCode ice_surface_mass_flux(IceModelVec2S &result);
   virtual PetscErrorCode ice_surface_temperature(IceModelVec2S &result);
-  virtual PetscErrorCode define_variables(set<string> vars, const PIO &nc, nc_type nctype);
+  virtual PetscErrorCode define_variables(set<string> vars, const PIO &nc, PISM_IO_Type nctype);
   virtual PetscErrorCode write_variables(set<string> vars, string filename);
-  virtual void add_vars_to_output(string keyword, set<string> &result);
+  virtual void add_vars_to_output(string keyword, map<string,NCSpatialVariable> &result);
 protected:
   string input_file;
-  IceModelVec2S acab, artm;
+  IceModelVec2S climatic_mass_balance, ice_surface_temp;
   IceModelVec2S *lat, *usurf;
 };
 

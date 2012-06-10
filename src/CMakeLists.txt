@@ -18,7 +18,10 @@ include_directories (
 # Computation grid, I/O, profiling, PISM "component" interface, miscellaneous
 # utility functions and classes plus the "enthalpy converter" (which is used
 # all over the place).
-add_library (pismutil
+set(PISM_PARALLEL_IO_FLAGS "")
+
+# Create a list of files making up libpismutil so that we can add to it later:
+set(PISMUTIL_SRC
   base/enthalpyConverter.cc
   base/util/IceGrid.cc
   base/util/IceGrid.cc
@@ -27,6 +30,7 @@ add_library (pismutil
   base/util/PISMComponent.cc
   base/util/PISMProf.cc
   base/util/PISMTime.cc
+  base/util/PISMGregorianTime.cc
   base/util/PISMVars.cc
   base/util/Timeseries.cc
   base/util/iceModelVec.cc
@@ -37,25 +41,38 @@ add_library (pismutil
   base/util/io/LocalInterpCtx.cc
   base/util/io/PIO.cc
   base/util/io/PISMNC3File.cc
-  base/util/io/PISMNC4File.cc
   base/util/io/PISMNCFile.cc
   base/util/pism_const.cc
   base/util/pism_default_config.cc
   base/util/pism_options.cc
+  base/util/time_options.cc
   base/varcEnthalpyConverter.cc
   )
+
+# Check if NetCDF-4 parallel I/O is enabled. If so, set compiler flags and add a source code file.
+if (Pism_USE_PARALLEL_NETCDF4)
+  set(PISM_PARALLEL_IO_FLAGS "${PISM_PARALLEL_IO_FLAGS} -DPISM_PARALLEL_NETCDF4=1")
+  list(APPEND PISMUTIL_SRC base/util/io/PISMNC4File.cc)
+else()
+  set(PISM_PARALLEL_IO_FLAGS "${PISM_PARALLEL_IO_FLAGS} -DPISM_PARALLEL_NETCDF4=0")
+endif()
+
+# Check if PnetCDF parallel I/O is enabled. If so, set compiler flags and add a source code file.
+if (Pism_USE_PNETCDF)
+  set(PISM_PARALLEL_IO_FLAGS "${PISM_PARALLEL_IO_FLAGS} -DPISM_PNETCDF=1")
+  list(APPEND PISMUTIL_SRC base/util/io/PISMPNCFile.cc)
+else()
+  set(PISM_PARALLEL_IO_FLAGS "${PISM_PARALLEL_IO_FLAGS} -DPISM_PNETCDF=0")
+endif()
+
+# The list of headers included in PIO.cc depends on parallel I/O settings.
+# These flags determine which headers are included.
+set_source_files_properties (base/util/io/PIO.cc
+  PROPERTIES COMPILE_FLAGS ${PISM_PARALLEL_IO_FLAGS})
+
+add_library (pismutil ${PISMUTIL_SRC})
 target_link_libraries (pismutil pismudunits ${Pism_EXTERNAL_LIBS})
 add_dependencies (pismutil pism_config)
-
-if (Pism_USE_PARALLEL_NETCDF)
-  set_source_files_properties (base/util/io/PISMNC4File.cc base/util/io/PIO.cc
-    PROPERTIES COMPILE_FLAGS
-    "-DPISM_PARALLEL_NETCDF=1")
-else()
-  set_source_files_properties (base/util/io/PISMNC4File.cc base/util/io/PIO.cc
-    PROPERTIES COMPILE_FLAGS
-    "-DPISM_PARALLEL_NETCDF=0 -Wno-unused")
-endif()
 
 add_custom_target (touch_pism_revision
   COMMAND ${CMAKE_COMMAND} -E touch pism_revision.cc
@@ -163,15 +180,12 @@ set_target_properties(pismudunits
 add_executable (pismr pismr.cc)
 
 # Simplified geometry
-add_executable (pisms pisms.cc 
+add_executable (pisms pisms.cc
   eismint/iceEISModel.cc
-  eismint/icePSTexModel.cc
-  ismip/iceMISMIPModel.cc)
-
-add_executable (pismebm coupler/surface/ebm_driver.cc pismebm.cc)
+  eismint/icePSTexModel.cc)
 
 # All of the following are linked against pismbase
-foreach (EXEC pismr pisms pismebm)
+foreach (EXEC pismr pisms)
   target_link_libraries (${EXEC} pismbase)
 endforeach (EXEC)
 
@@ -193,7 +207,7 @@ add_custom_command (OUTPUT pism_config.nc
 add_custom_target (pism_config DEPENDS pism_config.nc)
 
 install (TARGETS
-  pismr pisms pismv pclimate pismebm ## executables
+  pismr pisms pismv pclimate ## executables
   pismutil pismverif pismbase pismflowlaws pismearth pismudunits # libraries
   RUNTIME DESTINATION ${Pism_BIN_DIR}
   LIBRARY DESTINATION ${Pism_LIB_DIR}
@@ -228,31 +242,23 @@ if (Pism_BUILD_EXTRA_EXECS)
   add_executable (tryLCbd earth/tryLCbd.cc)
   target_link_libraries (tryLCbd pismearth pismrevision)
 
-  add_executable (pismtests software_tests/pismtests.cc software_tests/iMtests.cc)
-  target_link_libraries (pismtests pismbase)
-
   add_executable (btutest base/energy/btutest.cc base/energy/bedrockThermalUnit.cc verif/tests/exactTestK.c)
   target_link_libraries (btutest pismutil pismrevision)
 
-  if (NETCDF_PAR)
-    add_executable (netcdf_parallel software_tests/netcdf_parallel.cc)
-    target_link_libraries (netcdf_parallel ${NETCDF_LIBRARIES} ${MPI_LIBRARIES})
+  set (netcdf_test_libraries pismutil ${NETCDF_LIBRARIES} ${PETSC_LIBRARIES} ${MPI_LIBRARIES})
 
-    add_executable (netcdf_parallel_2d software_tests/netcdf_parallel_2d.c)
-    target_link_libraries (netcdf_parallel_2d ${NETCDF_LIBRARIES} ${MPI_LIBRARIES})
-
-    add_executable (netcdf_parallel_3d software_tests/netcdf_parallel_3d.c)
-    target_link_libraries (netcdf_parallel_3d ${NETCDF_LIBRARIES} ${MPI_LIBRARIES})
-
-    add_executable (pismncfile_test software_tests/pismncfile_test.cc
-      base/util/io/PISMNCFile.cc
-      base/util/io/PISMNC3File.cc
-      base/util/io/PISMNC4File.cc)
-    target_link_libraries (pismncfile_test ${NETCDF_LIBRARIES} ${MPI_LIBRARIES})
+  if (Pism_USE_PNETCDF)
+    list(APPEND netcdf_test_libraries ${PNETCDF_LIBRARIES})
   endif()
 
+ add_executable (pism_netcdf_test software_tests/pism_netcdf_test.cc)
+ target_link_libraries (pism_netcdf_test ${netcdf_test_libraries})
+
+ set_source_files_properties (software_tests/pism_netcdf_test.cc
+   PROPERTIES COMPILE_FLAGS ${PISM_PARALLEL_IO_FLAGS})
+
   install (TARGETS
-    ${SIMPLE_EXECS} tryLCbd pismtests btutest
+    ${SIMPLE_EXECS} tryLCbd btutest 
     RUNTIME DESTINATION ${Pism_BIN_DIR}
     LIBRARY DESTINATION ${Pism_LIB_DIR}
     ARCHIVE DESTINATION ${Pism_LIB_DIR})
@@ -260,7 +266,6 @@ endif (Pism_BUILD_EXTRA_EXECS)
 
 add_subdirectory (coupler)
 add_subdirectory (base/stressbalance)
-add_subdirectory (eismint)
 add_subdirectory (regional)
 add_subdirectory (inverse)
 add_subdirectory (pythonbindings)

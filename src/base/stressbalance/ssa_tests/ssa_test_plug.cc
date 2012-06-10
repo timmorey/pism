@@ -113,7 +113,7 @@ PetscErrorCode SSATestCasePlug::initializeSSACoefficients()
 
   // The finite difference code uses the following flag to treat the non-periodic grid correctly.
   config.set_flag("compute_surf_grad_inward_ssa", true);
-  config.set("epsilon_ssafd", 0.0);
+  config.set("epsilon_ssa", 0.0);
 
   // Ensure we never use the strength extension.
   ssa->strength_extension->set_min_thickness(H0/2);
@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
     SSATestCasePlug testcase(com,rank,size,config,glen_n);
     ierr = testcase.init(Mx,My,ssafactory); CHKERRQ(ierr);
     ierr = testcase.run(); CHKERRQ(ierr);
-    ierr = testcase.report(); CHKERRQ(ierr);
+    ierr = testcase.report("plug"); CHKERRQ(ierr);
     ierr = testcase.write(output_file); CHKERRQ(ierr);
   }
 

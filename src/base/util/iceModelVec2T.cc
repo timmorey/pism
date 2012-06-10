@@ -66,6 +66,10 @@ void IceModelVec2T::set_n_records(unsigned int my_N) {
   n_records = my_N;
 }
 
+unsigned int IceModelVec2T::get_n_records() {
+  return n_records;
+}
+
 PetscErrorCode IceModelVec2T::create(IceGrid &my_grid, string my_short_name,
                                      bool local, int width) {
   PetscErrorCode ierr;
@@ -144,7 +148,7 @@ PetscErrorCode IceModelVec2T::init(string fname) {
   PIO nc(grid->com, grid->rank, "netcdf3");
   string name_found;
   bool exists, found_by_standard_name;
-  ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+  ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
   ierr = nc.inq_var(vars[0].short_name, vars[0].get_string("standard_name"),
                     exists, name_found, found_by_standard_name); CHKERRQ(ierr);
   if (!exists) {
@@ -177,8 +181,9 @@ PetscErrorCode IceModelVec2T::init(string fname) {
     // we're found the time dimension
     NCTimeseries time_dimension;
     time_dimension.init(dimname, dimname, grid->com, grid->rank);
-    ierr = time_dimension.set_units("seconds"); CHKERRQ(ierr);
-    ierr = time_dimension.read(filename, time); CHKERRQ(ierr);
+
+    ierr = time_dimension.set_units(grid->time->units()); CHKERRQ(ierr);
+    ierr = time_dimension.read(filename, grid->time->use_reference_date(), time); CHKERRQ(ierr);
 
     string bounds_name;
     ierr = time_dimension.get_bounds_name(filename, bounds_name);
@@ -189,7 +194,7 @@ PetscErrorCode IceModelVec2T::init(string fname) {
       tb.init(bounds_name, dimname, grid->com, grid->rank);
       ierr = tb.set_units(time_dimension.get_string("units")); CHKERRQ(ierr);
 
-      ierr = tb.read(filename, time_bounds); CHKERRQ(ierr);
+      ierr = tb.read(filename, grid->time->use_reference_date(), time_bounds); CHKERRQ(ierr);
     } else {
       // compute fake time bounds data
 
@@ -306,25 +311,28 @@ PetscErrorCode IceModelVec2T::update(int start) {
   if (missing <= 0) return 0;
   
   N = kept + missing;
-  string long_name = string_attr("long_name");
-  ierr = verbPrintf(2, grid->com,
-                    "  reading \"%s\" into buffer\n"
-                    "          (short_name = %s): %d records, covering intervals (%3.3f, %3.3f) through (%3.3f, %3.3f) years...\n",
-		    long_name.c_str(), name.c_str(), missing,
-                    grid->time->year(time_bounds[start*2]),
-                    grid->time->year(time_bounds[start*2 + 1]),
-                    grid->time->year(time_bounds[(start + missing - 1)*2]),
-                    grid->time->year(time_bounds[(start + missing - 1)*2 + 1]));
+
+  if (this->get_n_records() > 1 || getVerbosityLevel() > 4) {
+    ierr = verbPrintf(2, grid->com,
+                      "  reading \"%s\" into buffer\n"
+                      "          (short_name = %s): %d records, time intervals (%s, %s) through (%s, %s)...\n",
+                      string_attr("long_name").c_str(), name.c_str(), missing,
+                      grid->time->date(time_bounds[start*2]).c_str(),
+                      grid->time->date(time_bounds[start*2 + 1]).c_str(),
+                      grid->time->date(time_bounds[(start + missing - 1)*2]).c_str(),
+                      grid->time->date(time_bounds[(start + missing - 1)*2 + 1]).c_str()); CHKERRQ(ierr);
+    report_range = false;
+  } else {
+    report_range = true;
+  }
 
   for (int j = 0; j < missing; ++j) {
     if (lic != NULL) {
       lic->start[0] = start + j;
-      lic->report_range = false;
+      lic->report_range = report_range;
     }
 
     ierr = vars[0].regrid(filename.c_str(), lic, true, false, 0.0, v); CHKERRQ(ierr);
-
-    // ierr = vars[0].read(filename.c_str(), start + j, v); CHKERRQ(ierr);
 
     ierr = verbPrintf(5, grid->com, " %s: reading entry #%02d, year %f...\n",
 		      name.c_str(), start + j, time[start + j]);
@@ -441,8 +449,8 @@ PetscErrorCode IceModelVec2T::at_time(double my_t) {
   if (i % 2 == 0) {
     PetscPrintf(grid->com,
                 "PISM ERROR: time bounds array does not represent continguous time intervals.\n"
-                "            (PISM was trying to compute %s at time %3.3f years.)\n",
-                name.c_str(), grid->time->year(my_t));
+                "            (PISM was trying to compute %s at time %s.)\n",
+                name.c_str(), grid->time->date(my_t).c_str());
     PISMEnd();
   }
 

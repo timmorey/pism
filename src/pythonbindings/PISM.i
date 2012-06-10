@@ -242,6 +242,47 @@ typedef int NormType; // YUCK.
             self.add(v)
   }
 }
+
+// There was a collision between the two IceModelVec::regrid methods:
+//  regrid(string filename,bool critical,start=0)
+//  regrid(string filename, PetscScalar default)
+//
+//  Calls in the python bindings to var.regrid(filename,True)
+//  were actually calling the second version, i.e. with a default value
+//  of true, and verification of critical variables was not done.
+//  
+//  We avoid the collision by renaming all three regrids (there are three
+//  because of SWIG's implementation of the default variable) 
+//
+//  And we add a python method regrid that can be called via
+//  var.regrid(filename, critical=True).  
+//
+//  To access the version of regrid taking a default value, call
+//  var.regrid_with_default(filename, value)
+%rename(regrid_with_default) IceModelVec::regrid(string, PetscScalar);
+%rename(regrid_with_critical) IceModelVec::regrid(string, bool);
+%rename(regrid_with_critical_and_start) IceModelVec::regrid(string, bool, int);
+%extend IceModelVec
+{
+  %pythoncode {
+    def regrid(self,filename,critical=False,start=0):
+      self.regrid_with_critical_and_start(filename,critical,start)
+  }
+}
+
+// We also make the same fix for IceModelVec2's.
+%rename(regrid_with_default) IceModelVec2::regrid(string, PetscScalar);
+%rename(regrid_with_critical) IceModelVec2::regrid(string, bool);
+%rename(regrid_with_critical_and_start) IceModelVec2::regrid(string, bool, int);
+%extend IceModelVec2
+{
+  %pythoncode {
+    def regrid(self,filename,critical=False,start=0):
+      self.regrid_with_critical_and_start(filename,critical,start)
+  }
+}
+
+
 // Shenanigans to allow python indexing to get at IceModelVec entries.  I couldn't figure out a more
 // elegant solution.
 %extend IceModelVec2S
@@ -310,7 +351,7 @@ typedef int NormType; // YUCK.
 // thing, and the warning is wrong.  Trying to reproduce the warning
 // in a simple test setting failed.  This should get cleaned up, and
 // a bug reported to SWIG if needed.  For now, we do the following hack.
-%rename(write_as_type) IceModelVec2::write(string,nc_type);
+%rename(write_as_type) IceModelVec2::write(string,PISM_IO_Type);
 
 %extend Timeseries
 {
@@ -373,34 +414,16 @@ typedef int NormType; // YUCK.
 // is being done to ensure that a python int on input is a valid nc_type, which isn't good.
 // In particular, the allowed values are different in NetCDF4 vs. NetCDF3 (there are more of them.)
 // A constraint check to the minimal set of NetCDF3 types would be the right thing to do. (FIXME)
-%typemap(in) nc_type (int tmp){
+%typemap(in) PISM_IO_Type (int tmp){
     SWIG_AsVal(int)($input,&tmp);
-    $1 = static_cast<nc_type>(tmp);
+    $1 = static_cast<PISM_IO_Type>(tmp);
 }
-%typemap(typecheck,precedence=SWIG_TYPECHECK_INTEGER) nc_type {
+%typemap(typecheck,precedence=SWIG_TYPECHECK_INTEGER) PISM_IO_Type {
     $1 = PyInt_Check($input);
 }
 
-// Copied straight from netcdf.h  I wonder if there is a more elegant way to do this, without dragging in everything
-// else from netcdf.h
-#define	NC_NAT 	        0	/* NAT = 'Not A Type' (c.f. NaN) */
-#define	NC_BYTE         1	/* signed 1 byte integer */
-#define	NC_CHAR 	2	/* ISO/ASCII character */
-#define	NC_SHORT 	3	/* signed 2 byte integer */
-#define	NC_INT 	        4	/* signed 4 byte integer */
-#define NC_LONG         NC_INT  /* deprecated, but required for backward compatibility. */
-#define	NC_FLOAT 	5	/* single precision floating point number */
-#define	NC_DOUBLE 	6	/* double precision floating point number */
-#define	NC_UBYTE 	7	/* unsigned 1 byte int */
-#define	NC_USHORT 	8	/* unsigned 2-byte int */
-#define	NC_UINT 	9	/* unsigned 4-byte int */
-#define	NC_INT64 	10	/* signed 8-byte int */
-#define	NC_UINT64 	11	/* unsigned 8-byte int */
-#define	NC_STRING 	12	/* string */
-
 #define NC_NOWRITE	0	/* default is read only */
 #define NC_WRITE    	0x0001	/* read & write */
-
 
 // Tell SWIG that the following variables are truly constant
 %immutable PISM_Revision;
@@ -435,6 +458,7 @@ typedef int NormType; // YUCK.
 %include "iceModelVec.hh"
 %include "PISMVars.hh"
 %include "PIO.hh"
+%include "PISMNCFile.hh"
 %include "PISMDiagnostic.hh"
 %include "PISMComponent.hh"
 %include "basal_resistance.hh"

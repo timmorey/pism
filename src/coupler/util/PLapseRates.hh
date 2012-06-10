@@ -61,11 +61,7 @@ public:
 
     ierr = reference_surface.update(m_t, m_dt); CHKERRQ(ierr);
 
-    if (enable_time_averaging) {
-      ierr = reference_surface.interp(m_t + 0.5*m_dt); CHKERRQ(ierr);
-    } else {
-      ierr = reference_surface.at_time(m_t); CHKERRQ(ierr);
-    }
+    ierr = reference_surface.at_time(m_t); CHKERRQ(ierr);
 
     return 0;
   }
@@ -107,7 +103,6 @@ protected:
   PetscReal bc_period,          // in seconds
     bc_reference_time,          // in seconds
     temp_lapse_rate;
-  bool enable_time_averaging;
   string option_prefix;
 
   virtual PetscErrorCode init_internal(PISMVars &vars)
@@ -118,7 +113,6 @@ protected:
 
     IceGrid &g = Mod::grid;
 
-    enable_time_averaging = false;
     PetscReal bc_period_years = 0,
       bc_reference_year = 0;
 
@@ -133,9 +127,6 @@ protected:
       ierr = PISMOptionsReal(option_prefix + "_reference_year",
                              "Boundary condition reference year",
                              bc_reference_year, bc_ref_year_set); CHKERRQ(ierr);
-      ierr = PISMOptionsIsSet(option_prefix + "_time_average",
-                              "Enable time-averaging of boundary condition data",
-                              enable_time_averaging); CHKERRQ(ierr);
       ierr = PISMOptionsReal("-temp_lapse_rate",
                              "Elevation lapse rate for the temperature, in K per km",
                              temp_lapse_rate, temp_lapse_rate_set); CHKERRQ(ierr);
@@ -163,7 +154,7 @@ protected:
       ref_surface_n_records = 1;
 
     PIO nc(g.com, g.rank, "netcdf3");
-    ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+    ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
     ierr = nc.inq_nrecords("usurf", "surface_altitude", ref_surface_n_records); CHKERRQ(ierr);
     ierr = nc.close(); CHKERRQ(ierr);
 

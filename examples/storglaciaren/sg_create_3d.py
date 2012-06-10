@@ -209,6 +209,42 @@ dem_var.standard_name = "surface_altitude"
 dem_var.coordinates = "lat lon"
 dem_var[:] = dem
 
+# generate (somewhat) reasonable acab
+acab_max =  2.5 # m/a
+acab_min = -3.0 # m/a
+acab_up = easting.min() + 200 # m; location of upstream end of linear acab
+acab_down = easting.max() - 600 # m;location of downstream end of linear acab
+acab = np.ones_like(dem)
+
+acab[:] = acab_max - (acab_max-acab_min) * (easting - acab_up) / (acab_down - acab_up)
+acab[thk<1] = acab_min
+
+acab_var = def_var(nc, "climatic_mass_balance", "m year-1", fill_value)
+acab_var.standard_name = "land_ice_surface_specific_mass_balance"
+acab_var[:] = acab
+
+# Set boundary conditions for Scandinavian-type polythermal glacier
+# ------------------------------------------------------------------------------
+#
+# (A) Surface temperature for temperature equation bc
+T0    = 273.15 # K
+Tma   =  -6.0  # degC, mean annual air temperature at Tarfala
+zcts  = 1300   # m a.s.l.; altitude where CTS is at the surface, projected to topg
+slope  = 100    # m; range around which surface temp transition happens
+
+# old abrupt jump:
+#artm  = np.zeros((M,N),float) + T0
+#artm[bed<zcts] = T0 + Tma # Scandinavian-type polythermal glacier
+
+# smoothed version; FIXME:  can't we at least have it depend on initial DEM?
+#   additional lapse rate?
+artm = T0 + Tma * (zcts + slope - bed) / (2.0 * slope)
+artm[bed<zcts-slope] = T0 + Tma
+artm[bed>zcts+slope] = T0
+
+artm_var = def_var(nc, "ice_surface_temp", "K", fill_value)
+artm_var[:] = artm
+
 # set global attributes
 nc.Conventions = "CF-1.4"
 historysep = ' '

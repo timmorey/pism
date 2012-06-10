@@ -1,4 +1,4 @@
-// Copyright (C) 2011 Constantine Khroulev
+// Copyright (C) 2011, 2012 Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -36,7 +36,9 @@ PISMTime::PISMTime(MPI_Comm c, const NCConfigVariable &conf)
 PetscErrorCode PISMTime::init() {
   PetscErrorCode ierr;
   bool y_set, ys_set, ye_set;
-  PetscReal y, ys, ye;
+  PetscReal y = config.get("run_length_years"),
+    ys = config.get("start_year"),
+    ye = ys + y;
 
   ierr = PetscOptionsBegin(com, "", "PISM model time options", ""); CHKERRQ(ierr);
   {
@@ -65,11 +67,11 @@ PetscErrorCode PISMTime::init() {
   time_in_seconds = run_start;
 
   if (ye_set == true) {
-    if (ye < year()) {
+    if (ye < seconds_to_years(time_in_seconds)) {
       ierr = PetscPrintf(com,
 			"PISM ERROR: -ye (%3.3f) is less than -ys (%3.3f) (or input file year or default).\n"
 			"PISM cannot run backward in time.\n",
-			 ye, start_year()); CHKERRQ(ierr);
+			 ye, seconds_to_years(run_start)); CHKERRQ(ierr);
       PISMEnd();
     }
     run_end = ye * secpera;
@@ -82,3 +84,42 @@ PetscErrorCode PISMTime::init() {
   return 0;
 }
 
+string PISMTime::date(double T) {
+  char tmp[256];
+  snprintf(tmp, 256, "%3.3f", seconds_to_years(T));
+  return string(tmp);
+}
+
+string PISMTime::date() {
+  return date(time_in_seconds);
+}
+
+string PISMTime::start_date() {
+  return date(run_start);
+}
+
+string PISMTime::end_date() {
+  return date(run_end);
+}
+
+string PISMTime::run_length() {
+  char tmp[256];
+  snprintf(tmp, 256, "%3.3f", seconds_to_years(run_end - run_start));
+  return string(tmp);
+}
+
+double PISMTime::mod(double time, double period) {
+  if (period <= 0)
+    return time;
+
+  double tmp = time - floor(time / period) * period;
+
+  if (fabs(tmp - period) < 1)
+    tmp = 0;
+
+  return tmp;
+}
+
+double PISMTime::year_fraction(double T) {
+  return seconds_to_years(T) - floor(seconds_to_years(T));
+}

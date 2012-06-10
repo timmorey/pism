@@ -59,13 +59,13 @@ PetscErrorCode PISMConstantYieldStress::init(PISMVars &/*vars*/) {
 }
 
 
-void PISMConstantYieldStress::add_vars_to_output(string /*keyword*/, set<string> &result) {
-  result.insert("tauc");
+void PISMConstantYieldStress::add_vars_to_output(string /*keyword*/, map<string,NCSpatialVariable> &result) {
+  result["tauc"] = tauc.get_metadata();
 }
 
 
 PetscErrorCode PISMConstantYieldStress::define_variables(set<string> vars, const PIO &nc,
-                                                         nc_type nctype) {
+                                                         PISM_IO_Type nctype) {
   if (set_contains(vars, "tauc")) {
     PetscErrorCode ierr = tauc.define(nc, nctype); CHKERRQ(ierr);
   }

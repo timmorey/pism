@@ -21,7 +21,7 @@
 
 #include "SSAFD.hh"
 #include "SSAFEM.hh"
-
+#include "pism_options.hh"
 
 //! Initialize the storage for the various coefficients used as input to the SSA
 //! (ice elevation, thickness, etc.)  
@@ -96,7 +96,7 @@ PetscErrorCode SSATestCase::buildSSACoefficients()
   ierr = ice_mask.set_attr("flag_meanings",
                            "ice_free_bedrock grounded_ice floating_ice ice_free_ocean");
   CHKERRQ(ierr);
-  ice_mask.output_data_type = NC_BYTE;
+  ice_mask.output_data_type = PISM_BYTE;
   ierr = vars.add(ice_mask); CHKERRQ(ierr);
 
   ierr = ice_mask.set(MASK_GROUNDED); CHKERRQ(ierr);
@@ -111,7 +111,7 @@ PetscErrorCode SSATestCase::buildSSACoefficients()
   ierr = bc_mask.set_attr("flag_values", mask_values); CHKERRQ(ierr);
   ierr = bc_mask.set_attr("flag_meanings",
                           "no_data ssa_dirichlet_bc_location"); CHKERRQ(ierr);
-  bc_mask.output_data_type = NC_BYTE;
+  bc_mask.output_data_type = PISM_BYTE;
   ierr = vars.add(bc_mask); CHKERRQ(ierr);
   
   return 0;
@@ -124,8 +124,7 @@ PetscErrorCode SSATestCase::init(PetscInt Mx, PetscInt My, SSAFactory ssafactory
   PetscErrorCode ierr;
 
   // Set options from command line.  
-  // FIXME (DAM 2/17/11):  These are currently only looked at by the finite difference solver.
-  ierr = config.scalar_from_option("ssa_eps",  "epsilon_ssafd"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("ssa_eps",  "epsilon_ssa"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("ssa_maxi", "max_iterations_ssafd"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("ssa_rtol", "ssafd_relative_convergence"); CHKERRQ(ierr);
 
@@ -162,8 +161,7 @@ PetscErrorCode SSATestCase::run()
 }
 
 //! Report on the generated solution
-PetscErrorCode SSATestCase::report()
-{
+PetscErrorCode SSATestCase::report(string testname) {
   PetscErrorCode  ierr;
     
   string ssa_stdout;
@@ -235,6 +233,106 @@ PetscErrorCode SSATestCase::report()
 
   ierr = verbPrintf(1,grid.com, "NUM ERRORS DONE\n");  CHKERRQ(ierr);
 
+  ierr = report_netcdf(testname,
+                       gmaxvecerr*report_velocity_scale,
+                       (gavvecerr/gexactvelmax)*100.0,
+                       gmaxuerr*report_velocity_scale,
+                       gmaxverr*report_velocity_scale,
+                       gavuerr*report_velocity_scale,
+                       gavverr*report_velocity_scale); CHKERRQ(ierr);
+
+  return 0;
+}
+
+PetscErrorCode SSATestCase::report_netcdf(string testname,
+                                          double max_vector,
+                                          double rel_vector,
+                                          double max_u,
+                                          double max_v,
+                                          double avg_u,
+                                          double avg_v) {
+  PetscErrorCode ierr;
+  NCTimeseries err;
+  unsigned int start;
+  string filename;
+  bool flag, append;
+  NCGlobalAttributes global_attributes;
+
+  ierr = PISMOptionsString("-report_file", "NetCDF error report file",
+                           filename, flag); CHKERRQ(ierr);
+
+  if (flag == false)
+    return 0;
+
+  ierr = verbPrintf(2, grid.com, "Also writing errors to '%s'...\n", filename.c_str());
+  CHKERRQ(ierr);
+
+  ierr = PISMOptionsIsSet("-append", "Append the NetCDF error report",
+                          append); CHKERRQ(ierr);
+
+  global_attributes.init("global_attributes", grid.com, grid.rank);
+  global_attributes.set_string("source", string("PISM ") + PISM_Revision);
+
+  // Find the number of records in this file:
+  PIO nc(grid.com, grid.rank, "netcdf3");
+  ierr = nc.open(filename, PISM_WRITE, append); CHKERRQ(ierr); // append == true
+  ierr = nc.inq_dimlen("N", start); CHKERRQ(ierr);
+  ierr = nc.close(); CHKERRQ(ierr);
+
+  ierr = global_attributes.write(filename); CHKERRQ(ierr);
+
+  // Write the dimension variable:
+  err.init("N", "N", grid.com, grid.rank);
+  ierr = err.write(filename, (size_t)start, (double)(start + 1), PISM_INT); CHKERRQ(ierr);
+
+  // Always write grid parameters:
+  err.short_name = "dx";
+  ierr = err.set_units("meters"); CHKERRQ(ierr);
+  ierr = err.write(filename, (size_t)start, grid.dx); CHKERRQ(ierr);
+  err.short_name = "dy";
+  ierr = err.write(filename, (size_t)start, grid.dy); CHKERRQ(ierr);
+
+  // Always write the test name:
+  err.reset();
+  err.short_name = "test";
+  ierr = err.write(filename, (size_t)start, testname[0], PISM_BYTE); CHKERRQ(ierr);
+
+  err.reset();
+  err.short_name = "max_velocity";
+  ierr = err.set_units("m/year"); CHKERRQ(ierr);
+  err.set_string("long_name", "maximum ice velocity magnitude error");
+  ierr = err.write(filename, (size_t)start, max_vector); CHKERRQ(ierr);
+
+  err.reset();
+  err.short_name = "relative_velocity";
+  ierr = err.set_units("percent"); CHKERRQ(ierr);
+  err.set_string("long_name", "relative ice velocity magnitude error");
+  ierr = err.write(filename, (size_t)start, rel_vector); CHKERRQ(ierr);
+
+  err.reset();
+  err.short_name = "maximum_u";
+  ierr = err.set_units("m/year"); CHKERRQ(ierr);
+  err.set_string("long_name", "maximum error in the X-component of the ice velocity");
+  ierr = err.write(filename, (size_t)start, max_u); CHKERRQ(ierr);
+
+  err.reset();
+  err.short_name = "maximum_v";
+  ierr = err.set_units("m/year"); CHKERRQ(ierr);
+  err.set_string("long_name", "maximum error in the Y-component of the ice velocity");
+  ierr = err.write(filename, (size_t)start, max_v); CHKERRQ(ierr);
+
+  err.reset();
+  err.short_name = "average_u";
+  ierr = err.set_units("m/year"); CHKERRQ(ierr);
+  err.set_string("long_name", "average error in the X-component of the ice velocity");
+  ierr = err.write(filename, (size_t)start, avg_u); CHKERRQ(ierr);
+
+  err.reset();
+  err.short_name = "average_v";
+  ierr = err.set_units("m/year"); CHKERRQ(ierr);
+  err.set_string("long_name", "average error in the Y-component of the ice velocity");
+  ierr = err.write(filename, (size_t)start, avg_v); CHKERRQ(ierr);
+
   return 0;
 }
 
@@ -253,10 +351,10 @@ PetscErrorCode SSATestCase::write(const string &filename)
 
   // Write results to an output file:
   PIO pio(grid.com, grid.rank, grid.config.get_string("output_format"));
-  ierr = pio.open(filename, NC_WRITE); CHKERRQ(ierr);
+  ierr = pio.open(filename, PISM_WRITE); CHKERRQ(ierr);
   ierr = pio.def_time(config.get_string("time_dimension_name"),
                       config.get_string("calendar"),
-                      grid.time->units()); CHKERRQ(ierr);
+                      grid.time->CF_units()); CHKERRQ(ierr);
   ierr = pio.append_time(config.get_string("time_dimension_name"), 0.0); CHKERRQ(ierr);
   ierr = pio.close(); CHKERRQ(ierr);
 

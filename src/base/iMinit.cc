@@ -71,7 +71,7 @@ PetscErrorCode IceModel::set_grid_defaults() {
   // Determine the grid extent from a bootstrapping file:
   PIO nc(grid.com, grid.rank, grid.config.get_string("output_format"));
   bool x_dim_exists, y_dim_exists, t_exists;
-  ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+  ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
 
   ierr = nc.inq_dim("x", x_dim_exists); CHKERRQ(ierr);
   ierr = nc.inq_dim("y", y_dim_exists); CHKERRQ(ierr);
@@ -118,8 +118,8 @@ PetscErrorCode IceModel::set_grid_defaults() {
     if (t_exists) {
       grid.time->set_start(input.time);
       ierr = verbPrintf(2, grid.com,
-  		      "  time t = %5.4f years found; setting current year\n",
-                        grid.time->year()); CHKERRQ(ierr);
+  		      "  time t = %s found; setting current time\n",
+                        grid.time->date().c_str()); CHKERRQ(ierr);
     }
   }
 
@@ -279,8 +279,8 @@ PetscErrorCode IceModel::grid_setup() {
 
     // Get the 'source' global attribute to check if we are given a PISM output
     // file:
-    ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
-    ierr = nc.get_att_text("NC_GLOBAL", "source", source); CHKERRQ(ierr);
+    ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
+    ierr = nc.get_att_text("PISM_GLOBAL", "source", source); CHKERRQ(ierr);
 
     bool mapping_exists;
     ierr = nc.inq_var("mapping", mapping_exists); CHKERRQ(ierr);
@@ -311,7 +311,7 @@ PetscErrorCode IceModel::grid_setup() {
     names.push_back("enthalpy");
     names.push_back("temp");
 
-    ierr = nc.open(filename, NC_NOWRITE); CHKERRQ(ierr);
+    ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
 
     for (unsigned int i = 0; i < names.size(); ++i) {
       ierr = nc.inq_grid(names[i], &grid, NOT_PERIODIC);
@@ -712,7 +712,6 @@ PetscErrorCode IceModel::allocate_basal_resistance_law() {
     return 0;
 
   bool do_pseudo_plastic_till = config.get_flag("do_pseudo_plastic_till");
-
   PetscScalar pseudo_plastic_q = config.get("pseudo_plastic_q"),
     pseudo_plastic_uthreshold = config.get("pseudo_plastic_uthreshold", "m/year", "m/s"),
     plastic_regularization = config.get("plastic_regularization", "1/year", "1/second");
@@ -838,6 +837,7 @@ PetscErrorCode IceModel::misc_setup() {
   event_beddef  = grid.profiler->create("bed_def",  "time spent updating the bed deformation model");
 
   event_output    = grid.profiler->create("output", "time spent writing an output file");
+  event_output_define = grid.profiler->create("output_define", "time spent defining variables");
   event_snapshots = grid.profiler->create("snapshots", "time spent writing snapshots");
   event_backups   = grid.profiler->create("backups", "time spent writing backups");
 

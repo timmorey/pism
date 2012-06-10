@@ -30,19 +30,13 @@
 using namespace std;
 /// @endcond
 
-// The following is a stupid kludge necessary to make NetCDF 4.x work in
-// serial mode in an MPI program:
-#ifndef MPI_INCLUDED
-#define MPI_INCLUDED 1
-#endif
-#include <netcdf.h>		// nc_type
-// Note: as far as I (CK) can tell, MPI_INCLUDED is a MPICH invention.
+#include "PIO.hh"
 
 class IceGrid;
 class NCConfigVariable;
+class NCSpatialVariable;
 class PISMDiagnostic;
 class PISMVars;
-class PIO;
 
 //! \brief A class defining a common interface for most PISM sub-models.
 /*!
@@ -121,18 +115,17 @@ public:
   /*!
     Keyword can be one of "small", "medium" or "big".
    */
-  virtual void add_vars_to_output(string /*keyword*/, set<string> &/*result*/) {}
+  virtual void add_vars_to_output(string /*keyword*/,
+                                  map<string,NCSpatialVariable> &/*result*/) = 0;
 
   //! Defines requested couplings fields to file and/or asks an attached
   //! model to do so.
   virtual PetscErrorCode define_variables(set<string> /*vars*/, const PIO &/*nc*/,
-                                          nc_type /*nctype*/)
-  { return 0; }
+                                          PISM_IO_Type /*nctype*/) = 0;
 
   //! Writes requested couplings fields to file and/or asks an attached
   //! model to do so.
-  virtual PetscErrorCode write_variables(set<string> /*vars*/, string /*filename*/)
-  { return 0; }
+  virtual PetscErrorCode write_variables(set<string> /*vars*/, string /*filename*/) = 0;
 
   //! Add pointers to available diagnostic quantities to a dictionary.
   virtual void get_diagnostics(map<string, PISMDiagnostic*> &/*dict*/) {}
@@ -207,7 +200,7 @@ public:
     }
   }
 
-  virtual void add_vars_to_output(string keyword, set<string> &result)
+  virtual void add_vars_to_output(string keyword, map<string,NCSpatialVariable> &result)
   {
     if (input_model != NULL) {
       input_model->add_vars_to_output(keyword, result);
@@ -215,7 +208,7 @@ public:
   }
 
   virtual PetscErrorCode define_variables(set<string> vars, const PIO &nc,
-                                          nc_type nctype)
+                                          PISM_IO_Type nctype)
   {
     if (input_model != NULL) {
       PetscErrorCode ierr = input_model->define_variables(vars, nc, nctype); CHKERRQ(ierr);
