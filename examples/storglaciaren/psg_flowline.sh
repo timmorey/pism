@@ -106,10 +106,10 @@ echo ""
 
 EB="-e 0.3"
 #PARAMS="$TILLPHI -pseudo_plastic_uthreshold $uth"
-#PARAMS="-plastic_phi $phi"
+PARAMS="-plastic_phi $phi"
 
-#PETSCSTUFF="-pc_type lu -pc_factor_mat_solver_package mumps"
-PETSCSTUFF="-pc_type asm -sub_pc_type lu -ksp_type lgmres -ksp_right_pc"
+PETSCSTUFF="-pc_type lu -pc_factor_mat_solver_package mumps"
+#PETSCSTUFF="-pc_type asm -sub_pc_type lu -ksp_type lgmres -ksp_right_pc"
 
 
 FULLPHYS="-ssa_sliding -thk_eff $PARAMS $PETSCSTUFF"
@@ -156,7 +156,7 @@ TSNAME=ts_${OUTNAME}
 TSTIMES=$STARTYEAR:$STEP:$ENDTIME
 echo
 echo "$SCRIPTNAME  SSA run with force-to-thickness for $RUNLENGTH years on ${GS}m grid"
-cmd="$PISM_MPIDO $NN $PISM $EB -skip $SKIP -i $INNAME $COUPLER_FORCING $FULLPHYS\
+cmd="$PISM_MPIDO $NN $PISM $EB -skip $SKIP -i $INNAME $COUPLER_FORCING $FULLPHYS \
      -force_to_thk $INNAME -force_to_thk_alpha $FTALPHA \
      -ts_file $TSNAME -ts_times $TSTIMES \
      -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
@@ -181,7 +181,7 @@ EXTIMES=$STARTYEAR:$STEP:$ENDTIME
 echo
 echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
 cmd="$PISM_MPIDO $NN $PISM $EB -skip $SKIP -i $INNAME $COUPLER_ELEV $FULLPHYS \
-     -ts_file $TSNAME -ts_times $TSTIMES \
+     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
      -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
      -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
 $PISM_DO $cmd

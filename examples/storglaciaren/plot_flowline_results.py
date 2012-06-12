@@ -27,8 +27,23 @@ except:
     print(("file %s not found ... ending ..." % args[0]))
     exit(2)
 
-def permute(variable, output_order = ('t', 'z', 'zb', 'y', 'x')):
-    """Permute dimensions of a NetCDF variable to match the output storage order."""
+def permute(variable, output_order=('time', 'z', 'zb', 'y', 'x')):
+    '''
+    Permute dimensions of a NetCDF variable to match the output
+    storage order.
+
+    Parameters
+    ----------
+    variable : a netcdf variable
+               e.g. thk = nc.variables['thk']
+    output_order: dimension tuple (optional)
+                  default ordering is ('time', 'z', 'zb', 'y', 'x')
+
+    Returns
+    -------
+    var_perm : array_like
+    '''
+
     input_dimensions = variable.dimensions
 
     # filter out irrelevant dimensions
@@ -42,7 +57,7 @@ def permute(variable, output_order = ('t', 'z', 'zb', 'y', 'x')):
     if mapping:
         return np.transpose(variable[:], mapping)
     else:
-        return variable[:]              # so that it does not break processing "mapping"
+        return variable[:]  # so that it does not break processing "mapping"
 
 
 x = nc.variables["x"][:]
@@ -89,7 +104,7 @@ if (plot_acab == True):
     try:
         acab = np.squeeze(nc.variables["ftt_modified_acab"][:])
     except:
-        acab = np.squeeze(nc.variables["acab"][:])
+        acab = np.squeeze(nc.variables["climatic_mass_balance"][:])
     axUpperRight = axUpperLeft.twinx()
     axUpperRight.plot(x,acab,color='#984EA3',lw=1.5)
     axUpperRight.axes.set_ylabel("mass balance [m a$^{-1}$]")
