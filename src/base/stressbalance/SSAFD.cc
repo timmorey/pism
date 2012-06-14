@@ -642,7 +642,7 @@ PetscErrorCode SSAFD::solve() {
   PetscErrorCode ierr;
   Mat A = SSAStiffnessMatrix; // solve  A SSAX = SSARHS
   PetscReal   norm, normChange;
-  PetscInt    ksp_iterations, outer_iterations;
+  PetscInt    ksp_iterations, ksp_iterations_total = 0, outer_iterations;
   KSPConvergedReason  reason;
 
   stdout_ssa = "";
@@ -652,7 +652,8 @@ PetscErrorCode SSAFD::solve() {
             epsilon              = config.get("epsilon_ssafd");
 
   PetscInt ssaMaxIterations = static_cast<PetscInt>(config.get("max_iterations_ssafd"));
-
+  // this has no units; epsilon goes up by this ratio when previous value failed
+  const PetscScalar DEFAULT_EPSILON_MULTIPLIER_SSA = 4.0;
   ierr = velocity.copy_to(velocity_old); CHKERRQ(ierr);
 
   // computation of RHS only needs to be done once; does not depend on
@@ -675,31 +676,58 @@ PetscErrorCode SSAFD::solve() {
       // in preparation of measuring change of effective viscosity:
       ierr = nuH.copy_to(nuH_old); CHKERRQ(ierr);
 
-      // assemble (or re-assemble) matrix, which depends on updated viscosity
-      ierr = assemble_matrix(true, A); CHKERRQ(ierr);
-      if (getVerbosityLevel() > 2)
-        stdout_ssa += "A:";
+      do {
+        // assemble (or re-assemble) matrix, which depends on updated viscosity
+        ierr = assemble_matrix(true, A); CHKERRQ(ierr);
+        if (getVerbosityLevel() > 2)
+          stdout_ssa += "A:";
 
-      // call PETSc to solve linear system by iterative method; "inner linear iteration"
-      ierr = KSPSetOperators(SSAKSP, A, A, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
-      //ierr = KSPView(SSAKSP,PETSC_VIEWER_STDOUT_WORLD); CHKERRQ(ierr); 
-      ierr = KSPSolve(SSAKSP, SSARHS, SSAX); CHKERRQ(ierr); // SOLVE
+        // call PETSc to solve linear system by iterative method; "inner iteration"
+        ierr = KSPSetOperators(SSAKSP, A, A, SAME_NONZERO_PATTERN); CHKERRQ(ierr);
+        ierr = KSPSolve(SSAKSP, SSARHS, SSAX); CHKERRQ(ierr); // SOLVE
 
-      // report to standard out about iteration
-      ierr = KSPGetConvergedReason(SSAKSP, &reason); CHKERRQ(ierr);
-      if (reason < 0) {
-        ierr = verbPrintf(1,grid.com,
-            "\n\n\nPISM ERROR:  KSPSolve() reports 'diverged'; reason = %d = '%s';\n"
-                  "  see PETSc man page for KSPGetConvergedReason();   ENDING ...\n\n",
-            reason,KSPConvergedReasons[reason]); CHKERRQ(ierr);
-        //PISMEnd();
-	pism_signal=SIGTERM;
-      }
-      ierr = KSPGetIterationNumber(SSAKSP, &ksp_iterations); CHKERRQ(ierr);
-      if (getVerbosityLevel() > 2) {
-        char tempstr[50] = "";  snprintf(tempstr,50, "S:%d,%d: ", ksp_iterations, reason);
-        stdout_ssa += tempstr;
-      }
+        // check if diverged; report to standard out about iteration
+        ierr = KSPGetConvergedReason(SSAKSP, &reason); CHKERRQ(ierr);
+        if (reason < 0) {
+          // KSP diverged
+          ierr = verbPrintf(1,grid.com,
+              "\nPISM WARNING:  KSPSolve() reports 'diverged'; reason = %d = '%s'\n",
+              reason,KSPConvergedReasons[reason]); CHKERRQ(ierr);
+          // write a file with a fixed filename; avoid zillions of files
+          char filename[PETSC_MAX_PATH_LEN] = "SSAFD_kspdivergederror.petsc";
+          ierr = verbPrintf(1,grid.com,
+              "  writing linear system to PETSc binary file %s ...\n",filename);
+              CHKERRQ(ierr);
+          PetscViewer    viewer;
+          ierr = PetscViewerBinaryOpen(grid.com, filename, FILE_MODE_WRITE,
+                                       &viewer); CHKERRQ(ierr);
+          ierr = MatView(A,viewer); CHKERRQ(ierr);
+          ierr = VecView(SSARHS,viewer); CHKERRQ(ierr);
+//           ierr = PetscViewerDestroy(&viewer); CHKERRQ(ierr);
+          // attempt recovery by same mechanism as for outer iteration
+          //   (FIXME: could force direct solve on subdomains?)
+          if (epsilon <= 0.0) {
+            ierr = verbPrintf(1,grid.com,
+                "KSP diverged AND epsilon<=0.0.\n  ENDING ...\n"); CHKERRQ(ierr);
+            PISMEnd();
+          }
+          ierr = verbPrintf(1,grid.com,
+              "  KSP diverged with epsilon=%8.2e.  Retrying with epsilon multiplied by %8.2e.\n\n",
+            epsilon, DEFAULT_EPSILON_MULTIPLIER_SSA); CHKERRQ(ierr);
+          epsilon *= DEFAULT_EPSILON_MULTIPLIER_SSA;
+          // recovery requires recompute on nuH  (FIXME: could be implemented by max(eps,nuH) here?)
+          ierr = compute_nuH_staggered(nuH, epsilon); CHKERRQ(ierr);
+        } else {
+          // report on KSP success; the "inner" iteration is done
+          ierr = KSPGetIterationNumber(SSAKSP, &ksp_iterations); CHKERRQ(ierr);
+          ksp_iterations_total += ksp_iterations;
+          if (getVerbosityLevel() > 2) {
+            char tempstr[50] = "";  snprintf(tempstr,50, "S:%d,%d: ", ksp_iterations, reason);
+            stdout_ssa += tempstr;
+          }
+        }
+
+      } while (reason < 0);  // keep trying till KSP converged
 
       // Communicate so that we have stencil width for evaluation of effective
       //   viscosity on next "outer" iteration (and geometry etc. if done):
