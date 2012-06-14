@@ -116,7 +116,7 @@ plt.colorbar(mappable=c1,ax=axLower,orientation='horizontal',pad=0.05,shrink=0.7
 c2=axLower.contourf(xx,zz,temppa,temppa_levels,cmap=plt.cm.Blues_r,lw = 1)
 plt.colorbar(mappable=c2,ax=axLower,orientation='horizontal',ticks=[-6,-5,-4,-3,-2,-1,0],pad=0.20,shrink=0.75)
 axLower.contour(xx,zz,cts,cts_level,colors='black',linestyles='dashed',lw = 1)
-axLower.axes.set_xlim(-250, 3500)
+axLower.axes.set_xlim(-250, 4000)
 axLower.axes.set_ylim(1100,1800)
 axLower.axes.set_xlabel("distance from bergschrund [m]")
 axLower.axes.set_ylabel("elevation [m a.s.l.]")
