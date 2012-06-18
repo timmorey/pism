@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) 2010-2012 Andy Aschwanden
+# Copyright (C) 2012 Andy Aschwanden
 
 
 if [ -n "${SCRIPTNAME:+1}" ] ; then
@@ -73,15 +73,17 @@ INNAME=$PISM_DATANAME
 PISM_TEMPSERIES=delta_T.nc
 
 # coupler settings
-COUPLER="-surface elevation -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
+#COUPLER="-surface elevation -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
+COUPLER="-surface elevation -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -4,2.5,1150,1400,1615 -climatic_mass_balance_limits -4,0"
 COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERIES -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
 # grid parameters
 FINEGRID="-periodicity y -Mx 792 -My 3 -Mz 201 -Lz 300 -z_spacing equal"  # 5 m grid
 FS=5
 FINESKIP=5000
 COARSEGRID="-periodicity y -Mx 114 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 35 m grid
-CS=35
-COARSESKIP=1000
+COARSEGRID="-periodicity y -Mx 39 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 35 m grid
+CS=100
+COARSESKIP=500
 
 GRID=$COARSEGRID
 SKIP=$COARSESKIP
@@ -146,7 +148,7 @@ $PISM_DO $cmd
 
 
 STARTYEAR=0
-RUNLENGTH=500
+RUNLENGTH=1000
 ENDTIME=$(($STARTYEAR + $RUNLENGTH))
 INNAME=$PREFIX${GS}m_steady.nc
 OUTNAME=ssa_${RUNLENGTH}a.nc
@@ -168,12 +170,10 @@ $PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
 
 EX1NAME=$OUTNAMEFULL
 
-
-
-COUPLER="-surface elevation -ice_surface_temp -1,-3.5,1200,1600 -climatic_mass_balance -0.5,0.5.,1200,1450,1615 -climatic_mass_balance_limits -0.5,0"
+COUPLER="-surface elevation -ice_surface_temp -2.5,-5,1200,1600 -climatic_mass_balance -0.5,0.5.,1200,1450,1615 -climatic_mass_balance_limits -0.5,0"
 
 STARTYEAR=0
-RUNLENGTH=500
+RUNLENGTH=250
 ENDTIME=$(($STARTYEAR + $RUNLENGTH))
 INNAME=$EX1NAME
 OUTNAME=tplus2_${RUNLENGTH}a.nc
@@ -186,6 +186,23 @@ EXTIMES=$STARTYEAR:$STEP:$ENDTIME
 echo
 echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
 cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
+     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
+     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
+     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
+$PISM_DO $cmd
+echo
+$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+
+OUTNAME=tplus2_cold_${RUNLENGTH}a.nc
+OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
+TSNAME=ts_${OUTNAMEFULL}
+EXNAME=ex_${OUTNAMEFULL}
+TSTIMES=$STARTYEAR:$STEP:$ENDTIME
+EXTIMES=$STARTYEAR:$STEP:$ENDTIME
+
+echo
+echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
+cmd="$PISM_MPIDO $NN $PISM $EB -cold -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
      -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
      -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
      -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
@@ -208,6 +225,24 @@ EXTIMES=$STARTYEAR:$STEP:$ENDTIME
 echo
 echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
 cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_FORCING $FULLPHYS \
+     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
+     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
+     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
+$PISM_DO $cmd
+echo
+$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+
+
+OUTNAME=t2c_cold_${RUNLENGTH}a.nc
+OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
+TSNAME=ts_${OUTNAMEFULL}
+EXNAME=ex_${OUTNAMEFULL}
+TSTIMES=$STARTYEAR:$STEP:$ENDTIME
+EXTIMES=$STARTYEAR:$STEP:$ENDTIME
+
+echo
+echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
+cmd="$PISM_MPIDO $NN $PISM $EB -cold -skip -skip_max  $SKIP -i $INNAME $COUPLER_FORCING $FULLPHYS \
      -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
      -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
      -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
