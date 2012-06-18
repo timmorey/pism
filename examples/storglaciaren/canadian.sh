@@ -7,12 +7,12 @@ if [ -n "${SCRIPTNAME:+1}" ] ; then
   echo "[SCRIPTNAME=$SCRIPTNAME (already set)]"
   echo ""
 else
-  SCRIPTNAME="#(psg_flowline.sh)"
+  SCRIPTNAME="#(canadian.sh)"
 fi
 
 echo
 echo "# =================================================================================="
-echo "# PISM Storglaciaren Flow Line Model"
+echo "# PISM Storglaciaren Flow Line Model -- Canadian Type"
 echo "# =================================================================================="
 echo
 
@@ -70,13 +70,11 @@ DATANAME=storglaciaren_flowline.nc
 PISM_DATANAME=pism_$DATANAME
 INNAME=$PISM_DATANAME
 
+PISM_TEMPSERIES=delta_T.nc
+
 # coupler settings
-COUPLER="-surface given -surface_given_file $PISM_DATANAME"
-COUPLER_FORCING="-surface given,forcing -surface_given_file $PISM_DATANAME"
-
-# force-to-thickness
-FTALPHA=0.05
-
+COUPLER="-surface elevation -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
+COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERIES -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
 # grid parameters
 FINEGRID="-periodicity y -Mx 792 -My 3 -Mz 201 -Lz 300 -z_spacing equal"  # 5 m grid
 FS=5
@@ -105,6 +103,7 @@ echo ""
 
 
 EB="-sia_e 1"
+phi=40
 #PARAMS="$TILLPHI -pseudo_plastic_uthreshold $uth"
 PARAMS="-plastic_phi $phi"
 
@@ -112,16 +111,16 @@ PETSCSTUFF="-pc_type lu -pc_factor_mat_solver_package mumps"
 #PETSCSTUFF="-pc_type asm -sub_pc_type lu -ksp_type lgmres -ksp_right_pc"
 
 
-FULLPHYS="-ssa_sliding -thk_eff $PARAMS $PETSCSTUFF"
+FULLPHYS="-ssa_sliding -cfbc -thk_eff $PARAMS $PETSCSTUFF"
 
 SMOOTHRUNLENGTH=1
-NOMASSRUNLENGTH=500
+NOMASSRUNLENGTH=1000
 
 STEP=1
 
-EXVARS="enthalpybase,topg,velsurf,velbase,cts,liqfraq,temp_pa,climatic_mass_balance,temppabase,tempicethk,bmelt,bwat,usurf,csurf,mask,hardav,thk" # add mask, so that check_stationarity.py ignores ice-free areas.
+EXVARS="enthalpybase,topg,velsurf,velbase,cts,liqfrac,temp_pa,climatic_mass_balance,temppabase,tempicethk,bmelt,bwat,usurf,csurf,mask,hardav,thk" # add mask, so that check_stationarity.py ignores ice-free areas.
 
-PREFIX=psg_flowline_
+PREFIX=canadian_
 
 # bootstrap and do smoothing run to 1 year
 OUTNAME=$PREFIX${GS}m_pre$SMOOTHRUNLENGTH.nc
@@ -144,119 +143,71 @@ cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER \
 $PISM_DO $cmd
 
 
-# We use the force-to-thickness mechanism to infer the mass balance
+
 
 STARTYEAR=0
-RUNLENGTH=10
+RUNLENGTH=500
 ENDTIME=$(($STARTYEAR + $RUNLENGTH))
-INNAME=$OUTNAME
-OUTNAME=ssa_ftt_${RUNLENGTH}a.nc
+INNAME=$PREFIX${GS}m_steady.nc
+OUTNAME=ssa_${RUNLENGTH}a.nc
 OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
-TSNAME=ts_${OUTNAME}
+TSNAME=ts_${OUTNAMEFULL}
+EXNAME=ex_${OUTNAMEFULL}
 TSTIMES=$STARTYEAR:$STEP:$ENDTIME
+EXTIMES=$STARTYEAR:$STEP:$ENDTIME
+
 echo
-echo "$SCRIPTNAME  SSA run with force-to-thickness for $RUNLENGTH years on ${GS}m grid"
+echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
+cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
+     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
+     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
+     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
+$PISM_DO $cmd
+echo
+$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+
+EX1NAME=$OUTNAMEFULL
+
+
+
+COUPLER="-surface elevation -ice_surface_temp -1,-3.5,1200,1600 -climatic_mass_balance -0.5,0.5.,1200,1450,1615 -climatic_mass_balance_limits -0.5,0"
+
+STARTYEAR=0
+RUNLENGTH=500
+ENDTIME=$(($STARTYEAR + $RUNLENGTH))
+INNAME=$EX1NAME
+OUTNAME=tplus2_${RUNLENGTH}a.nc
+OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
+TSNAME=ts_${OUTNAMEFULL}
+EXNAME=ex_${OUTNAMEFULL}
+TSTIMES=$STARTYEAR:$STEP:$ENDTIME
+EXTIMES=$STARTYEAR:$STEP:$ENDTIME
+
+echo
+echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
+cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
+     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
+     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
+     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
+$PISM_DO $cmd
+echo
+$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+
+
+STARTYEAR=0
+RUNLENGTH=500
+ENDTIME=$(($STARTYEAR + $RUNLENGTH))
+INNAME=$EX1NAME
+OUTNAME=t2c_${RUNLENGTH}a.nc
+OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
+TSNAME=ts_${OUTNAMEFULL}
+EXNAME=ex_${OUTNAMEFULL}
+TSTIMES=$STARTYEAR:$STEP:$ENDTIME
+EXTIMES=$STARTYEAR:$STEP:$ENDTIME
+
+echo
+echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
 cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_FORCING $FULLPHYS \
-     -force_to_thk $INNAME -force_to_thk_alpha $FTALPHA \
-     -ts_file $TSNAME -ts_times $TSTIMES \
-     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
-$PISM_DO $cmd
-echo
-$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
-
-
-COUPLER_ELEV="-surface elevation -ice_surface_temp -6,0,1395,1400 -climatic_mass_balance -3,2.5.,1200,1450,1615 -climatic_mass_balance_limits -3,0"
-
-STARTYEAR=0
-RUNLENGTH=25
-ENDTIME=$(($STARTYEAR + $RUNLENGTH))
-INNAME=$OUTNAMEFULL
-OUTNAME=ssa_${RUNLENGTH}a.nc
-OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
-TSNAME=ts_${OUTNAMEFULL}
-EXNAME=ex_${OUTNAMEFULL}
-TSTIMES=$STARTYEAR:$STEP:$ENDTIME
-EXTIMES=$STARTYEAR:$STEP:$ENDTIME
-
-echo
-echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
-cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_ELEV $FULLPHYS \
-     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
-     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
-     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
-$PISM_DO $cmd
-echo
-$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
-
-
-
-COUPLER_ELEV="-surface elevation -ice_surface_temp -6,0,1395,1400 -climatic_mass_balance -3,2.5.,1200,1450,1615 -climatic_mass_balance_limits -3,0"
-
-STARTYEAR=0
-RUNLENGTH=40
-ENDTIME=$(($STARTYEAR + $RUNLENGTH))
-INNAME=$OUTNAMEFULL
-OUTNAME=ssa_${RUNLENGTH}a.nc
-OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
-TSNAME=ts_${OUTNAMEFULL}
-EXNAME=ex_${OUTNAMEFULL}
-TSTIMES=$STARTYEAR:$STEP:$ENDTIME
-EXTIMES=$STARTYEAR:$STEP:$ENDTIME
-
-echo
-echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
-cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_ELEV $FULLPHYS \
-     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
-     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
-     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
-$PISM_DO $cmd
-echo
-$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
-
-
-
-COUPLER_ELEV="-surface elevation -ice_surface_temp -1,-3.5,1200,1600 -climatic_mass_balance -3,2.5.,1200,1450,1615 -climatic_mass_balance_limits -3,0"
-
-STARTYEAR=0
-RUNLENGTH=20
-ENDTIME=$(($STARTYEAR + $RUNLENGTH))
-INNAME=$OUTNAMEFULL
-OUTNAME=ssa_t_h_${RUNLENGTH}a.nc
-OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
-TSNAME=ts_${OUTNAMEFULL}
-EXNAME=ex_${OUTNAMEFULL}
-TSTIMES=$STARTYEAR:$STEP:$ENDTIME
-EXTIMES=$STARTYEAR:$STEP:$ENDTIME
-
-echo
-echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
-cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_ELEV $FULLPHYS \
-     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
-     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
-     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
-$PISM_DO $cmd
-echo
-$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
-
-
-
-
-COUPLER_ELEV="-surface elevation -ice_surface_temp 0,-2.5,1200,1600 -climatic_mass_balance -3,2.5.,1200,1450,1615 -climatic_mass_balance_limits -3,0"
-
-STARTYEAR=0
-RUNLENGTH=20
-ENDTIME=$(($STARTYEAR + $RUNLENGTH))
-INNAME=$OUTNAMEFULL
-OUTNAME=ssa_t0_h_${RUNLENGTH}a.nc
-OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
-TSNAME=ts_${OUTNAMEFULL}
-EXNAME=ex_${OUTNAMEFULL}
-TSTIMES=$STARTYEAR:$STEP:$ENDTIME
-EXTIMES=$STARTYEAR:$STEP:$ENDTIME
-
-echo
-echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance for $RUNLENGTH years on ${GS}m grid"
-cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_ELEV $FULLPHYS \
      -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
      -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
      -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"

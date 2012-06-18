@@ -17,7 +17,7 @@ parser.description = "A script to compare PISM flowline velocities with full Sto
 
 plot_acab = True
 
-if len(args) != 1:
+if len(args) < 1:
     print('wrong number of arguments, 1 expected')
     exit(1)
     
@@ -88,7 +88,7 @@ temppa = np.ma.array(data=temppa,mask=mask2)
 ## Contour level of the CTS
 cts_level = [1,1]
 liqfrac_levels = np.arange(0,2.5,.25)
-temppa_levels = [-6,-5,-4,-3,-2,-1,-.0001]
+temppa_levels = [-8,-7,-6,-5,-4,-3,-2,-1,-.0001]
 
 fig = plt.figure(figsize=(6.4,7.4))
 
@@ -117,11 +117,14 @@ c2=axLower.contourf(xx,zz,temppa,temppa_levels,cmap=plt.cm.Blues_r,lw = 1)
 plt.colorbar(mappable=c2,ax=axLower,orientation='horizontal',ticks=[-6,-5,-4,-3,-2,-1,0],pad=0.20,shrink=0.75)
 axLower.contour(xx,zz,cts,cts_level,colors='black',linestyles='dashed',lw = 1)
 axLower.axes.set_xlim(-250, 4000)
-axLower.axes.set_ylim(1100,1800)
+axLower.axes.set_ylim(1000,1800)
 axLower.axes.set_xlabel("distance from bergschrund [m]")
 axLower.axes.set_ylabel("elevation [m a.s.l.]")
 
+FileName = 'sg_results.pdf'
+if len(args) == 2:
+    FileName = args[1]
 
-plt.savefig('sg_results.pdf',bbox_inches='tight',pad_inches=0.35)
+plt.savefig(FileName,bbox_inches='tight',pad_inches=0.35)
 
 nc.close()
