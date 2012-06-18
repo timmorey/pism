@@ -80,10 +80,10 @@ COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERI
 FINEGRID="-periodicity y -Mx 792 -My 3 -Mz 201 -Lz 300 -z_spacing equal"  # 5 m grid
 FS=5
 FINESKIP=5000
-COARSEGRID="-periodicity y -Mx 114 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 35 m grid
+#COARSEGRID="-periodicity y -Mx 114 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 35 m grid
 COARSEGRID="-periodicity y -Mx 39 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 35 m grid
-CS=100
-COARSESKIP=500
+CS=35
+COARSESKIP=1000
 
 GRID=$COARSEGRID
 SKIP=$COARSESKIP
@@ -227,12 +227,12 @@ for i in {0..50}
 	$PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
 done
 
-RUNLENGTH=0
+RUNLENGTH=200
 STARTYEAR=50
 COUPLER="-surface elevation -ice_surface_temp $(float_eval "$Tab"),0,$HEIGHTb,$HEIGHTa -climatic_mass_balance -3,2.5.,1200,$ELA,1615 -climatic_mass_balance_limits -3,0"
 ENDTIME=$(($STARTYEAR + $RUNLENGTH))
 INNAME=$OUTNAMEFULL
-OUTNAME=ela${ELA}m_500a.nc
+OUTNAME=ela${ELA}m_${ENDTIME}a.nc
 OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
 TSNAME=ts_${OUTNAMEFULL}
 EXNAME=ex_${OUTNAMEFULL}
