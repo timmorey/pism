@@ -7,12 +7,12 @@ if [ -n "${SCRIPTNAME:+1}" ] ; then
   echo "[SCRIPTNAME=$SCRIPTNAME (already set)]"
   echo ""
 else
-  SCRIPTNAME="#(canadian.sh)"
+  SCRIPTNAME="#(scandinavian.sh)"
 fi
 
 echo
 echo "# =================================================================================="
-echo "# PISM Storglaciaren Flow Line Model -- Canadian Type"
+echo "# PISM Storglaciaren Flow Line Model -- Scandinavian Type"
 echo "# =================================================================================="
 echo
 
@@ -122,12 +122,7 @@ STEP=1
 
 EXVARS="enthalpybase,topg,velsurf,velbase,cts,liqfrac,temp_pa,climatic_mass_balance,temppabase,tempicethk,bmelt,bwat,usurf,csurf,mask,hardav,thk" # add mask, so that check_stationarity.py ignores ice-free areas.
 
-PREFIX=canadian_
-
-
-STARTFILE=!!!NOFILE
-
-
+PREFIX=scandinavian_
 
 
 function float_eval()
@@ -174,12 +169,33 @@ function float_eval()
     return $stat
 }
 
+
+# bootstrap and do smoothing run to 1 year
+OUTNAME=$PREFIX${GS}m_pre$SMOOTHRUNLENGTH.nc
+echo
+echo "$SCRIPTNAME  bootstrapping plus short smoothing run for ${SMOOTHRUNLENGTH}a"
+cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -boot_file $INNAME $GRID \
+  $COUPLER -y ${SMOOTHRUNLENGTH} -o $OUTNAME"
+$PISM_DO $cmd
+
+# run with -no_mass (no surface change) 
+INNAME=$OUTNAME
+OUTNAMEFULL=$PREFIX${GS}m_steady.nc
+EXNAME=ex_${OUTNAME}
+EXTIMES=0:25:${NOMASSRUNLENGTH}
+echo
+echo "$SCRIPTNAME  -no_mass (no surface change) sia run to achieve approximate enthalpy equilibrium, for ${NOMASSRUNLENGTH}a"
+cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER \
+  -no_mass -y ${NOMASSRUNLENGTH} \
+  -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES -o $OUTNAMEFULL"
+$PISM_DO $cmd
+
+
 ELA0=1400
 BUFFER=10
 T0=-7
 dt=2/50
 Tacc=0
-OUTNAMEFULL=$STARTFILE
 for i in {0..50}
         do
 	RUNLENGTH=1
@@ -202,7 +218,7 @@ for i in {0..50}
 
 	echo
 	echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance and temperature for $RUNLENGTH years on ${GS}m grid"
-	cmd="$PISM_MPIDO $NN $PISM $EB -cold -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
+	cmd="$PISM_MPIDO $NN $PISM $EB  -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
 	     -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
 	     -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
 	     -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
@@ -225,7 +241,7 @@ EXTIMES=$STARTYEAR:$STEP:$ENDTIME
 
 echo
 echo "$SCRIPTNAME  SSA run with elevation-dependent mass balance and temperature for $RUNLENGTH years on ${GS}m grid"
-cmd="$PISM_MPIDO $NN $PISM $EB -cold -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
+cmd="$PISM_MPIDO $NN $PISM $EB  -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLPHYS \
      -ts_file $TSNAME -ts_times $TSTIMES -plastic_phi 40 \
      -extra_file $EXNAME -extra_vars $EXVARS -extra_times $EXTIMES \
      -ys $STARTYEAR -y $RUNLENGTH -o_size big -o $OUTNAMEFULL"
