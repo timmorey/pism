@@ -167,6 +167,7 @@ cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLP
 $PISM_DO $cmd
 echo
 $PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+$PISM_DO flowline.py -c -o ex_$OUTNAME $EXNAME
 
 EX1NAME=$OUTNAMEFULL
 
@@ -192,6 +193,7 @@ cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER $FULLP
 $PISM_DO $cmd
 echo
 $PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+$PISM_DO flowline.py -c -o ex_$OUTNAME $EXNAME
 
 OUTNAME=tplus2_cold_${RUNLENGTH}a.nc
 OUTNAMEFULL=$PREFIX${GS}m_$OUTNAME
@@ -209,6 +211,7 @@ cmd="$PISM_MPIDO $NN $PISM $EB -cold -skip -skip_max  $SKIP -i $INNAME $COUPLER 
 $PISM_DO $cmd
 echo
 $PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+$PISM_DO flowline.py -c -o ex_$OUTNAME $EXNAME
 
 
 STARTYEAR=0
@@ -231,6 +234,7 @@ cmd="$PISM_MPIDO $NN $PISM $EB -skip -skip_max  $SKIP -i $INNAME $COUPLER_FORCIN
 $PISM_DO $cmd
 echo
 $PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+$PISM_DO flowline.py -c -o ex_$OUTNAME $EXNAME
 
 
 OUTNAME=t2c_cold_${RUNLENGTH}a.nc
@@ -249,3 +253,4 @@ cmd="$PISM_MPIDO $NN $PISM $EB -cold -skip -skip_max  $SKIP -i $INNAME $COUPLER_
 $PISM_DO $cmd
 echo
 $PISM_DO flowline.py -c -o $OUTNAME $OUTNAMEFULL
+$PISM_DO flowline.py -c -o ex_$OUTNAME $EXNAME
