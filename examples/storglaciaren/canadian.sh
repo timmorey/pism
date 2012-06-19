@@ -73,14 +73,14 @@ INNAME=$PISM_DATANAME
 PISM_TEMPSERIES=delta_T.nc
 
 # coupler settings
-COUPLER="-surface elevation -ice_surface_temp -4.,-6.5,1200,1600 -climatic_mass_balance -4,2.75,1150,1400,1615 -climatic_mass_balance_limits -4,0"
-COUPLER_WARM="-surface elevation -ice_surface_temp -2.,-4.5,1200,1600 -climatic_mass_balance -4,2.75.,1150,1450,1615 -climatic_mass_balance_limits -0.5,0"
-COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERIES -ice_surface_temp -4.,-6.5,1200,1600 -climatic_mass_balance -4,2.75.,1200,1400,1615 -climatic_mass_balance_limits -4,0"
+COUPLER="-surface elevation -ice_surface_temp -4.,-6.5,1200,1600 -climatic_mass_balance -4,3,1150,1400,1615 -climatic_mass_balance_limits -4,0"
+COUPLER_WARM="-surface elevation -ice_surface_temp -2.,-4.5,1200,1600 -climatic_mass_balance -4,3.,1150,1450,1615 -climatic_mass_balance_limits -0.5,0"
+COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERIES -ice_surface_temp -4.,-6.5,1200,1600 -climatic_mass_balance -4,3.,1200,1400,1615 -climatic_mass_balance_limits -4,0"
 # grid parameters
 FINEGRID="-periodicity y -Mx 792 -My 3 -Mz 201 -Lz 300 -z_spacing equal"  # 5 m grid
 FS=5
 FINESKIP=5000
-COARSEGRID="-periodicity y -Mx 114 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 35 m grid
+COARSEGRID="-periodicity y -Mx 114 -My 3 -Mz 401 -Lz 500 -z_spacing equal"  # 35 m grid
 #COARSEGRID="-periodicity y -Mx 39 -My 3 -Mz 101 -Lz 500 -z_spacing equal"  # 100 m grid
 CS=35
 COARSESKIP=1000
