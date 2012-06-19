@@ -74,8 +74,8 @@ PISM_TEMPSERIES=delta_T.nc
 
 # coupler settings
 #COUPLER="-surface elevation -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
-COUPLER="-surface elevation -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2.5,1.,1100,1400,1615 -climatic_mass_balance_limits -10,0"
-COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERIES -ice_surface_temp -4.5,-7,1200,1600 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
+COUPLER="-surface elevation -ice_surface_temp -7,0,1390,1410 -climatic_mass_balance -2.5,1.,1100,1400,1615 -climatic_mass_balance_limits -10,0"
+COUPLER_FORCING="-surface elevation,delta_T -surface_delta_T_file $PISM_TEMPSERIES -ice_surface_temp -7,0,1390,1410 -climatic_mass_balance -2,1.,1200,1450,1615 -climatic_mass_balance_limits -2,0"
 # grid parameters
 FINEGRID="-periodicity y -Mx 792 -My 3 -Mz 201 -Lz 300 -z_spacing equal"  # 5 m grid
 FS=5
