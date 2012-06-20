@@ -66,6 +66,8 @@ public:
     if (keyword != "small") {
       result.insert(temp_name);
       result.insert(mass_flux_name);
+      result.insert("temp_bl");
+      result.insert("salt_bl");
     }
   }
 

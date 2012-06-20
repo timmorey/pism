@@ -44,18 +44,22 @@ public:
   }
 
   virtual PetscErrorCode shelf_base_temperature(IceModelVec2S &result);
+  virtual PetscErrorCode calculate_boundlayer_temp_and_salt();
 
   virtual PetscErrorCode shelf_base_mass_flux(IceModelVec2S &result);
 
-  virtual PetscErrorCode cavity_heat_water_fluxes_3eq(
-               PetscReal sal, PetscReal temp_insitu, PetscReal zice, PetscReal rhow,
-               PetscReal rhoi, PetscReal rho, PetscReal &meltrate);
+  virtual PetscErrorCode shelf_base_temp_salinity_3eq( PetscReal sal_ocean,
+               PetscReal temp_insitu, PetscReal zice, PetscReal &temp_base,
+               PetscReal &sal_base);
+  virtual PetscErrorCode meltrate_3eq( PetscReal rhow, PetscReal rhoi,
+               PetscReal temp_base, PetscReal sal_base, PetscReal sal_ocean,
+               PetscReal &meltrate);
   virtual PetscErrorCode adlprt(PetscReal salz, PetscReal temp_insitu, PetscReal pres, PetscReal &adlprt_out);
   virtual PetscErrorCode pttmpr(PetscReal salz, PetscReal temp_insitu, PetscReal pres,PetscReal rfpres, PetscReal &thetao);
   virtual PetscErrorCode potit(PetscReal salz,PetscReal thetao,PetscReal pres,PetscReal rfpres, PetscReal &temp_insitu_out);
   protected:
-    IceModelVec2S *ice_thickness, *bed; // is not owned by this class
-
+    IceModelVec2S *ice_thickness; // is not owned by this class
+    IceModelVec2S temp_boundlayer, salinity_boundlayer;
 };
 
 
