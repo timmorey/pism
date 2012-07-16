@@ -24,6 +24,7 @@
 #include "Mask.hh"
 #include "PISMOcean.hh"
 
+#include "pism_options.hh"
 
 //! \file iMcalving.cc Methods implementing PIK options -eigen_calving and -calving_at_thickness [\ref Winkelmannetal2011].
 
@@ -46,6 +47,10 @@ PetscErrorCode IceModel::eigenCalving() {
   ierr = vH.endGhostComm(); CHKERRQ(ierr);
   ierr = vMask.beginGhostComm(); CHKERRQ(ierr);
   ierr = vMask.endGhostComm(); CHKERRQ(ierr);
+
+  bool leave_iceshelf_band;
+  ierr = PISMOptionsIsSet("-leave_iceshelf_band", leave_iceshelf_band); CHKERRQ(ierr);
+  bool belongs_to_iceshelf_band = false;
 
   double ocean_rho = config.get("sea_water_density");
   double ice_rho = config.get("ice_density");
@@ -190,28 +195,34 @@ PetscErrorCode IceModel::eigenCalving() {
   ierr = vDiffCalvRate.begin_access(); CHKERRQ(ierr);
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+          
+      if (leave_iceshelf_band)
+        belongs_to_iceshelf_band = mask.grounded(i + 2, j) || mask.grounded(i - 2, j) || mask.grounded(i, j + 2) || mask.grounded(i, j - 2) || mask.grounded(i + 1, j) || mask.grounded(i - 1, j) || mask.grounded(i, j + 1) || mask.grounded(i, j - 1) || mask.grounded(i + 1, j + 1) || mask.grounded(i + 1, j - 1) || mask.grounded(i - 1, j + 1) || mask.grounded(i - 1, j - 1);
+    
+
 
       PetscScalar restCalvRate = 0.0;
       bool hereFloating = (vH(i, j) > 0.0 && (vbed(i, j) < (sea_level - ice_rho / ocean_rho*vH(i, j))));
 
-      if (hereFloating &&
+      if (hereFloating && belongs_to_iceshelf_band == false &&
           (vDiffCalvRate(i + 1, j) > 0.0 || vDiffCalvRate(i - 1, j) > 0.0 ||
-           vDiffCalvRate(i, j + 1) > 0.0 || vDiffCalvRate(i, j - 1) > 0.0 )) {
+          vDiffCalvRate(i, j + 1) > 0.0 || vDiffCalvRate(i, j - 1) > 0.0 )) {
 
         restCalvRate = (vDiffCalvRate(i + 1, j) +
-                        vDiffCalvRate(i - 1, j) +
-                        vDiffCalvRate(i, j + 1) +
-                        vDiffCalvRate(i, j - 1));     // in m/s
+                          vDiffCalvRate(i - 1, j) +
+                          vDiffCalvRate(i, j + 1) +
+                          vDiffCalvRate(i, j - 1));     // in m/s
 
         vHref(i, j) = vH(i, j) - (restCalvRate * dt); // in m
 
         vHnew(i, j) = 0.0;
 
         if(vHref(i, j) < 0.0) { // i.e. terminal floating ice grid cell has calved off completely.
-          // We do not account for further calving ice-inwards!
-          // Alternatively CFL criterion for time stepping could be adjusted to maximum of calving rate.
-          // ierr = verbPrintf(2, grid.com, "!!!!! calving front would even retreat further at point %d, %d with volume %.2f \n",i,j,-vHref(i, j));    CHKERRQ(ierr);
-          vHref(i, j) = 0.0;
+        // We do not account for further calving ice-inwards!
+        // Alternatively CFL criterion for time stepping could be adjusted to maximum of calving rate.
+        // ierr = verbPrintf(2, grid.com, "!!!!! calving front would even retreat further at point %d, %d with volume %.2f \n",i,j,-vHref(i, j));    CHKERRQ(ierr);
+         vHref(i, j) = 0.0;
+
         }
       }
     }
@@ -259,12 +270,18 @@ PetscErrorCode IceModel::calvingAtThickness() {
 
   double ocean_rho = config.get("sea_water_density"),
          ice_rho   = config.get("ice_density"),
-         Hcalving  = config.get("calving_at_thickness");
+         Hcalving  = config.get("calving_at_thickness");   
 
   PetscReal sea_level;
   if (ocean != NULL) {
     ierr = ocean->sea_level_elevation(sea_level); CHKERRQ(ierr);
   } else { SETERRQ(grid.com, 2, "PISM ERROR: ocean == NULL"); }
+  
+  MaskQuery mask(vMask);
+  ierr = vMask.begin_access(); CHKERRQ(ierr);
+  bool leave_iceshelf_band;
+  ierr = PISMOptionsIsSet("-leave_iceshelf_band", leave_iceshelf_band); CHKERRQ(ierr);
+  bool belongs_to_iceshelf_band = false;
 
   ierr = vH.begin_access(); CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
@@ -277,14 +294,22 @@ PetscErrorCode IceModel::calvingAtThickness() {
                                     (vH(i, j + 1) == 0.0 && vbed(i, j + 1) < sea_level) ||
                                     (vH(i, j - 1) == 0.0 && vbed(i, j - 1) < sea_level));
       if (hereFloating && vH(i, j) <= Hcalving && icefreeOceanNeighbor) {
-	my_discharge_flux -= vHnew(i, j);
-        vHnew(i, j) = 0.0;
+        
+        if (leave_iceshelf_band)
+          belongs_to_iceshelf_band = mask.grounded(i + 2, j) || mask.grounded(i - 2, j) || mask.grounded(i, j + 2) || mask.grounded(i, j - 2) || mask.grounded(i + 1, j) || mask.grounded(i - 1, j) || mask.grounded(i, j + 1) || mask.grounded(i, j - 1) || mask.grounded(i + 1, j + 1) || mask.grounded(i + 1, j - 1) || mask.grounded(i - 1, j + 1) || mask.grounded(i - 1, j - 1);
+      
+        if (belongs_to_iceshelf_band == false) {
+          my_discharge_flux -= vHnew(i, j);
+          vHnew(i, j) = 0.0;
+        }
       }
     }
   }
   ierr = vHnew.end_access(); CHKERRQ(ierr);
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vbed.end_access(); CHKERRQ(ierr);
+  
+  ierr = vMask.end_access(); CHKERRQ(ierr);
   
   ierr = PISMGlobalSum(&my_discharge_flux,     &discharge_flux,     grid.com); CHKERRQ(ierr);
   PetscScalar factor = config.get("ice_density") * (dx * dy);
