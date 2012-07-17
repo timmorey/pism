@@ -26,6 +26,8 @@
 #include "PISMSurface.hh"
 #include "PISMStressBalance.hh"
 
+#include "pism_options.hh"
+
 //! \file iMgeometry.cc Methods of IceModel with update and maintain consistency of ice sheet geometry.
 
 
@@ -308,9 +310,18 @@ PetscErrorCode IceModel::massContExplicitStep() {
   }
 
   MaskQuery mask(vMask);
+  
+  bool leave_iceshelf_band;
+  ierr = PISMOptionsIsSet("-leave_iceshelf_band", leave_iceshelf_band); CHKERRQ(ierr);
+  bool belongs_to_iceshelf_band = false;
+  PetscScalar minShelfThickness = 50.0;
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+      
+      
+      if (leave_iceshelf_band)
+        belongs_to_iceshelf_band = mask.grounded(i + 2, j) || mask.grounded(i - 2, j) || mask.grounded(i, j + 2) || mask.grounded(i, j - 2) || mask.grounded(i + 1, j) || mask.grounded(i - 1, j) || mask.grounded(i, j + 1) || mask.grounded(i, j - 1) || mask.grounded(i + 1, j + 1) || mask.grounded(i + 1, j - 1) || mask.grounded(i - 1, j + 1) || mask.grounded(i - 1, j - 1);
 
       PetscScalar divQ = 0.0;
 
@@ -399,7 +410,17 @@ PetscErrorCode IceModel::massContExplicitStep() {
                  mask.floating_ice(i, j) ||
                  mask.next_to_grounded_ice(i, j) ) {
         // grounded/floating default case, and case of ice-free ocean adjacent to grounded
+        
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
+        
+        if (mask.floating_ice(i, j) && belongs_to_iceshelf_band && vHnew(i, j) <= minShelfThickness){
+          vHnew(i, j) = minShelfThickness;
+          if (vH(i, j) <= minShelfThickness){
+            shelfbmassflux(i,j) = 0.0;
+            acab(i, j) = 0.0; //FIXME: This is just any easy fix to avoid ongoing melt and accumulation fluxes
+          }
+        }
+        
       } else {
         // last possibility: ice-free ocean not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;
