@@ -91,6 +91,7 @@ IceModel::IceModel(IceGrid &g, NCConfigVariable &conf, NCConfigVariable &conf_ov
   reset_counters();
 
   allowAboveMelting = PETSC_FALSE;  // only IceCompModel ever sets it to true
+
 }
 
 void IceModel::reset_counters() {
@@ -244,12 +245,17 @@ PetscErrorCode IceModel::createVecs() {
   }
 
   // grounded_dragging_floating integer mask
-  if(config.get_flag("do_eigen_calving")) {
-    ierr = vMask.create(grid, "mask", true, 3); CHKERRQ(ierr); 
-    // The wider stencil is needed for parallel calculation in iMcalving.cc when asking for mask values at the front (offset+1)
+  if(config.get_flag("do_eigen_calving") || config.get_flag("leave_iceshelf_band")) {
+    if (config.get("leave_band_of_width")>3) {
+        ierr = vMask.create(grid, "mask", true, config.get("leave_band_of_width")); CHKERRQ(ierr); }
+    else {
+      ierr = vMask.create(grid, "mask", true, 3); CHKERRQ(ierr); 
+      // The wider stencil is needed for parallel calculation in iMcalving.cc when asking for mask values at the front (offset+1)
+    }
   } else {
     ierr = vMask.create(grid, "mask", true, WIDE_STENCIL); CHKERRQ(ierr);
   }
+ 
   ierr = vMask.set_attrs("diagnostic", "grounded_dragging_floating integer mask",
 			 "", ""); CHKERRQ(ierr);
   vector<double> mask_values(4);

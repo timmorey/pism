@@ -111,7 +111,13 @@ protected:
 class MaskQuery : private Mask
 {
 public:
+  //MaskQuery(const NCConfigVariable &config, IceModelVec2Int &m) : mask(m) {}
   MaskQuery(IceModelVec2Int &m) : mask(m) {}
+  // {
+  //   double leave_band_of_width = config.get("leave_band_of_width");
+  // }
+  
+
   
   inline bool ocean(int i, int j) { return Mask::ocean(mask.as_int(i, j)); }
 
@@ -163,6 +169,8 @@ public:
     return floating_ice(i, j) &&
       (ice_free_land(i + 1, j) || ice_free_land(i - 1, j) || ice_free_land(i, j + 1) || ice_free_land(i, j - 1));
   }
+  
+
 
 
   inline PetscErrorCode fill_where_grounded(IceModelVec2S &result, const PetscScalar fillval) {

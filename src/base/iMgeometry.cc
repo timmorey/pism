@@ -311,20 +311,17 @@ PetscErrorCode IceModel::massContExplicitStep() {
 
   MaskQuery mask(vMask);
   
-  bool leave_iceshelf_band;
-  ierr = PISMOptionsIsSet("-leave_iceshelf_band", leave_iceshelf_band); CHKERRQ(ierr);
+  bool leave_iceshelf_band = config.get_flag("leave_iceshelf_band");
+  double leave_band_of_width = config.get("leave_band_of_width");
   bool belongs_to_iceshelf_band = false;
-  PetscScalar minShelfThickness = 50.0;
+  PetscScalar minShelfThickness = config.get("min_thickness_strength_extension_ssa");
   
-  bool complete_iceshelf_band;
-  ierr = PISMOptionsIsSet("-complete_iceshelf_band", complete_iceshelf_band); CHKERRQ(ierr);
+  //bool complete_iceshelf_band;
+  //ierr = PISMOptionsIsSet("-complete_iceshelf_band", complete_iceshelf_band); CHKERRQ(ierr);
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
       
-      
-      if (leave_iceshelf_band || complete_iceshelf_band)
-        belongs_to_iceshelf_band = mask.grounded(i + 2, j) || mask.grounded(i - 2, j) || mask.grounded(i, j + 2) || mask.grounded(i, j - 2) || mask.grounded(i + 1, j) || mask.grounded(i - 1, j) || mask.grounded(i, j + 1) || mask.grounded(i, j - 1) || mask.grounded(i + 1, j + 1) || mask.grounded(i + 1, j - 1) || mask.grounded(i - 1, j + 1) || mask.grounded(i - 1, j - 1);
 
       PetscScalar divQ = 0.0;
 
@@ -408,12 +405,6 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHnew(i, j) = 0.0; // no change from vH value, actually
           // vHref(i, j) not changed
         }
-        
-        if (belongs_to_iceshelf_band && vHnew(i, j) <= minShelfThickness) {
-           vHnew(i, j) = minShelfThickness; //FIXME: acab and shelfbmassflux 
-           vHref(i, j) = 0.0;
-           if (do_redist) {  vHresidual(i, j) = 0.0; }
-        }
 
       } else if (mask.grounded(i, j) ||
                  mask.floating_ice(i, j) ||
@@ -422,23 +413,36 @@ PetscErrorCode IceModel::massContExplicitStep() {
         
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
         
-        if (belongs_to_iceshelf_band && vHnew(i, j) <= minShelfThickness){
-          if (mask.floating_ice(i, j) && leave_iceshelf_band)
-             vHnew(i, j) = minShelfThickness;
-          if (mask.ocean(i, j) && complete_iceshelf_band)
-             vHnew(i, j) = minShelfThickness;
-          //if (vH(i, j) <= minShelfThickness){
-          //  shelfbmassflux(i,j) = 0.0;
-          //  acab(i, j) = 0.0; //FIXME: This is just any easy fix to avoid ongoing melt and accumulation fluxes
-          //}
-        }
         
       } else {
         // last possibility: ice-free ocean not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;
-        if (belongs_to_iceshelf_band && vHnew(i, j) <= minShelfThickness && mask.ocean(i, j) && complete_iceshelf_band)
-        vHnew(i, j) = minShelfThickness;
       }
+      //////////////////////////////////////////////////
+      if (leave_iceshelf_band){
+        //belongs_to_iceshelf_band = mask.belongs_to_iceshelf_band(i, j); 
+        //FIXME: config not working for mask.hh
+        PetscScalar window = 2*leave_band_of_width+1;
+        for (PetscInt k = 1; k <= window ; ++k) {
+          for (PetscInt l = 1; l <= window  ; ++l) {
+            if (mask.grounded(i + k - 1 - leave_band_of_width, j + l - 1 - leave_band_of_width)){
+              belongs_to_iceshelf_band = true;
+            }
+          }
+        }
+      }
+       
+      if (leave_iceshelf_band && belongs_to_iceshelf_band && vHnew(i, j) <= minShelfThickness && mask.ocean(i, j)){
+        vHnew(i, j) = minShelfThickness;
+        if (do_part_grid){
+          vHref(i, j) = 0.0;
+          if (do_redist) {  vHresidual(i, j) = 0.0; }
+        }
+        shelfbmassflux(i, j) = 0.0; //FIXME: not really correct
+        acab(i, j) = 0.0;
+      }
+      /////////////////////////////////////////////
+      
       
       if (dirichlet_bc && vBCMask.as_int(i,j) == 1) {
         vHnew(i, j) = vH(i, j);

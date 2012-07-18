@@ -280,6 +280,7 @@ protected:
     cumulative_surface_ice_flux;
   PetscInt    skipCountDown;
 
+
   // physical parameters used frequently enough to make looking up via
   // config.get() a hassle; initialized in the IceModel constructor from the
   // configuration file; SHOULD NOT be hard-wired.

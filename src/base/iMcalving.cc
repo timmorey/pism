@@ -24,7 +24,6 @@
 #include "Mask.hh"
 #include "PISMOcean.hh"
 
-#include "pism_options.hh"
 
 //! \file iMcalving.cc Methods implementing PIK options -eigen_calving and -calving_at_thickness [\ref Winkelmannetal2011].
 
@@ -48,8 +47,8 @@ PetscErrorCode IceModel::eigenCalving() {
   ierr = vMask.beginGhostComm(); CHKERRQ(ierr);
   ierr = vMask.endGhostComm(); CHKERRQ(ierr);
 
-  bool leave_iceshelf_band;
-  ierr = PISMOptionsIsSet("-leave_iceshelf_band", leave_iceshelf_band); CHKERRQ(ierr);
+  bool leave_iceshelf_band = config.get_flag("leave_iceshelf_band");
+  double leave_band_of_width = config.get("leave_band_of_width");
   bool belongs_to_iceshelf_band = false;
 
   double ocean_rho = config.get("sea_water_density");
@@ -196,9 +195,18 @@ PetscErrorCode IceModel::eigenCalving() {
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
           
-      if (leave_iceshelf_band)
-        belongs_to_iceshelf_band = mask.grounded(i + 2, j) || mask.grounded(i - 2, j) || mask.grounded(i, j + 2) || mask.grounded(i, j - 2) || mask.grounded(i + 1, j) || mask.grounded(i - 1, j) || mask.grounded(i, j + 1) || mask.grounded(i, j - 1) || mask.grounded(i + 1, j + 1) || mask.grounded(i + 1, j - 1) || mask.grounded(i - 1, j + 1) || mask.grounded(i - 1, j - 1);
-    
+      if (leave_iceshelf_band){
+        //belongs_to_iceshelf_band = mask.belongs_to_iceshelf_band(i, j); 
+        //FIXME: config not working for mask.hh
+        PetscScalar window = 2*leave_band_of_width+1;
+        for (PetscInt k = 1; k <= window ; ++k) {
+          for (PetscInt l = 1; l <= window  ; ++l) {
+            if (mask.grounded(i + k - 1 - leave_band_of_width, j + l - 1 - leave_band_of_width)){
+              belongs_to_iceshelf_band = true;
+            }
+          }
+        }
+      }
 
 
       PetscScalar restCalvRate = 0.0;
@@ -279,8 +287,8 @@ PetscErrorCode IceModel::calvingAtThickness() {
   
   MaskQuery mask(vMask);
   ierr = vMask.begin_access(); CHKERRQ(ierr);
-  bool leave_iceshelf_band;
-  ierr = PISMOptionsIsSet("-leave_iceshelf_band", leave_iceshelf_band); CHKERRQ(ierr);
+  bool leave_iceshelf_band = config.get_flag("leave_iceshelf_band");
+  double leave_band_of_width = config.get("leave_band_of_width");
   bool belongs_to_iceshelf_band = false;
 
   ierr = vH.begin_access(); CHKERRQ(ierr);
@@ -295,8 +303,18 @@ PetscErrorCode IceModel::calvingAtThickness() {
                                     (vH(i, j - 1) == 0.0 && vbed(i, j - 1) < sea_level));
       if (hereFloating && vH(i, j) <= Hcalving && icefreeOceanNeighbor) {
         
-        if (leave_iceshelf_band)
-          belongs_to_iceshelf_band = mask.grounded(i + 2, j) || mask.grounded(i - 2, j) || mask.grounded(i, j + 2) || mask.grounded(i, j - 2) || mask.grounded(i + 1, j) || mask.grounded(i - 1, j) || mask.grounded(i, j + 1) || mask.grounded(i, j - 1) || mask.grounded(i + 1, j + 1) || mask.grounded(i + 1, j - 1) || mask.grounded(i - 1, j + 1) || mask.grounded(i - 1, j - 1);
+        if (leave_iceshelf_band){
+          //belongs_to_iceshelf_band = mask.belongs_to_iceshelf_band(i, j); 
+          //FIXME: config not working for mask.hh
+          PetscScalar window = 2*leave_band_of_width+1;
+          for (PetscInt k = 1; k <= window ; ++k) {
+            for (PetscInt l = 1; l <= window  ; ++l) {
+              if (mask.grounded(i + k - 1 - leave_band_of_width, j + l - 1 - leave_band_of_width)){
+                belongs_to_iceshelf_band = true;
+              }
+            }
+          }
+        }
       
         if (belongs_to_iceshelf_band == false) {
           my_discharge_flux -= vHnew(i, j);
