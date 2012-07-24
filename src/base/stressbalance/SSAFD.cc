@@ -284,8 +284,21 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // Note that if the current cell is "marginal" but not a CFBC
           // location, the following two lines are equaivalent to the "usual
           // case" below.
-          rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
-          rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;
+          //rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
+          //rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;   
+           
+          //for ice shelves this equals the version above:
+          rhs_uv[i][j].u = tdx/4.0 + (aMM - aPP)*ocean_pressure / (2.0*dx);
+          rhs_uv[i][j].v = tdy/4.0 + (bMM - bPP)*ocean_pressure / (2.0*dy);
+          
+          //this is only slightly different for ice shelves, since tdx~2*taud:
+          //rhs_uv[i][j].u = taud(i, j).u/1.0 + (aMM - aPP)*ocean_pressure / (2.0*dx) ;
+          //rhs_uv[i][j].v = taud(i, j).v/1.0 + (bMM - bPP)*ocean_pressure / (2.0*dy);
+          
+          if (M.grounded_ice(M_ij)){ //for water-terminating glacier and cliffs
+            rhs_uv[i][j].u = taud(i, j).u + (aMM - aPP)*ocean_pressure / (2.0*dx) ;
+            rhs_uv[i][j].v = taud(i, j).v + (bMM - bPP)*ocean_pressure / (2.0*dy);
+          }
 
           continue;
         } // end of "if (is_marginal(i, j))"
