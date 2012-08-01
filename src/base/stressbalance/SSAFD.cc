@@ -234,7 +234,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             if (M.ice_free(M_s)) bMM = 0;
           }
 
-          const double ice_pressure = ice_rho * standard_gravity * H_ij,
+          double ice_pressure = ice_rho * standard_gravity * H_ij,
                        H_ij2        = H_ij*H_ij;
           double ocean_pressure,
                  h_ij = 0.0,
@@ -248,13 +248,22 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
 	    h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
-						
 	    // what is the force balance of an iceshelf facing a bedrock wall?! 
 	    // this is not relevant as long as we ask only for ice_free_ocean neighbors
 	    //if ((aPP==0 && (*bed)(i+1,j)>h_ij) || (aMM==0 && (*bed)(i-1,j)>h_ij) ||
 	    //    (bPP==0 && (*bed)(i,j+1)>h_ij) || (bMM==0 && (*bed)(i,j-1)>h_ij)){
 	    //  ocean_pressure = 0.0; 
 	    //}
+	    //h_ij = (1.0 - ice_rho / ocean_rho) * 0.5 * ((*thickness)(i-1,j)+(*thickness)(i,j));
+      //take into accoutn also the upstream grounded neighbor
+	      if (M.grounded_ice(M_w) && aPP==0)
+       h_ij = 0.5*( (*thickness)(i-1,j) + (*bed)(i-1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_e) && aMM==0)
+         h_ij = 0.5*( (*thickness)(i+1,j) + (*bed)(i+1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_s) && bPP==0)
+        h_ij = 0.5*( (*thickness)(i,j-1) + (*bed)(i,j-1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_n) && bMM==0)
+        h_ij = 0.5*( (*thickness)(i,j+1) + (*bed)(i,j+1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
 
           } else {
             if( (*bed)(i,j) >= sea_level) {
@@ -268,8 +277,19 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
               // boundary condition for marine terminating glacier
               ocean_pressure = 0.5 * ice_rho * standard_gravity *
                 (H_ij2 - (ocean_rho / ice_rho)*(sea_level - (*bed)(i,j))*(sea_level - (*bed)(i,j)));
-	      h_ij = H_ij + (*bed)(i,j) - sea_level;
-            }
+	      
+	      //h_ij = H_ij + (*bed)(i,j) - sea_level;
+	      //take into account also the steep upstream neighbor
+        if (M.grounded_ice(M_w) && aPP==0)
+        h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+          //h_ij = 0.5*((*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+        if (M.grounded_ice(M_e) && aMM==0)
+          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
+        if (M.grounded_ice(M_s) && bPP==0)
+          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
+        if (M.grounded_ice(M_n) && bMM==0)
+          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
+        }
           }
 
           //here we take the direct gradient at the boundary (not centered)
@@ -286,7 +306,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // location, the following two lines are equaivalent to the "usual
           // case" below.
           rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
-          rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;
+          rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;   
 
           continue;
         } // end of "if (is_marginal(i, j))"
@@ -622,6 +642,7 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
           // areas already have a strength extension
           beta = beta_ice_free_bedrock;
         }
+        
         if (sub_gl){
           // if grounding line interpolation apply here reduced basal drag
           if (M.icy(M_ij)) {

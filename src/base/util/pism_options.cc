@@ -685,6 +685,10 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("eigen_calving", "do_eigen_calving"); CHKERRQ(ierr);
 
   ierr = config.flag_from_option("kill_icebergs", "kill_icebergs"); CHKERRQ(ierr);
+  
+  ierr = config.flag_from_option("leave_iceshelf_band", "leave_iceshelf_band"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("leave_iceshelf_band_width", "leave_band_of_width"); CHKERRQ(ierr);
+  
 
   // Output
   ierr = config.flag_from_option("acab_cumulative", "compute_cumulative_acab"); CHKERRQ(ierr);

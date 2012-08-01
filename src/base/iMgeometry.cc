@@ -26,6 +26,8 @@
 #include "PISMSurface.hh"
 #include "PISMStressBalance.hh"
 
+#include "pism_options.hh"
+
 //! \file iMgeometry.cc Methods of IceModel with update and maintain consistency of ice sheet geometry.
 
 
@@ -308,9 +310,18 @@ PetscErrorCode IceModel::massContExplicitStep() {
   }
 
   MaskQuery mask(vMask);
+  
+  bool leave_iceshelf_band = config.get_flag("leave_iceshelf_band");
+  double leave_band_of_width = config.get("leave_band_of_width");
+  bool belongs_to_iceshelf_band = false;
+  PetscScalar minShelfThickness = config.get("min_thickness_strength_extension_ssa");
+  
+  //bool complete_iceshelf_band;
+  //ierr = PISMOptionsIsSet("-complete_iceshelf_band", complete_iceshelf_band); CHKERRQ(ierr);
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+      
 
       PetscScalar divQ = 0.0;
 
@@ -399,11 +410,39 @@ PetscErrorCode IceModel::massContExplicitStep() {
                  mask.floating_ice(i, j) ||
                  mask.next_to_grounded_ice(i, j) ) {
         // grounded/floating default case, and case of ice-free ocean adjacent to grounded
+        
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
+        
+        
       } else {
         // last possibility: ice-free ocean not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;
       }
+      //////////////////////////////////////////////////
+      if (leave_iceshelf_band){
+        //belongs_to_iceshelf_band = mask.belongs_to_iceshelf_band(i, j); 
+        //FIXME: config not working for mask.hh
+        PetscScalar window = 2*leave_band_of_width+1;
+        for (PetscInt k = 1; k <= window ; ++k) {
+          for (PetscInt l = 1; l <= window  ; ++l) {
+            if (mask.grounded(i + k - 1 - leave_band_of_width, j + l - 1 - leave_band_of_width)){
+              belongs_to_iceshelf_band = true;
+            }
+          }
+        }
+      }
+       
+      if (leave_iceshelf_band && belongs_to_iceshelf_band && vHnew(i, j) <= minShelfThickness && mask.ocean(i, j)){
+        vHnew(i, j) = minShelfThickness;
+        if (do_part_grid){
+          vHref(i, j) = 0.0;
+          if (do_redist) {  vHresidual(i, j) = 0.0; }
+        }
+        shelfbmassflux(i, j) = 0.0; //FIXME: not really correct
+        acab(i, j) = 0.0;
+      }
+      /////////////////////////////////////////////
+      
       
       if (dirichlet_bc && vBCMask.as_int(i,j) == 1) {
         vHnew(i, j) = vH(i, j);
@@ -599,8 +638,8 @@ PetscErrorCode IceModel::sub_gl_position() {
         gl_mask_x=1.0;
         gl_mask_y=1.0;
       }
-      
-      if (mask.grounded(i, j) && mask.floating_ice(i+1, j)) {
+      //if (mask.grounded(i, j) && mask.floating_ice(i+1, j)) {
+      if (mask.grounded(i, j) && (mask.floating_ice(i+1, j) || mask.ice_free_ocean(i+1, j))) {
         xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
         xpart2=vbed(i+1, j)-sea_level+vH(i+1, j)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
@@ -609,21 +648,24 @@ PetscErrorCode IceModel::sub_gl_position() {
         else
           gl_mask_new(i+1,j)+=(interpol-0.5);
         
-        //ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }
-      if (mask.grounded(i, j) && mask.floating_ice(i-1, j)){
+      //if (mask.grounded(i, j) && mask.floating_ice(i-1, j)){
+      if (mask.grounded(i, j) && (mask.floating_ice(i-1, j) || mask.ice_free_ocean(i-1, j))){
         xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
         xpart2=vbed(i-1, j)-sea_level+vH(i-1, j)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
         if (interpol<0.5)
           gl_mask_x+=(interpol-0.5);
-        else
-          gl_mask_new(i-1,j)+=(interpol-0.5);
-          
+        else{
+          //if (vH(i-1, j)>0.0)
+            gl_mask_new(i-1,j)+=(interpol-0.5);
+        }  
         //if (j==1){
-        //ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }     
-      if (mask.grounded(i, j) && mask.floating_ice(i, j+1)){
+      //if (mask.grounded(i, j) && mask.floating_ice(i, j+1)){
+      if (mask.grounded(i, j) && (mask.floating_ice(i, j+1) || mask.ice_free_ocean(i, j+1))){
         xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
         xpart2=vbed(i, j+1)-sea_level+vH(i, j+1)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
@@ -632,9 +674,10 @@ PetscErrorCode IceModel::sub_gl_position() {
         else
           gl_mask_new(i,j+1)+=(interpol-0.5);
           
-        //ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }
-      if (mask.grounded(i, j) && mask.floating_ice(i, j-1)){
+      //if (mask.grounded(i, j) && mask.floating_ice(i, j-1)){
+      if (mask.grounded(i, j) && (mask.floating_ice(i, j-1) || mask.ice_free_ocean(i, j-1))){
         xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
         xpart2=vbed(i, j-1)-sea_level+vH(i, j-1)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
@@ -643,7 +686,7 @@ PetscErrorCode IceModel::sub_gl_position() {
         else
           gl_mask_new(i,j-1)+=(interpol-0.5);
           
-        //ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr); 
+        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr); 
       }
       if (mask.grounded(i, j))
         gl_mask_new(i,j) = gl_mask_x * gl_mask_y;
