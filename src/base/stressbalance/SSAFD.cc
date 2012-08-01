@@ -234,7 +234,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             if (M.ice_free(M_s)) bMM = 0;
           }
 
-          const double ice_pressure = ice_rho * standard_gravity * H_ij,
+          double ice_pressure = ice_rho * standard_gravity * H_ij,
                        H_ij2        = H_ij*H_ij;
           double ocean_pressure,
                  h_ij = 0.0,
@@ -254,6 +254,16 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
 	    //    (bPP==0 && (*bed)(i,j+1)>h_ij) || (bMM==0 && (*bed)(i,j-1)>h_ij)){
 	    //  ocean_pressure = 0.0; 
 	    //}
+	    //h_ij = (1.0 - ice_rho / ocean_rho) * 0.5 * ((*thickness)(i-1,j)+(*thickness)(i,j));
+      //take into accoutn also the upstream grounded neighbor
+	      if (M.grounded_ice(M_w) && aPP==0)
+       h_ij = 0.5*( (*thickness)(i-1,j) + (*bed)(i-1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_e) && aMM==0)
+         h_ij = 0.5*( (*thickness)(i+1,j) + (*bed)(i+1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_s) && bPP==0)
+        h_ij = 0.5*( (*thickness)(i,j-1) + (*bed)(i,j-1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_n) && bMM==0)
+        h_ij = 0.5*( (*thickness)(i,j+1) + (*bed)(i,j+1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
 
           } else {
             if( (*bed)(i,j) >= sea_level) {
@@ -267,8 +277,19 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
               // boundary condition for marine terminating glacier
               ocean_pressure = 0.5 * ice_rho * standard_gravity *
                 (H_ij2 - (ocean_rho / ice_rho)*(sea_level - (*bed)(i,j))*(sea_level - (*bed)(i,j)));
-	      h_ij = H_ij + (*bed)(i,j) - sea_level;
-            }
+	      
+	      //h_ij = H_ij + (*bed)(i,j) - sea_level;
+	      //take into account also the steep upstream neighbor
+        if (M.grounded_ice(M_w) && aPP==0)
+        h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+          //h_ij = 0.5*((*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+        if (M.grounded_ice(M_e) && aMM==0)
+          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
+        if (M.grounded_ice(M_s) && bPP==0)
+          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
+        if (M.grounded_ice(M_n) && bMM==0)
+          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
+        }
           }
 
           //here we take the direct gradient at the boundary (not centered)
@@ -284,21 +305,8 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // Note that if the current cell is "marginal" but not a CFBC
           // location, the following two lines are equaivalent to the "usual
           // case" below.
-          //rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
-          //rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;   
-           
-          //for ice shelves this equals the version above:
-          rhs_uv[i][j].u = tdx/4.0 + (aMM - aPP)*ocean_pressure / (2.0*dx);
-          rhs_uv[i][j].v = tdy/4.0 + (bMM - bPP)*ocean_pressure / (2.0*dy);
-          
-          //this is only slightly different for ice shelves, since tdx~2*taud:
-          //rhs_uv[i][j].u = taud(i, j).u/1.0 + (aMM - aPP)*ocean_pressure / (2.0*dx) ;
-          //rhs_uv[i][j].v = taud(i, j).v/1.0 + (bMM - bPP)*ocean_pressure / (2.0*dy);
-          
-          if (M.grounded_ice(M_ij)){ //for water-terminating glacier and cliffs
-            rhs_uv[i][j].u = taud(i, j).u + (aMM - aPP)*ocean_pressure / (2.0*dx) ;
-            rhs_uv[i][j].v = taud(i, j).v + (bMM - bPP)*ocean_pressure / (2.0*dy);
-          }
+          rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
+          rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;   
 
           continue;
         } // end of "if (is_marginal(i, j))"

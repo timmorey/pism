@@ -53,6 +53,9 @@ PetscErrorCode IceModel::cell_interface_velocities(bool do_part_grid,
     return 0;
   }
 
+  PetscScalar C=2.4511e-18;
+  //from Van der veen ice shelf solution, schould be softness-dependent (here B0 = 1.9×108 Pa s1/3)
+  
   if (M.icy(i, j) && (!M.ice_margin(i, j))) {
     // in the middle of ice or bedrock
     vel.e = 0.5 * (vreg.ij.u + vreg.e.u);
@@ -60,17 +63,31 @@ PetscErrorCode IceModel::cell_interface_velocities(bool do_part_grid,
     vel.n = 0.5 * (vreg.ij.v + vreg.n.v);
     vel.s = 0.5 * (vreg.s.v + vreg.ij.v);
   } else if (M.ice_margin(i, j)) {
+    PetscScalar Q0=vreg.ij.u*vH(i,j);
+    PetscScalar inverseH=(4.0*C*grid.dx/PetscAbs(Q0))+pow(vH(i,j),-4.0);
+    PetscScalar v_virt = Q0*pow(inverseH,0.25); //virtual ice shelf velocity
+    vel.e = 0.5 * (vreg.ij.u + v_virt);
+    vel.w = 0.5 * (v_virt + vreg.ij.u);
+    vel.n = 0.5 * (vreg.ij.v + v_virt);
+    vel.s = 0.5 * (v_virt + vreg.ij.v);
     // on floating or grounded ice, but next to a ice-free grid cell 
-    vel.e = (M.ice_free(i + 1, j) ? vreg.ij.u : 0.5 * (vreg.ij.u + vreg.e.u));
-    vel.w = (M.ice_free(i - 1, j) ? vreg.ij.u : 0.5 * (vreg.w.u + vreg.ij.u));
-    vel.n = (M.ice_free(i, j + 1) ? vreg.ij.v : 0.5 * (vreg.ij.v + vreg.n.v));
-    vel.s = (M.ice_free(i, j - 1) ? vreg.ij.v : 0.5 * (vreg.s.v + vreg.ij.v));
+    //vel.e = (M.ice_free(i + 1, j) ? vreg.ij.u : 0.5 * (vreg.ij.u + vreg.e.u));
+    //vel.w = (M.ice_free(i - 1, j) ? vreg.ij.u : 0.5 * (vreg.w.u + vreg.ij.u));
+    //vel.n = (M.ice_free(i, j + 1) ? vreg.ij.v : 0.5 * (vreg.ij.v + vreg.n.v));
+    //vel.s = (M.ice_free(i, j - 1) ? vreg.ij.v : 0.5 * (vreg.s.v + vreg.ij.v));
   } else if (M.next_to_ice(i, j)){
+    PetscScalar Q0=vreg.ij.u*vH(i,j);
+    PetscScalar inverseH=(4.0*C*grid.dx/PetscAbs(Q0))+pow(vH(i,j),-4.0);
+    PetscScalar v_virt = Q0*pow(inverseH,0.25); //virtual ice shelf velocity
+    vel.e = 0.5 * (vreg.e.u + v_virt);
+    vel.w = 0.5 * (v_virt + vreg.w.u);
+    vel.n = 0.5 * (vreg.n.v + v_virt);
+    vel.s = 0.5 * (v_virt +  vreg.s.v);
     // on an ice-free (or partially filled) cell next to an icy grid cell
-    vel.e = (M.icy(i + 1, j) ? vreg.e.u : 0.0);
-    vel.w = (M.icy(i - 1, j) ? vreg.w.u : 0.0);
-    vel.n = (M.icy(i, j + 1) ? vreg.n.v : 0.0);
-    vel.s = (M.icy(i, j - 1) ? vreg.s.v : 0.0);
+    //vel.e = (M.icy(i + 1, j) ? vreg.e.u : 0.0);
+    //vel.w = (M.icy(i - 1, j) ? vreg.w.u : 0.0);
+    //vel.n = (M.icy(i, j + 1) ? vreg.n.v : 0.0);
+    //vel.s = (M.icy(i, j - 1) ? vreg.s.v : 0.0);
   } else {
     // on ice-free ocean or land and no ice neighbors
     vel.e = 0.0;
