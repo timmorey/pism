@@ -53,7 +53,7 @@ PetscErrorCode IceModel::cell_interface_velocities(bool do_part_grid,
     return 0;
   }
 
-  PetscScalar C=2.4511e-18;
+  //PetscScalar C=2.4511e-18;
   //from Van der veen ice shelf solution, schould be softness-dependent (here B0 = 1.9×108 Pa s1/3)
   
   if (M.icy(i, j) && (!M.ice_margin(i, j))) {
