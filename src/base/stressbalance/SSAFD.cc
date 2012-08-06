@@ -232,14 +232,20 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             if (M.ice_free(M_w)) aMM = 0;
             if (M.ice_free(M_n)) bPP = 0;
             if (M.ice_free(M_s)) bMM = 0;
+            
+            if ((aPP==0 || aMM==0)&&(j==50)){
+            ierr = verbPrintf(1,grid.com, "\n!!!: RHS:app=%d and amm=%d at %d, %d \n\n",aPP,aMM,i,j); CHKERRQ(ierr);}
+            
           }
 
           double ice_pressure = ice_rho * standard_gravity * H_ij,
                        H_ij2        = H_ij*H_ij;
           double ocean_pressure,
                  h_ij = 0.0,
-                 tdx  = taud(i,j).u,
-                 tdy  = taud(i,j).v;
+                 tdx  = 0.0,
+                 tdy  = 0.0;
+                 //tdx  = taud(i,j).u,
+                 //tdy  = taud(i,j).v;
 
           if ((*bed)(i,j) < (sea_level - (ice_rho / ocean_rho) * H_ij)) {
             //calving front boundary condition for floating shelf
@@ -256,14 +262,14 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
 	    //}
 	    //h_ij = (1.0 - ice_rho / ocean_rho) * 0.5 * ((*thickness)(i-1,j)+(*thickness)(i,j));
       //take into accoutn also the upstream grounded neighbor
-	      if (M.grounded_ice(M_w) && aPP==0)
-       h_ij = 0.5*( (*thickness)(i-1,j) + (*bed)(i-1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-        if (M.grounded_ice(M_e) && aMM==0)
-         h_ij = 0.5*( (*thickness)(i+1,j) + (*bed)(i+1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-        if (M.grounded_ice(M_s) && bPP==0)
-        h_ij = 0.5*( (*thickness)(i,j-1) + (*bed)(i,j-1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-        if (M.grounded_ice(M_n) && bMM==0)
-        h_ij = 0.5*( (*thickness)(i,j+1) + (*bed)(i,j+1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+        if (M.grounded_ice(M_w) && aPP==0)
+               h_ij = 0.5*( (*thickness)(i-1,j) + (*bed)(i-1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+                if (M.grounded_ice(M_e) && aMM==0)
+                 h_ij = 0.5*( (*thickness)(i+1,j) + (*bed)(i+1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+                if (M.grounded_ice(M_s) && bPP==0)
+                h_ij = 0.5*( (*thickness)(i,j-1) + (*bed)(i,j-1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
+                if (M.grounded_ice(M_n) && bMM==0)
+                h_ij = 0.5*( (*thickness)(i,j+1) + (*bed)(i,j+1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
 
           } else {
             if( (*bed)(i,j) >= sea_level) {
@@ -281,14 +287,17 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
 	      //h_ij = H_ij + (*bed)(i,j) - sea_level;
 	      //take into account also the steep upstream neighbor
         if (M.grounded_ice(M_w) && aPP==0)
-        h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
-          //h_ij = 0.5*((*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+        //h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+        h_ij = 1.0*((*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
         if (M.grounded_ice(M_e) && aMM==0)
-          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
+          //h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
+          h_ij = 1.0*((*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
         if (M.grounded_ice(M_s) && bPP==0)
-          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
+          //h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
+          h_ij = 1.0*((*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
         if (M.grounded_ice(M_n) && bMM==0)
-          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
+          //h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
+          h_ij = 1.0*((*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
         }
           }
 
@@ -305,8 +314,11 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // Note that if the current cell is "marginal" but not a CFBC
           // location, the following two lines are equaivalent to the "usual
           // case" below.
-          rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
-          rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;   
+          rhs_uv[i][j].u = +tdx - (aMM - aPP)*ocean_pressure / dx;
+          rhs_uv[i][j].v = +tdy - (bMM - bPP)*ocean_pressure / dy;   
+          
+          if (j==50 ){
+          ierr = verbPrintf(1,grid.com, "\n!!!: RHS: tdx %.3e and tstat %.3e and rhsx %.3e for app=%d and amm=%d at %d, %d \n\n",tdx,(aPP - aMM)*ocean_pressure/dx,rhs_uv[i][j].u,aPP,aMM,i,j); CHKERRQ(ierr);}
 
           continue;
         } // end of "if (is_marginal(i, j))"
