@@ -282,6 +282,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = shelfbmassflux.begin_access(); CHKERRQ(ierr);
   ierr = vMask.begin_access();  CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
+  
+  const bool do_grounded_margin_shelf_extension = config.get_flag("grounded_margin_shelf_extension");
+  PetscScalar C_veen = 0.0;
+  if (do_grounded_margin_shelf_extension)
+    C_veen = config.get("ice_softness")*pow(((config.get("ice_density")*config.get("standard_gravity")/4.0)*(1.0-config.get("ice_density")/config.get("sea_water_density"))),config.get("Glen_exponent"));
+  
 
   // related to PIK part_grid mechanism; see Albrecht et al 2011
   const bool do_part_grid = config.get_flag("part_grid"),
@@ -337,7 +343,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
 
       // get non-diffusive velocities according to old or -part_grid scheme
       planeStar<PetscScalar> v;
-      ierr = cell_interface_velocities(do_part_grid, i, j, v); CHKERRQ(ierr);
+      ierr = cell_interface_velocities(do_part_grid, do_grounded_margin_shelf_extension, C_veen, i, j, v); CHKERRQ(ierr);
 
       if (dirichlet_bc) {
         //the staggered velocities have to be adjusted to Dirichlet boundary conditions

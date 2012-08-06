@@ -611,6 +611,9 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("brutal_sliding", "scalebrutalSet"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("brutal_sliding_scale","sliding_scale_brutal"); CHKERRQ(ierr); 
+  
+  ierr = config.flag_from_option("grounded_margin_shelf_extension","grounded_margin_shelf_extension"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("mod_cf_taud","mod_cf_taud"); CHKERRQ(ierr);
  
 
   // Basal strength

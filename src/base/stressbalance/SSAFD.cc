@@ -191,6 +191,8 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
     ierr = bed->begin_access(); CHKERRQ(ierr);
     ierr = mask->begin_access(); CHKERRQ(ierr);
   }
+  
+  bool mod_cf_taud_version = config.get("mod_cf_taud");
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
@@ -247,24 +249,26 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // this is not really the ocean_pressure, but the difference between
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
-	    h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
-	    // what is the force balance of an iceshelf facing a bedrock wall?! 
-	    // this is not relevant as long as we ask only for ice_free_ocean neighbors
-	    //if ((aPP==0 && (*bed)(i+1,j)>h_ij) || (aMM==0 && (*bed)(i-1,j)>h_ij) ||
-	    //    (bPP==0 && (*bed)(i,j+1)>h_ij) || (bMM==0 && (*bed)(i,j-1)>h_ij)){
-	    //  ocean_pressure = 0.0; 
-	    //}
-	    //h_ij = (1.0 - ice_rho / ocean_rho) * 0.5 * ((*thickness)(i-1,j)+(*thickness)(i,j));
-      //take into accoutn also the upstream grounded neighbor
-	      if (M.grounded_ice(M_w) && aPP==0)
-       h_ij = 0.5*( (*thickness)(i-1,j) + (*bed)(i-1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-        if (M.grounded_ice(M_e) && aMM==0)
-         h_ij = 0.5*( (*thickness)(i+1,j) + (*bed)(i+1,j)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-        if (M.grounded_ice(M_s) && bPP==0)
-        h_ij = 0.5*( (*thickness)(i,j-1) + (*bed)(i,j-1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-        if (M.grounded_ice(M_n) && bMM==0)
-        h_ij = 0.5*( (*thickness)(i,j+1) + (*bed)(i,j+1)  - sea_level + (1.0 - ice_rho / ocean_rho) * H_ij);
-
+            h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
+            // what is the force balance of an iceshelf facing a bedrock wall?! 
+            // this is not relevant as long as we ask only for ice_free_ocean neighbors
+            //if ((aPP==0 && (*bed)(i+1,j)>h_ij) || (aMM==0 && (*bed)(i-1,j)>h_ij) ||
+            //    (bPP==0 && (*bed)(i,j+1)>h_ij) || (bMM==0 && (*bed)(i,j-1)>h_ij)){
+            //  ocean_pressure = 0.0; 
+            //}
+            if (mod_cf_taud_version == 0) //default
+              h_ij = (1.0 - ice_rho / ocean_rho) * 0.5 * ((*thickness)(i-1,j)+(*thickness)(i,j));
+            else {
+              //take into accoutn also the upstream grounded neighbor
+              if (M.grounded_ice(M_w) && aPP==0)
+                h_ij = 0.5*( (*thickness)(i-1,j)+(*bed)(i-1,j)-sea_level+(1.0-ice_rho/ocean_rho)*H_ij);
+              if (M.grounded_ice(M_e) && aMM==0)
+                h_ij = 0.5*( (*thickness)(i+1,j)+(*bed)(i+1,j)-sea_level+(1.0-ice_rho/ocean_rho)*H_ij);
+              if (M.grounded_ice(M_s) && bPP==0)
+                h_ij = 0.5*( (*thickness)(i,j-1)+(*bed)(i,j-1)-sea_level+(1.0-ice_rho/ocean_rho)*H_ij);
+              if (M.grounded_ice(M_n) && bMM==0)
+                h_ij = 0.5*( (*thickness)(i,j+1)+(*bed)(i,j+1)-sea_level+(1.0-ice_rho/ocean_rho)*H_ij);
+            }
           } else {
             if( (*bed)(i,j) >= sea_level) {
               // boundary condition for a "cliff" (grounded ice next to
@@ -272,24 +276,43 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
               ocean_pressure = 0.5 * ice_rho * standard_gravity * H_ij2;
               // this is not 'zero' because the isotrop.normal stresses
               // (=pressure) from within the ice figures on RHS
-	      h_ij = H_ij;
+              h_ij = H_ij;
             } else {
               // boundary condition for marine terminating glacier
               ocean_pressure = 0.5 * ice_rho * standard_gravity *
                 (H_ij2 - (ocean_rho / ice_rho)*(sea_level - (*bed)(i,j))*(sea_level - (*bed)(i,j)));
-	      
-	      //h_ij = H_ij + (*bed)(i,j) - sea_level;
-	      //take into account also the steep upstream neighbor
-        if (M.grounded_ice(M_w) && aPP==0)
-        h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
-          //h_ij = 0.5*((*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
-        if (M.grounded_ice(M_e) && aMM==0)
-          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
-        if (M.grounded_ice(M_s) && bPP==0)
-          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
-        if (M.grounded_ice(M_n) && bMM==0)
-          h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
-        }
+                
+              if (mod_cf_taud_version == 0) //default
+                h_ij = H_ij + (*bed)(i,j) - sea_level;
+              else if (mod_cf_taud_version == 1){ //take into account average upstream surface elevation
+                if (M.grounded_ice(M_w) && aPP==0)
+                h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+                if (M.grounded_ice(M_e) && aMM==0)
+                  h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
+                if (M.grounded_ice(M_s) && bPP==0)
+                  h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
+                if (M.grounded_ice(M_n) && bMM==0)
+                  h_ij = 0.5*(H_ij + (*bed)(i,j)+ (*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
+              }
+              else { 
+                PetscScalar taud_factor=0.0;
+                if (mod_cf_taud_version == 2) 
+                  taud_factor=0.5; //take into account half the surface elev. of upstream neigbor only (classic centered differences)
+                else if (mod_cf_taud_version == 3)
+                  taud_factor=1.0; //take into account full surface elev. of upstream neigbor only 
+                else if (mod_cf_taud_version == 4)
+                  taud_factor=2.0;//take into account double surface elev. of upstream neigbor only                 
+                
+                if (M.grounded_ice(M_w) && aPP==0)
+                  h_ij = taud_factor*((*thickness)(i-1,j) + (*bed)(i-1,j)) - sea_level;
+                if (M.grounded_ice(M_e) && aMM==0)
+                  h_ij = taud_factor*((*thickness)(i+1,j) + (*bed)(i+1,j)) - sea_level;
+                if (M.grounded_ice(M_s) && bPP==0)
+                  h_ij = taud_factor*((*thickness)(i,j-1) + (*bed)(i,j-1)) - sea_level;
+                if (M.grounded_ice(M_n) && bMM==0)
+                  h_ij = taud_factor*((*thickness)(i,j+1) + (*bed)(i,j+1)) - sea_level;
+              }         
+            }
           }
 
           //here we take the direct gradient at the boundary (not centered)

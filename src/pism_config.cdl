@@ -139,6 +139,9 @@ netcdf pism_config {
     pism_config:nuBedrockSet = "false";
     pism_config:nuBedrockSet_doc = "set viscosity at ice shelf margin next to ice free bedrock as friction parameterization";
 
+    pism_config:grounded_margin_shelf_extension = "no";
+    pism_config:grounded_margin_shelf_extension_doc = "apply correction of flux through grounded margin assuming a van der veen ice shelf attached";
+
     // parameters:
 
     pism_config:bootstrapping_H_value_no_var = 0.0;
@@ -284,6 +287,9 @@ netcdf pism_config {
 
     pism_config:calving_at_thickness = 50.0;
     pism_config:calving_at_thickness_doc = "m; When terminal ice thickness of floating ice shelf is less than this threshold, it will be calved off.";
+
+    pism_config:mod_cf_taud = 0;
+    pism_config:mod_cf_taud_doc = "modifies the driving stress at the calving front";
 
     pism_config:nuBedrock = 5.0e15;
     pism_config:nuBedrock_doc = "Pa s; Staggered Viscosity used as side friction parameterization.";
