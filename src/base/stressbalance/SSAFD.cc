@@ -249,7 +249,6 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             // this is not really the ocean_pressure, but the difference between
             // ocean_pressure and isotrop.normal stresses (=pressure) from within
             // the ice
-            h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
             // what is the force balance of an iceshelf facing a bedrock wall?! 
             // this is not relevant as long as we ask only for ice_free_ocean neighbors
             //if ((aPP==0 && (*bed)(i+1,j)>h_ij) || (aMM==0 && (*bed)(i-1,j)>h_ij) ||
@@ -257,7 +256,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             //  ocean_pressure = 0.0; 
             //}
             if (mod_cf_taud_version == 0) //default
-              h_ij = (1.0 - ice_rho / ocean_rho) * 0.5 * ((*thickness)(i-1,j)+(*thickness)(i,j));
+              h_ij = (1.0 - ice_rho / ocean_rho) * H_ij;
             else {
               //take into accoutn also the upstream grounded neighbor
               if (M.grounded_ice(M_w) && aPP==0)
