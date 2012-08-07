@@ -192,7 +192,7 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
     ierr = mask->begin_access(); CHKERRQ(ierr);
   }
   
-  bool mod_cf_taud_version = config.get("mod_cf_taud");
+  PetscInt mod_cf_taud_version = config.get("mod_cf_taud");
 
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
