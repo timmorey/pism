@@ -252,6 +252,11 @@ PetscErrorCode IceModel::massContExplicitStep() {
   if (ocean != NULL) {
     ierr = ocean->shelf_base_mass_flux(shelfbmassflux); CHKERRQ(ierr);
   } else { SETERRQ(grid.com, 2, "PISM ERROR: ocean == NULL"); }
+  
+  const bool sub_gl = config.get_flag("sub_groundingline");
+  if (sub_gl){
+    ierr = gl_mask.begin_access(); CHKERRQ(ierr);
+   }
 
   IceModelVec2S vHnew = vWork2d[0];
   ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
@@ -337,12 +342,14 @@ PetscErrorCode IceModel::massContExplicitStep() {
                  - v.s * (v.s > 0 ? vH(i, j - 1) : vH(i, j)) ) / dy;
 
       PetscReal S = 0.0;
-      if (include_bmr_in_continuity) {
-        if (mask.ocean(i, j))
+      if (include_bmr_in_continuity) {    
+        if (mask.ocean(i, j)) 
           S = shelfbmassflux(i,j);
         else
-          S = vbmr(i, j);
-      }
+          S = vbmr(i, j);         
+        
+        if (sub_gl)
+          S = (1.0-gl_mask(i,j)) * shelfbmassflux(i,j) + gl_mask(i,j) * vbmr(i, j);
 
       // decide whether to apply Albrecht et al 2011 subgrid-scale
       //   parameterization
@@ -487,6 +494,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
   if (do_ocean_kill) {
     ierr = ocean_kill_mask.end_access(); CHKERRQ(ierr);
   }
+  
+  if (sub_gl){
+    ierr = gl_mask.end_access(); CHKERRQ(ierr);
+   }
 
   // flux accounting
   {
