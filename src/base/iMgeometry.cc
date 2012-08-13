@@ -664,19 +664,19 @@ PetscErrorCode IceModel::sub_gl_position() {
         xpart2=vbed(i+1, j)-sea_level+vH(i+1, j)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
         if (subgltype=="PA") {
-        interpolPA = (vH(i+1, j)*vH(i, j)*rhoq + vbed(i, j)) / (vH(i+1, j)*vbed(i, j) - vbed(i+1, j)*vH(i, j)); //Pattyn
-        if (interpolPA>1.0)
-          interpolPA=1.0;
-        else if (interpolPA<0.0)
-          interpolPA=0.0;
-        interpol=interpolPA;       
-        }
+             interpolPA = vH(i+1, j)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i+1, j)) - vH(i+1, j)*(sea_level-vbed(i, j))); //Pattyn
+             // if (interpolPA>1.0)
+             //   interpolPA=1.0;
+             // else if (interpolPA<0.0)
+             //   interpolPA=0.0;
+             interpol=interpolPA;       
+           }
         if (interpol<0.5)
           gl_mask_x+=(interpol-0.5);
         else
           gl_mask_new(i+1,j)+=(interpol-0.5);
         
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }
       //if (mask.grounded(i, j) && mask.floating_ice(i-1, j)){
       if (mask.grounded(i, j) && (mask.floating_ice(i-1, j) || mask.ice_free_ocean(i-1, j))){
@@ -684,61 +684,48 @@ PetscErrorCode IceModel::sub_gl_position() {
         xpart2=vbed(i-1, j)-sea_level+vH(i-1, j)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
         if (subgltype=="PA") {
-        interpolPA = (vH(i-1, j)*vH(i, j)*rhoq + vbed(i, j)) / (vH(i-1, j)*vbed(i, j) - vbed(i-1, j)*vH(i, j)); //Pattyn
-        if (interpolPA>1.0)
-          interpolPA=1.0;
-        else if (interpolPA<0.0)
-          interpolPA=0.0;
-        interpol=interpolPA;       
+          interpolPA = vH(i-1, j)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i-1, j)) - vH(i-1, j)*(sea_level-vbed(i, j))); //Pattyn
+          interpol=interpolPA;       
         }
         if (interpol<0.5)
           gl_mask_x+=(interpol-0.5);
-        else{
-          //if (vH(i-1, j)>0.0)
-            gl_mask_new(i-1,j)+=(interpol-0.5);
-        }  
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        else
+          gl_mask_new(i-1,j)+=(interpol-0.5);
+
+        ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }     
       //if (mask.grounded(i, j) && mask.floating_ice(i, j+1)){
-      if (mask.grounded(i, j) && (mask.floating_ice(i, j+1) || mask.ice_free_ocean(i, j+1))){
-        xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
-        xpart2=vbed(i, j+1)-sea_level+vH(i, j+1)*rhoq;
-        interpol=xpart1/(xpart1-xpart2);
-        if (subgltype=="PA") {
-        interpolPA = (vH(i, j+1)*vH(i, j)*rhoq + vbed(i, j)) / (vH(i, j+1)*vbed(i, j) - vbed(i, j+1)*vH(i, j)); //Pattyn
-        if (interpolPA>1.0)
-          interpolPA=1.0;
-        else if (interpolPA<0.0)
-          interpolPA=0.0;
-        interpol=interpolPA;       
-        }
-        if (interpol<0.5)
-          gl_mask_y+=(interpol-0.5);
-        else
-          gl_mask_new(i,j+1)+=(interpol-0.5);
-          
-       ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
-      }
-      //if (mask.grounded(i, j) && mask.floating_ice(i, j-1)){
-      if (mask.grounded(i, j) && (mask.floating_ice(i, j-1) || mask.ice_free_ocean(i, j-1))){
-        xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
-        xpart2=vbed(i, j-1)-sea_level+vH(i, j-1)*rhoq;
-        interpol=xpart1/(xpart1-xpart2);
-        if (subgltype=="PA") {
-        interpolPA = (vH(i, j-1)*vH(i, j)*rhoq + vbed(i, j)) / (vH(i, j-1)*vbed(i, j) - vbed(i, j-1)*vH(i, j)); //Pattyn 
-        if (interpolPA>1.0)
-          interpolPA=1.0;
-        else if (interpolPA<0.0)
-          interpolPA=0.0;
-        interpol=interpolPA;       
-        }
-        if (interpol<0.5)
-          gl_mask_y+=(interpol-0.5);
-        else
-          gl_mask_new(i,j-1)+=(interpol-0.5);
-          
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
-      }
+           if (mask.grounded(i, j) && (mask.floating_ice(i, j+1) || mask.ice_free_ocean(i, j+1))){
+             xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
+             xpart2=vbed(i, j+1)-sea_level+vH(i, j+1)*rhoq;
+             interpol=xpart1/(xpart1-xpart2);
+             if (subgltype=="PA") {
+               interpolPA = vH(i, j+1)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i, j+1)) - vH(i, j+1)*(sea_level-vbed(i, j))); //Pattyn
+               interpol=interpolPA;       
+             }
+             if (interpol<0.5)
+               gl_mask_y+=(interpol-0.5);
+             else
+               gl_mask_new(i,j+1)+=(interpol-0.5);
+               
+            ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+           }
+           //if (mask.grounded(i, j) && mask.floating_ice(i, j-1)){
+              if (mask.grounded(i, j) && (mask.floating_ice(i, j-1) || mask.ice_free_ocean(i, j-1))){
+                xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
+                xpart2=vbed(i, j-1)-sea_level+vH(i, j-1)*rhoq;
+                interpol=xpart1/(xpart1-xpart2);
+                if (subgltype=="PA") {
+                    interpolPA = vH(i, j-1)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i, j-1)) - vH(i, j-1)*(sea_level-vbed(i, j))); //Pattyn
+                    interpol=interpolPA;       
+                  }
+                if (interpol<0.5)
+                  gl_mask_y+=(interpol-0.5);
+                else
+                  gl_mask_new(i,j-1)+=(interpol-0.5);
+                  
+               ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+              }
       if (mask.grounded(i, j))
         gl_mask_new(i,j) = gl_mask_x * gl_mask_y;
     } // inner for loop (j)
