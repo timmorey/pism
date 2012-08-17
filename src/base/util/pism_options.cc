@@ -611,6 +611,9 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("brutal_sliding", "scalebrutalSet"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("brutal_sliding_scale","sliding_scale_brutal"); CHKERRQ(ierr); 
+  
+  ierr = config.flag_from_option("grounded_margin_shelf_extension","grounded_margin_shelf_extension"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("mod_cf_taud","mod_cf_taud"); CHKERRQ(ierr);
  
 
   // Basal strength
@@ -667,6 +670,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("constant_thickness", "do_constant_thickness"); CHKERRQ(ierr);
   
   ierr = config.flag_from_option("subgl", "sub_groundingline"); CHKERRQ(ierr);
+  ierr = config.keyword_from_option("subgl_type", "subgl_type","LI,PA"); CHKERRQ(ierr);
 
 
   // Calving

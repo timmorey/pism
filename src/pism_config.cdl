@@ -86,7 +86,11 @@ netcdf pism_config {
     pism_config:do_thickness_calving_doc = "ad hoc calving at certain threshold for terminal ice thickness";
 
     pism_config:sub_groundingline  = "false";
-    pism_config:sub_groundingline_doc = "The Pattyn et al. interpolation scheme expanded to two dimensions is used if switched on in order to evaluate the position of the grounding line on a subgrid scale.";
+    pism_config:sub_groundingline_doc = "interpolation scheme expanded to two dimensions is used if switched on in order to evaluate the position of the grounding line on a subgrid scale.";
+
+   pism_config:subgl_type = "LI";
+   pism_config:subgl_type_doc = "Different types of grounding line interpolation. LI - linear interpolation, PA - Pattyn-like interpolation";
+
 
     pism_config:leave_iceshelf_band  = "false";
     pism_config:leave_iceshelf_band_doc = "When retreat due to calving or melting, leaves an ice shelf band of 1, 2 or 3 cells width from grounding line with minimum 50m thickness";
@@ -138,6 +142,9 @@ netcdf pism_config {
 
     pism_config:nuBedrockSet = "false";
     pism_config:nuBedrockSet_doc = "set viscosity at ice shelf margin next to ice free bedrock as friction parameterization";
+
+    pism_config:grounded_margin_shelf_extension = "no";
+    pism_config:grounded_margin_shelf_extension_doc = "apply correction of flux through grounded margin assuming a van der veen ice shelf attached";
 
     // parameters:
 
@@ -284,6 +291,9 @@ netcdf pism_config {
 
     pism_config:calving_at_thickness = 50.0;
     pism_config:calving_at_thickness_doc = "m; When terminal ice thickness of floating ice shelf is less than this threshold, it will be calved off.";
+
+    pism_config:mod_cf_taud = 0;
+    pism_config:mod_cf_taud_doc = "modifies the driving stress at the calving front";
 
     pism_config:nuBedrock = 5.0e15;
     pism_config:nuBedrock_doc = "Pa s; Staggered Viscosity used as side friction parameterization.";

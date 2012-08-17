@@ -263,6 +263,11 @@ PetscErrorCode IceModel::massContExplicitStep() {
   if (ocean != NULL) {
     ierr = ocean->shelf_base_mass_flux(shelfbmassflux); CHKERRQ(ierr);
   } else { SETERRQ(grid.com, 2, "PISM ERROR: ocean == NULL"); }
+  
+  const bool sub_gl = config.get_flag("sub_groundingline");
+  if (sub_gl){
+    ierr = gl_mask.begin_access(); CHKERRQ(ierr);
+   }
 
   IceModelVec2S vHnew = vWork2d[0];
   ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
@@ -282,6 +287,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = shelfbmassflux.begin_access(); CHKERRQ(ierr);
   ierr = vMask.begin_access();  CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
+  
+  const bool do_grounded_margin_shelf_extension = config.get_flag("grounded_margin_shelf_extension");
+  PetscScalar C_veen = 0.0;
+  if (do_grounded_margin_shelf_extension)
+    C_veen = config.get("ice_softness")*pow(((config.get("ice_density")*config.get("standard_gravity")/4.0)*(1.0-config.get("ice_density")/config.get("sea_water_density"))),config.get("Glen_exponent"));
+  
 
   // related to PIK part_grid mechanism; see Albrecht et al 2011
   const bool do_part_grid = config.get_flag("part_grid"),
@@ -337,7 +348,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
 
       // get non-diffusive velocities according to old or -part_grid scheme
       planeStar<PetscScalar> v;
-      ierr = cell_interface_velocities(do_part_grid, i, j, v); CHKERRQ(ierr);
+      ierr = cell_interface_velocities(do_part_grid, do_grounded_margin_shelf_extension, C_veen, i, j, v); CHKERRQ(ierr);
 
       if (dirichlet_bc) {
         //the staggered velocities have to be adjusted to Dirichlet boundary conditions
@@ -357,13 +368,15 @@ PetscErrorCode IceModel::massContExplicitStep() {
                  - v.s * (v.s > 0 ? vH(i, j - 1) : vH(i, j)) ) / dy;
 
       PetscReal S = 0.0;
-      if (include_bmr_in_continuity) {
-        if (mask.ocean(i, j))
+      if (include_bmr_in_continuity) {    
+        if (mask.ocean(i, j)) 
           S = shelfbmassflux(i,j);
         else
-          S = vbmr(i, j);
+          S = vbmr(i, j);         
+        
+        if (sub_gl)
+          S = (1.0-gl_mask(i,j)) * shelfbmassflux(i,j) + gl_mask(i,j) * vbmr(i, j);
       }
-
       // decide whether to apply Albrecht et al 2011 subgrid-scale
       //   parameterization
 
@@ -535,6 +548,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
   if (do_ocean_kill) {
     ierr = ocean_kill_mask.end_access(); CHKERRQ(ierr);
   }
+  
+  if (sub_gl){
+    ierr = gl_mask.end_access(); CHKERRQ(ierr);
+   }
 
   // flux accounting
   {
@@ -604,6 +621,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   return 0;
 }
 
+
 PetscErrorCode IceModel::sub_gl_position() {
   PetscErrorCode ierr;
 
@@ -617,6 +635,8 @@ PetscErrorCode IceModel::sub_gl_position() {
   PetscReal ice_rho = config.get("ice_density"),
             ocean_rho = config.get("sea_water_density"),
             rhoq = ice_rho/ocean_rho;
+            
+  string subgltype = config.get_string("subgl_type");
 
   IceModelVec2S gl_mask_new = vWork2d[0];
   //ierr = gl_mask.copy_to(gl_mask_new); CHKERRQ(ierr);
@@ -632,7 +652,7 @@ PetscErrorCode IceModel::sub_gl_position() {
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) { 
       
-      PetscReal xpart1=0.0, xpart2=0.0, interpol=0.0, gl_mask_x=0.0, gl_mask_y=0.0; 
+      PetscReal xpart1=0.0, xpart2=0.0, interpol=0.0, gl_mask_x=0.0, gl_mask_y=0.0, interpolPA=0.0; 
       
       if (mask.grounded(i, j)) { 
         gl_mask_x=1.0;
@@ -643,51 +663,69 @@ PetscErrorCode IceModel::sub_gl_position() {
         xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
         xpart2=vbed(i+1, j)-sea_level+vH(i+1, j)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
+        if (subgltype=="PA") {
+             interpolPA = vH(i+1, j)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i+1, j)) - vH(i+1, j)*(sea_level-vbed(i, j))); //Pattyn
+             // if (interpolPA>1.0)
+             //   interpolPA=1.0;
+             // else if (interpolPA<0.0)
+             //   interpolPA=0.0;
+             interpol=interpolPA;       
+           }
         if (interpol<0.5)
           gl_mask_x+=(interpol-0.5);
         else
           gl_mask_new(i+1,j)+=(interpol-0.5);
         
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }
       //if (mask.grounded(i, j) && mask.floating_ice(i-1, j)){
       if (mask.grounded(i, j) && (mask.floating_ice(i-1, j) || mask.ice_free_ocean(i-1, j))){
         xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
         xpart2=vbed(i-1, j)-sea_level+vH(i-1, j)*rhoq;
         interpol=xpart1/(xpart1-xpart2);
+        if (subgltype=="PA") {
+          interpolPA = vH(i-1, j)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i-1, j)) - vH(i-1, j)*(sea_level-vbed(i, j))); //Pattyn
+          interpol=interpolPA;       
+        }
         if (interpol<0.5)
           gl_mask_x+=(interpol-0.5);
-        else{
-          //if (vH(i-1, j)>0.0)
-            gl_mask_new(i-1,j)+=(interpol-0.5);
-        }  
-        //if (j==1){
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+        else
+          gl_mask_new(i-1,j)+=(interpol-0.5);
+
+        ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
       }     
       //if (mask.grounded(i, j) && mask.floating_ice(i, j+1)){
-      if (mask.grounded(i, j) && (mask.floating_ice(i, j+1) || mask.ice_free_ocean(i, j+1))){
-        xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
-        xpart2=vbed(i, j+1)-sea_level+vH(i, j+1)*rhoq;
-        interpol=xpart1/(xpart1-xpart2);
-        if (interpol<0.5)
-          gl_mask_y+=(interpol-0.5);
-        else
-          gl_mask_new(i,j+1)+=(interpol-0.5);
-          
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
-      }
-      //if (mask.grounded(i, j) && mask.floating_ice(i, j-1)){
-      if (mask.grounded(i, j) && (mask.floating_ice(i, j-1) || mask.ice_free_ocean(i, j-1))){
-        xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
-        xpart2=vbed(i, j-1)-sea_level+vH(i, j-1)*rhoq;
-        interpol=xpart1/(xpart1-xpart2);
-        if (interpol<0.5)
-          gl_mask_y+=(interpol-0.5);
-        else
-          gl_mask_new(i,j-1)+=(interpol-0.5);
-          
-        ierr = verbPrintf(2, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr); 
-      }
+           if (mask.grounded(i, j) && (mask.floating_ice(i, j+1) || mask.ice_free_ocean(i, j+1))){
+             xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
+             xpart2=vbed(i, j+1)-sea_level+vH(i, j+1)*rhoq;
+             interpol=xpart1/(xpart1-xpart2);
+             if (subgltype=="PA") {
+               interpolPA = vH(i, j+1)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i, j+1)) - vH(i, j+1)*(sea_level-vbed(i, j))); //Pattyn
+               interpol=interpolPA;       
+             }
+             if (interpol<0.5)
+               gl_mask_y+=(interpol-0.5);
+             else
+               gl_mask_new(i,j+1)+=(interpol-0.5);
+               
+            ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+           }
+           //if (mask.grounded(i, j) && mask.floating_ice(i, j-1)){
+              if (mask.grounded(i, j) && (mask.floating_ice(i, j-1) || mask.ice_free_ocean(i, j-1))){
+                xpart1=vbed(i, j)-sea_level+vH(i, j)*rhoq;
+                xpart2=vbed(i, j-1)-sea_level+vH(i, j-1)*rhoq;
+                interpol=xpart1/(xpart1-xpart2);
+                if (subgltype=="PA") {
+                    interpolPA = vH(i, j-1)*(vH(i, j)*rhoq - sea_level + vbed(i, j)) / (vH(i, j)*(sea_level-vbed(i, j-1)) - vH(i, j-1)*(sea_level-vbed(i, j))); //Pattyn
+                    interpol=interpolPA;       
+                  }
+                if (interpol<0.5)
+                  gl_mask_y+=(interpol-0.5);
+                else
+                  gl_mask_new(i,j-1)+=(interpol-0.5);
+                  
+               ierr = verbPrintf(4, grid.com,"!!! PISM_INFO: h1=%f, h2=%f, interpol=%f at i=%d, j=%d\n",xpart1,xpart2,interpol,i,j); CHKERRQ(ierr);
+              }
       if (mask.grounded(i, j))
         gl_mask_new(i,j) = gl_mask_x * gl_mask_y;
     } // inner for loop (j)
