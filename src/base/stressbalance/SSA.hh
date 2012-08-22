@@ -167,13 +167,9 @@ public:
   virtual PetscErrorCode compute_principal_strain_rates(
                 IceModelVec2S &result_e1, IceModelVec2S &result_e2);
 
-  using ShallowStressBalance::compute_2d_stresses;
-  virtual PetscErrorCode compute_2d_stresses(
-                IceModelVec2S &result_Txx, IceModelVec2S &result_Tyy, IceModelVec2S &result_Txy);
-                
-  using ShallowStressBalance::compute_3d_stresses;
-  virtual PetscErrorCode compute_3d_stresses(
-                IceModelVec2S &result_Txx3, IceModelVec2S &result_Tyy3, IceModelVec2S &result_Txy3, PetscInt &kk);
+  using ShallowStressBalance::compute_stresses;
+  virtual PetscErrorCode compute_stresses(
+                IceModelVec2S &result_Txx, IceModelVec2S &result_Tyy, IceModelVec2S &result_Txy, PetscInt &kk);
 
 
 protected:

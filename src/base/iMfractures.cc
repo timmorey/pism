@@ -161,13 +161,11 @@ PetscErrorCode IceModel::calculateFractureDensity() {
      
    for (PetscInt kk = 0; kk <= k_up; kk++) {
    //for (PetscInt kk = k_up; kk >= 0; kk--) {
-     if (do_fracdepth){
-       ierr = stress_balance->get_3d_stresses(txx, tyy, txy, kk); CHKERRQ(ierr);
-     } else {
-       ierr = stress_balance->get_2d_stresses(txx, tyy, txy); CHKERRQ(ierr);
-     }
+
+     ierr = stress_balance->get_stresses(txx, tyy, txy, kk); CHKERRQ(ierr);
+
     
-   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
+     for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
      for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
        
        //PetscInt ks = grid.kBelowHeight(vH(i,j));
@@ -238,13 +236,13 @@ PetscErrorCode IceModel::calculateFractureDensity() {
          //vFH(i,j)=gammaheal*(-healThreshold);//}              
     
          //fracture age since fracturing occured
-         if (sigmat <= initThreshold  && fractured){// && (vFA(i+1,j)>0.0 || vFA(i-1,j)>0.0 || vFA(i,j+1)>0.0 || vFA(i,j-1)>0.0)) {
+         //if (sigmat <= initThreshold){// && (vFA(i+1,j)>0.0 || vFA(i-1,j)>0.0 || vFA(i,j+1)>0.0 || vFA(i,j-1)>0.0)) {
+         if (doitonce){
            vFAnew(i,j) -= dt * (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFA(i+1,j)-vFA(i, j):vFA(i, j)-vFA(i-1, j))/dx; 
-           vFAnew(i,j) -= dt * (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFA(i,j+1)-vFA(i, j):vFA(i, j)-vFA(i, j-1))/dy;  
-         }
-         if (sigmat <= initThreshold && fractured)// && vFAnew(i,j)>0.0)
+           vFAnew(i,j) -= dt * (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFA(i,j+1)-vFA(i, j):vFA(i, j)-vFA(i, j-1))/dy;
            vFAnew(i,j)+= dt/secpera;
-         else if (sigmat > initThreshold) 
+         }
+         if (sigmat > initThreshold) 
            vFAnew(i,j) = 0.0;
 
          // additional flow enhancement due to fracture softening
@@ -257,8 +255,13 @@ PetscErrorCode IceModel::calculateFractureDensity() {
    
        //boundary condition
        if (dirichlet_bc) {
-         if (vBCMask.as_int(i,j) == 1 && (vBCvel(i,j).u != 0.0 || vBCvel(i,j).v != 0.0))
-            vFDnew(i,j)=fdBoundaryValue;
+         if (vBCMask.as_int(i,j) == 1){
+            if (vBCvel(i,j).u != 0.0 || vBCvel(i,j).v != 0.0)
+              vFDnew(i,j)=fdBoundaryValue;
+            vFAnew(i,j)=0.0;
+            vFG(i,j)=0.0;
+            vFH(i,j)=0.0;
+         }
        }
              
        //bounding        
@@ -267,8 +270,12 @@ PetscErrorCode IceModel::calculateFractureDensity() {
        if (vFDnew(i,j)>1.0)
           vFDnew(i,j)=1.0;
              
-       if (vH(i,j)==0.0)
+       if (vH(i,j)==0.0){
          vFDnew(i,j)=0.0;
+         vFAnew(i,j)=0.0;
+         vFG(i,j)=0.0;
+         vFH(i,j)=0.0;
+       }
        
        //fracture depth  
        if (sigmat > initThreshold && do_fracdepth && fractured)
