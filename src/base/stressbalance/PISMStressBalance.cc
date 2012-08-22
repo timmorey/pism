@@ -168,10 +168,17 @@ PetscErrorCode PISMStressBalance::get_principal_strain_rates(
   return 0;
 }
 
-PetscErrorCode PISMStressBalance::get_2D_stresses(
+PetscErrorCode PISMStressBalance::get_2d_stresses(
                 IceModelVec2S &result_Txx, IceModelVec2S &result_Tyy, IceModelVec2S &result_Txy) {
   PetscErrorCode ierr;
-  ierr = stress_balance->compute_2D_stresses(result_Txx, result_Tyy, result_Txy); CHKERRQ(ierr);
+  ierr = stress_balance->compute_2d_stresses(result_Txx, result_Tyy, result_Txy); CHKERRQ(ierr);
+  return 0;
+}
+
+PetscErrorCode PISMStressBalance::get_3d_stresses(
+                IceModelVec2S &result_Txx3, IceModelVec2S &result_Tyy3, IceModelVec2S &result_Txy3, PetscInt kk) {
+  PetscErrorCode ierr;
+  ierr = stress_balance->compute_3d_stresses(result_Txx3, result_Tyy3, result_Txy3, kk); CHKERRQ(ierr);
   return 0;
 }
 

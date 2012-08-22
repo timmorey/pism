@@ -336,8 +336,8 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           rhs_uv[i][j].u = +tdx - (aMM - aPP)*ocean_pressure / dx;
           rhs_uv[i][j].v = +tdy - (bMM - bPP)*ocean_pressure / dy;   
           
-          if (j==50 ){
-          ierr = verbPrintf(1,grid.com, "\n!!!: RHS: tdx %.3e and tstat %.3e and rhsx %.3e for app=%d and amm=%d at %d, %d \n\n",tdx,(aPP - aMM)*ocean_pressure/dx,rhs_uv[i][j].u,aPP,aMM,i,j); CHKERRQ(ierr);}
+          //if (j==50 ){
+          //ierr = verbPrintf(1,grid.com, "\n!!!: RHS: tdx %.3e and tstat %.3e and rhsx %.3e for app=%d and amm=%d at %d, %d \n\n",tdx,(aPP - aMM)*ocean_pressure/dx,rhs_uv[i][j].u,aPP,aMM,i,j); CHKERRQ(ierr);}
 
           continue;
         } // end of "if (is_marginal(i, j))"

@@ -30,7 +30,7 @@
 
 
 PetscErrorCode IceModel::calculateFractureDensity() {
-  const PetscScalar   dx = grid.dx, dy = grid.dy, Mx = grid.Mx, My = grid.My;
+  const PetscScalar   dx = grid.dx, dy = grid.dy, dz=grid.dz_fine, Mx = grid.Mx, My = grid.My, Mz = grid.Mz;
   PetscErrorCode ierr;
   ierr = verbPrintf(4, grid.com, "######### calculateFractureDensity() start \n");    CHKERRQ(ierr);
 
@@ -44,7 +44,7 @@ PetscErrorCode IceModel::calculateFractureDensity() {
   ierr = vMask.begin_access();  CHKERRQ(ierr);
    
   ierr = stress_balance->get_principal_strain_rates(vPrinStrain1, vPrinStrain2); CHKERRQ(ierr);
-  ierr = stress_balance->get_2D_stresses(txx, tyy, txy); CHKERRQ(ierr);
+  //ierr = stress_balance->get_2d_stresses(txx, tyy, txy); CHKERRQ(ierr);
    
   ierr = txx.beginGhostComm(); CHKERRQ(ierr);
   ierr = txx.endGhostComm(); CHKERRQ(ierr);
@@ -82,6 +82,13 @@ PetscErrorCode IceModel::calculateFractureDensity() {
     ierr = vFAnew.begin_access(); CHKERRQ(ierr);
    }
    
+   const bool do_fracdepth = config.get_flag("do_frac_at_depth");
+   if (do_fracdepth) {
+     ierr = vFdepth.begin_access();  CHKERRQ(ierr);
+     //vector<double> &fzlev = grid.zlevels_fine;
+   }
+   vector<double> &fzlev = grid.zlevels_fine;
+  
    IceModelVec2V *vel_advective;
    ierr = stress_balance->get_advective_2d_velocity(vel_advective); CHKERRQ(ierr);
    //IceModelVec2V vel = *vel_advective; // just an alias
@@ -147,33 +154,67 @@ PetscErrorCode IceModel::calculateFractureDensity() {
   
    }
    
+   
+   PetscInt k_up=0;
+   if (do_fracdepth)
+     k_up = Mz;
+     
+   for (PetscInt kk = 0; kk <= k_up; kk++) {
+   //for (PetscInt kk = k_up; kk >= 0; kk--) {
+     if (do_fracdepth){
+       ierr = stress_balance->get_3d_stresses(txx, tyy, txy, kk); CHKERRQ(ierr);
+     } else {
+       ierr = stress_balance->get_2d_stresses(txx, tyy, txy); CHKERRQ(ierr);
+     }
     
    for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
      for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+       
+       //PetscInt ks = grid.kBelowHeight(vH(i,j));
+       PetscInt ks = static_cast<PetscInt>(floor(vH(i,j)/grid.dz_fine));
+       if (kk>ks) {
+         continue;
+       }
+       
+       bool fractured = ((do_fracdepth &&  vFdepth(i,j)==0.0) || do_fracdepth==false);
+       //bool doitonce = (kk==k_up);
+       bool doitonce = (kk==0);
+       if (do_fracdepth && doitonce)
+         vFdepth(i,j) = 0.0;
+
 
        tempFD=0;
        //SSA: v . grad memField
-       tempFD +=  (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFD(i+1,j)-vFD(i, j):vFD(i, j)-vFD(i-1, j))/dx; 
-       tempFD +=  (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFD(i,j+1)-vFD(i, j):vFD(i, j)-vFD(i, j-1))/dy; 
-
+       if (doitonce){
+       tempFD += (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFD(i+1,j)-vFD(i,j):vFD(i,j)-vFD(i-1,j))/dx; 
+       tempFD += (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFD(i,j+1)-vFD(i,j):vFD(i,j)-vFD(i,j-1))/dy; 
        vFDnew(i,j)-= tempFD * dt;
+       }
        
        //source
        //van mises
        PetscScalar T1 =0.5*(txx(i,j)+tyy(i,j))+sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
        PetscScalar T2 =0.5*(txx(i,j)+tyy(i,j))-sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
        PetscScalar sigmat=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
-
+       
+       //max shear stress
+       PetscScalar sspm=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
+       //if (j==100 && i==100){
+       //  ierr = verbPrintf(2,grid.com,"!!! max shear stress %.1f, von mises %.1f for  H=%.1f \n",sspm,sigmat,vH(i,j));    CHKERRQ(ierr);}
   
-       if (sigmat > initThreshold) 
-          vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-0.0)*dt*(1-vFDnew(i,j));       
+       //fracture density
+       if (sigmat > initThreshold) {
+          if (fractured)
+            vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-0.0)*dt*(1-vFDnew(i,j));       
        //if (sigmat > initThreshold && vPrinStrain1(i,j)>3.0e-10) 
           //vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-3.0e-10)*dt*(1-vFDnew(i,j));
        //if (vPrinStrain1(i,j)>initThreshold) 
           //vFDnew(i,j)+= gamma*(vPrinStrain1(i,j))*dt*(1-vFDnew(i,j)));
-           
+       }
+      
        //healing
-       if (vPrinStrain1(i,j) < healThreshold) {
+       //if (vPrinStrain1(i,j) < healThreshold  && (do_fracdepth==false || (do_fracdepth && kk = k_up))) {
+       if (vPrinStrain1(i,j) < healThreshold  && doitonce) {
            vFDnew(i,j)+= gammaheal*(vPrinStrain1(i,j)-healThreshold)*dt;//*(1-vFD(i,j)); 
        }
        //vFDnew(i,j)+= gammaheal*(-healThreshold)*dt;
@@ -183,23 +224,25 @@ PetscErrorCode IceModel::calculateFractureDensity() {
        if (write_fd && vH(i,j)>0.0) {
          // fracture growth rate
          if (sigmat > initThreshold) {
-           vFG(i,j)=gamma*(vPrinStrain1(i,j)-0.0)*(1-vFDnew(i,j)); }
-         else {
+           if (fractured)
+             vFG(i,j)=gamma*(vPrinStrain1(i,j)-0.0)*(1-vFDnew(i,j)); 
+         } else {
            vFG(i,j)=0.0;}
          
          // fracture healing rate      
          if (vPrinStrain1(i,j) < healThreshold){
-           vFH(i,j)=gammaheal*(vPrinStrain1(i,j)-healThreshold); }
-         else {
+           if (doitonce)
+             vFH(i,j)=gammaheal*(vPrinStrain1(i,j)-healThreshold); 
+         } else {
            vFH(i,j)=0.0;}
          //vFH(i,j)=gammaheal*(-healThreshold);//}              
     
          //fracture age since fracturing occured
-         if (sigmat <= initThreshold){// && (vFA(i+1,j)>0.0 || vFA(i-1,j)>0.0 || vFA(i,j+1)>0.0 || vFA(i,j-1)>0.0)) {
+         if (sigmat <= initThreshold  && fractured){// && (vFA(i+1,j)>0.0 || vFA(i-1,j)>0.0 || vFA(i,j+1)>0.0 || vFA(i,j-1)>0.0)) {
            vFAnew(i,j) -= dt * (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFA(i+1,j)-vFA(i, j):vFA(i, j)-vFA(i-1, j))/dx; 
            vFAnew(i,j) -= dt * (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFA(i,j+1)-vFA(i, j):vFA(i, j)-vFA(i, j-1))/dy;  
          }
-         if (sigmat <= initThreshold)// && vFAnew(i,j)>0.0)
+         if (sigmat <= initThreshold && fractured)// && vFAnew(i,j)>0.0)
            vFAnew(i,j)+= dt/secpera;
          else if (sigmat > initThreshold) 
            vFAnew(i,j) = 0.0;
@@ -218,17 +261,22 @@ PetscErrorCode IceModel::calculateFractureDensity() {
             vFDnew(i,j)=fdBoundaryValue;
        }
              
-      //bounding        
-      if (vFDnew(i,j)<0.0)
-        vFDnew(i,j)=0.0;
-      if (vFDnew(i,j)>1.0)
-         vFDnew(i,j)=1.0;
+       //bounding        
+       if (vFDnew(i,j)<0.0)
+         vFDnew(i,j)=0.0;
+       if (vFDnew(i,j)>1.0)
+          vFDnew(i,j)=1.0;
              
-      if (vH(i,j)==0.0)
-        vFDnew(i,j)=0.0;
+       if (vH(i,j)==0.0)
+         vFDnew(i,j)=0.0;
+       
+       //fracture depth  
+       if (sigmat > initThreshold && do_fracdepth && fractured)
+         vFdepth(i,j) = vH(i,j) - fzlev[kk];
  
      }
    } 
+ }
     
     ierr = vel_advective->end_access(); CHKERRQ(ierr);
     ierr = vH.end_access(); CHKERRQ(ierr);
@@ -250,6 +298,11 @@ PetscErrorCode IceModel::calculateFractureDensity() {
      ierr = vFAnew.beginGhostComm(vFA); CHKERRQ(ierr);
      ierr = vFAnew.endGhostComm(vFA); CHKERRQ(ierr);
    }
+   
+   if (write_fd) {
+     ierr = vFdepth.end_access();  CHKERRQ(ierr);
+   }
+   //delete [] E;
      
    ierr = vPrinStrain1.end_access(); CHKERRQ(ierr);
    ierr = vPrinStrain2.end_access(); CHKERRQ(ierr);

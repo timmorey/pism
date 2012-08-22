@@ -299,26 +299,31 @@ PetscErrorCode IceModel::createVecs() {
     ierr = vFD.set_attr("valid_min", 0.0); CHKERRQ(ierr);
     ierr = variables.add(vFD); CHKERRQ(ierr);
 
-  	if (config.get_flag("write_fd_fields")) {
-  		ierr = vFG.create(grid, "fracture_growth_rate", true, WIDE_STENCIL); CHKERRQ(ierr); 
-  	  ierr = vFG.set_attrs("model_state", "fracture growth rate",	"", ""); CHKERRQ(ierr);
-  	  ierr = vFG.set_attr("valid_min", 0.0); CHKERRQ(ierr);
-  	  ierr = variables.add(vFG); CHKERRQ(ierr);
+    if (config.get_flag("write_fd_fields")) {
+      ierr = vFG.create(grid, "fracture_growth_rate", true, WIDE_STENCIL); CHKERRQ(ierr); 
+      ierr = vFG.set_attrs("model_state", "fracture growth rate",	"", ""); CHKERRQ(ierr);
+      ierr = vFG.set_attr("valid_min", 0.0); CHKERRQ(ierr);
+      ierr = variables.add(vFG); CHKERRQ(ierr);
 
-  		ierr = vFH.create(grid, "fracture_healing_rate", true, WIDE_STENCIL); CHKERRQ(ierr); 
-  	  ierr = vFH.set_attrs("model_state", "fracture healing rate",	"", ""); CHKERRQ(ierr);
-  	  ierr = variables.add(vFH); CHKERRQ(ierr);
+      ierr = vFH.create(grid, "fracture_healing_rate", true, WIDE_STENCIL); CHKERRQ(ierr); 
+      ierr = vFH.set_attrs("model_state", "fracture healing rate",	"", ""); CHKERRQ(ierr);
+      ierr = variables.add(vFH); CHKERRQ(ierr);
 
-  		ierr = vFE.create(grid, "fracture_flow_enhancement", true, WIDE_STENCIL); CHKERRQ(ierr); 
-  	  ierr = vFE.set_attrs("model_state", "fracture-induced flow enhancement",	"", ""); CHKERRQ(ierr);
-  	  ierr = variables.add(vFE); CHKERRQ(ierr);
+      ierr = vFE.create(grid, "fracture_flow_enhancement", true, WIDE_STENCIL); CHKERRQ(ierr); 
+      ierr = vFE.set_attrs("model_state", "fracture-induced flow enhancement",	"", ""); CHKERRQ(ierr);
+      ierr = variables.add(vFE); CHKERRQ(ierr);
 
-  		ierr = vFA.create(grid, "fracture_age", true, WIDE_STENCIL); CHKERRQ(ierr); 
-  	  ierr = vFA.set_attrs("model_state", "age since fracturing",	"", ""); CHKERRQ(ierr);
-  	  ierr = variables.add(vFA); CHKERRQ(ierr);
+      ierr = vFA.create(grid, "fracture_age", true, WIDE_STENCIL); CHKERRQ(ierr); 
+      ierr = vFA.set_attrs("model_state", "age since fracturing",	"yrs", ""); CHKERRQ(ierr);
+      ierr = variables.add(vFA); CHKERRQ(ierr);
 
-  	}
-   }
+    }
+    if (config.get_flag("do_frac_at_depth")) {
+      ierr = vFdepth.create(grid, "fracture_depth", true, WIDE_STENCIL); CHKERRQ(ierr); 
+      ierr = vFdepth.set_attrs("model_state", "fracture depth",	"m", ""); CHKERRQ(ierr);
+      ierr = variables.add(vFdepth); CHKERRQ(ierr);
+    }
+  }
   
 
   // upward geothermal flux at bedrock surface

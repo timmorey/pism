@@ -364,7 +364,7 @@ PetscErrorCode SSA::compute_principal_strain_rates(IceModelVec2S &result_e1,
   return 0;
 }
 
-PetscErrorCode SSA::compute_2D_stresses(IceModelVec2S &result_Txx, IceModelVec2S &result_Tyy, IceModelVec2S &result_Txy) {
+PetscErrorCode SSA::compute_2d_stresses(IceModelVec2S &result_Txx, IceModelVec2S &result_Tyy, IceModelVec2S &result_Txy) {
   PetscErrorCode ierr;
   PetscScalar    dx = grid.dx, dy = grid.dy;
 
@@ -459,6 +459,112 @@ PetscErrorCode SSA::compute_2D_stresses(IceModelVec2S &result_Txx, IceModelVec2S
 
   return 0;
 }
+
+
+PetscErrorCode SSA::compute_3d_stresses(IceModelVec2S &result_Txx3, IceModelVec2S &result_Tyy3, IceModelVec2S &result_Txy3, PetscInt &kk) {
+  PetscErrorCode ierr;
+  PetscScalar    dx = grid.dx, dy = grid.dy;
+ 
+   IceModelVec2S H = *thickness; // an alias
+   ierr = velocity.begin_access(); CHKERRQ(ierr);
+   ierr = H.begin_access(); CHKERRQ(ierr);
+   ierr = result_Txx3.begin_access(); CHKERRQ(ierr);
+   ierr = result_Tyy3.begin_access(); CHKERRQ(ierr);
+   ierr = result_Txy3.begin_access(); CHKERRQ(ierr);
+   
+   PetscScalar p_air=config.get("surface_pressure"), 
+               rho_ice=config.get("ice_density"),
+               g_acc=config.get("standard_gravity");
+  
+   PetscScalar *E_ij;
+   //E = new PetscScalar[grid.Mz];
+   ierr = enthalpy->begin_access(); CHKERRQ(ierr);
+   vector<double> &fzlev = grid.zlevels_fine;
+  
+  for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
+     for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
+       
+       const PetscInt ks = static_cast<PetscInt>(floor(H(i,j)/grid.dz_fine));
+  
+       if ( velocity(i,j).u == 0.0 || velocity(i,j).v == 0.0 || kk>ks || H(i,j)==0.0) {
+         result_Txx3(i,j)=0.0;
+         result_Tyy3(i,j)=0.0;
+         result_Txy3(i,j)=0.0;
+         continue;
+       }
+  
+       //centered difference scheme; strain in units s-1
+       PetscScalar
+         u_x = (velocity(i+1,j).u - velocity(i-1,j).u) / (2 * dx),
+         u_y = (velocity(i,j+1).u - velocity(i,j-1).u) / (2 * dy),
+         v_x = (velocity(i+1,j).v - velocity(i-1,j).v) / (2 * dx),
+         v_y = (velocity(i,j+1).v - velocity(i,j-1).v) / (2 * dy);
+  
+       //inward scheme at the ice-shelf front
+       //FIXME: should be formulated in terms of mask values like principal strain rates
+  
+       if (H(i+1,j)==0.0) {
+         u_x = (velocity(i,j).u - velocity(i-1,j).u) / dx;
+         v_x = (velocity(i,j).v - velocity(i-1,j).v) / dx;
+       }
+       if (H(i-1,j)==0.0) {
+         u_x = (velocity(i+1,j).u - velocity(i,j).u) / dx;
+         v_x = (velocity(i+1,j).v - velocity(i,j).v) / dx;
+       }
+       if (H(i,j+1)==0.0) {
+         u_y = (velocity(i,j).u - velocity(i,j-1).u) / dy;
+         v_y = (velocity(i,j).v - velocity(i,j-1).v) / dy;
+       }
+       if (H(i,j-1)==0.0) {
+         u_y = (velocity(i,j+1).u - velocity(i,j).u) / dy;
+         v_y = (velocity(i,j+1).v - velocity(i,j).v) / dy;
+       }
+  
+       // ice nose case
+       if (H(i,j-1)==0.0 && H(i,j+1)==0.0) {
+         u_y = 0.0;
+         v_y = 0.0;
+       }
+       if (H(i+1,j)==0.0 && H(i-1,j)==0.0) {
+         u_x = 0.0;
+         v_x = 0.0;
+       }
+       
+       ierr = enthalpy->getInternalColumn(i,j,&E_ij); CHKERRQ(ierr);
+       //const PetscInt ks = static_cast<PetscInt>(floor(H(i,j)/grid.dz_fine));
+       //PetscInt ks = grid.kBelowHeight(H(i,j));
+       //if (kk<=ks) {
+       PetscScalar depth = H(i,j) - fzlev[kk];
+       PetscScalar pressure = p_air + rho_ice * g_acc * depth;
+       PetscScalar BB = flow_law->hardness_parameter(E_ij[kk],pressure); CHKERRQ(ierr);
+       //if (i==100 && j==100) {
+        //  ierr = verbPrintf(2,grid.com,"!!!!! E(k)=%e, Mz=%d, fMz=%d, k=%d, B=%e ks1=%d, ks2=%d dz=%.1f at %d,%d\n",E_ij[kk],grid.Mz,grid.Mz_fine,kk,BB,static_cast<PetscInt>(floor(H(i,j)/grid.dz_fine)),grid.kBelowHeight(H(i,j)),fzlev[kk],i,j); CHKERRQ(ierr);}
+
+       //get local effective viscosity
+       PetscScalar nu = flow_law->effective_viscosity(BB, u_x, u_y, v_x, v_y);
+
+       //get deviatoric stresses
+       result_Txx3(i,j)=nu*u_x;
+       result_Tyy3(i,j)=nu*v_y;
+       result_Txy3(i,j)=0.5*nu*(u_y+v_x);
+
+     } // j
+   }   // i
+   
+   ierr = velocity.end_access(); CHKERRQ(ierr);
+   ierr = H.end_access(); CHKERRQ(ierr);
+   ierr = result_Txx3.end_access(); CHKERRQ(ierr);
+   ierr = result_Tyy3.end_access(); CHKERRQ(ierr);
+   ierr = result_Txy3.end_access(); CHKERRQ(ierr);
+   
+   ierr = enthalpy->end_access(); CHKERRQ(ierr);
+ 
+  //delete [] E;
+
+
+  return 0;
+}
+
 
 
 //! \brief Compute the basal frictional heating.
