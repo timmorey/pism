@@ -426,7 +426,7 @@ PetscErrorCode SSA::compute_2D_stresses(IceModelVec2S &result_Txx, IceModelVec2S
         v_x = 0.0;
       }
 
-	 //get hardness from enthalpie
+	 //get hardness from enthalpy
 	 PetscScalar BB;
 	 ierr = enthalpy->getInternalColumn(i,j,&E_ij); CHKERRQ(ierr);
 	 if (H(i,j) == 0) {

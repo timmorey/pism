@@ -259,11 +259,11 @@ PetscErrorCode IceModel::killIdentifiedIceBergs() {
          vH(i, j) = 0.0;
          vh(i, j) = 0.0;
          vMask(i, j) = MASK_ICE_FREE_OCEAN;
-         if (vpik) {
-           PetscSynchronizedPrintf(grid.com, 
-                     "PISM-PIK INFO: [rank %d] killed iceberg at i=%d, j=%d\n", 
-                     grid.rank, i, j);
-         }
+         //if (vpik) {
+         //  PetscSynchronizedPrintf(grid.com, 
+         //            "PISM-PIK INFO: [rank %d] killed iceberg at i=%d, j=%d\n", 
+         //            grid.rank, i, j);
+         //}
       }
 
     }

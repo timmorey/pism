@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # -no_sia takes care of high velocities at inland boundaries (SIA "sees"
@@ -35,7 +36,7 @@ if [ $# -gt 4 ] ; then  # if user says "run_prog.sh 8 211 0.6 500 7e16" then ...
 fi
 
 PISMPREFIX=""
-# PISMPREFIX="../../../bin/"
+PISMPREFIX="../../../bin/"
 
 cmd_diag="mpiexec -n $NN ${PISMPREFIX}pismr -boot_file Ross_combined_prog.nc -Mx $M -My $M \
   -Mz 61 -Lz 3000 -z_spacing equal -surface given -no_sia \

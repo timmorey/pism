@@ -86,6 +86,13 @@ PetscErrorCode IceModel::calculateFractureDensity() {
    ierr = stress_balance->get_advective_2d_velocity(vel_advective); CHKERRQ(ierr);
    //IceModelVec2V vel = *vel_advective; // just an alias
    ierr = vel_advective->begin_access(); CHKERRQ(ierr);
+   
+   //PetscScalar *E_ij; 
+   //IceModelVec3 *enthalpy;
+   //E = new PetscScalar[grid.Mz];
+   //ierr = enthalpy->begin_access(); CHKERRQ(ierr);  
+   //ierr = enthalpy->getInternalColumn(i,j,&E_ij); CHKERRQ(ierr);
+   //ierr = stress_balance->getInternalColumn(i,j,&E_ij); CHKERRQ(ierr);
   
    MaskQuery M(vMask);
    PetscScalar tempFD;
@@ -163,7 +170,13 @@ PetscErrorCode IceModel::calculateFractureDensity() {
        PetscScalar T1 =0.5*(txx(i,j)+tyy(i,j))+sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
        PetscScalar T2 =0.5*(txx(i,j)+tyy(i,j))-sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
        PetscScalar sigmat=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
-
+       
+       //max shear stress
+       PetscScalar sspm=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
+       //ierr = enthalpy->getInternalColumn(i,j,&E_ij); CHKERRQ(ierr);
+       //ierr = enthalpy->getInternalColumn(i,j,&E_ij); CHKERRQ(ierr);
+       if (j==1 and i==50){
+          ierr = verbPrintf(3,grid.com,"!!! max shear stress %eec H=%f \n",sspm,vH(i,j));    CHKERRQ(ierr);}
   
        if (sigmat > initThreshold) 
           vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-0.0)*dt*(1-vFDnew(i,j));       
@@ -250,6 +263,9 @@ PetscErrorCode IceModel::calculateFractureDensity() {
      ierr = vFAnew.beginGhostComm(vFA); CHKERRQ(ierr);
      ierr = vFAnew.endGhostComm(vFA); CHKERRQ(ierr);
    }
+   
+   //ierr = enthalpy->end_access(); CHKERRQ(ierr);
+   //delete [] E;
      
    ierr = vPrinStrain1.end_access(); CHKERRQ(ierr);
    ierr = vPrinStrain2.end_access(); CHKERRQ(ierr);
