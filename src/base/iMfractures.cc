@@ -82,6 +82,8 @@ PetscErrorCode IceModel::calculateFractureDensity() {
     ierr = vFAnew.begin_access(); CHKERRQ(ierr);
    }
    
+   const bool do_fracground = config.get_flag("do_frac_on_grounded");
+   
    const bool do_fracdepth = config.get_flag("do_frac_at_depth");
    if (do_fracdepth) {
      ierr = vFdepth.begin_access();  CHKERRQ(ierr);
@@ -166,124 +168,125 @@ PetscErrorCode IceModel::calculateFractureDensity() {
 
     
      for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
-     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
-       
-       //PetscInt ks = grid.kBelowHeight(vH(i,j));
-       PetscInt ks = static_cast<PetscInt>(floor(vH(i,j)/grid.dz_fine));
-       if (kk>ks) {
-         continue;
-       }
-       
-       bool fractured = ((do_fracdepth &&  vFdepth(i,j)==0.0) || do_fracdepth==false);
-       //bool doitonce = (kk==k_up);
-       bool doitonce = (kk==0);
-       if (do_fracdepth && doitonce)
-         vFdepth(i,j) = 0.0;
-
-
-       tempFD=0;
-       //SSA: v . grad memField
-       if (doitonce){
-       tempFD += (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFD(i+1,j)-vFD(i,j):vFD(i,j)-vFD(i-1,j))/dx; 
-       tempFD += (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFD(i,j+1)-vFD(i,j):vFD(i,j)-vFD(i,j-1))/dy; 
-       vFDnew(i,j)-= tempFD * dt;
-       }
-       
-       //source
-       //van mises
-       PetscScalar T1 =0.5*(txx(i,j)+tyy(i,j))+sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
-       PetscScalar T2 =0.5*(txx(i,j)+tyy(i,j))-sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
-       PetscScalar sigmat=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
-       
-       //max shear stress
-       PetscScalar sspm=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
-       //if (j==100 && i==100){
-       //  ierr = verbPrintf(2,grid.com,"!!! max shear stress %.1f, von mises %.1f for  H=%.1f \n",sspm,sigmat,vH(i,j));    CHKERRQ(ierr);}
-  
-       //fracture density
-       if (sigmat > initThreshold) {
-          if (fractured)
-            vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-0.0)*dt*(1-vFDnew(i,j));       
-       //if (sigmat > initThreshold && vPrinStrain1(i,j)>3.0e-10) 
-          //vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-3.0e-10)*dt*(1-vFDnew(i,j));
-       //if (vPrinStrain1(i,j)>initThreshold) 
-          //vFDnew(i,j)+= gamma*(vPrinStrain1(i,j))*dt*(1-vFDnew(i,j)));
-       }
+      for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+        
+        //PetscInt ks = grid.kBelowHeight(vH(i,j));
+        PetscInt ks = static_cast<PetscInt>(floor(vH(i,j)/grid.dz_fine));
+        if (kk>ks) {
+          continue;
+        }
+        
+        bool fractured = ((do_fracdepth &&  vFdepth(i,j)==0.0) || do_fracdepth==false);
+        //bool doitonce = (kk==k_up);
+        bool doitonce = (kk==0);
+        if (do_fracdepth && doitonce)
+          vFdepth(i,j) = 0.0;
       
-       //healing
-       //if (vPrinStrain1(i,j) < healThreshold  && (do_fracdepth==false || (do_fracdepth && kk = k_up))) {
-       if (vPrinStrain1(i,j) < healThreshold  && doitonce) {
-           vFDnew(i,j)+= gammaheal*(vPrinStrain1(i,j)-healThreshold)*dt;//*(1-vFD(i,j)); 
-       }
-       //vFDnew(i,j)+= gammaheal*(-healThreshold)*dt;
-       
-       // write related fracture quantities to nc-file
-       // if option -write_fd_fields is set
-       if (write_fd && vH(i,j)>0.0) {
-         // fracture growth rate
-         if (sigmat > initThreshold) {
+      
+        tempFD=0;
+        //SSA: v . grad memField
+        if (doitonce){
+        tempFD += (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFD(i+1,j)-vFD(i,j):vFD(i,j)-vFD(i-1,j))/dx; 
+        tempFD += (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFD(i,j+1)-vFD(i,j):vFD(i,j)-vFD(i,j-1))/dy; 
+        vFDnew(i,j)-= tempFD * dt;
+        }
+        
+        //source
+        //van mises
+        PetscScalar T1 =0.5*(txx(i,j)+tyy(i,j))+sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
+        PetscScalar T2 =0.5*(txx(i,j)+tyy(i,j))-sqrt(0.25*PetscSqr(txx(i,j)-tyy(i,j))+PetscSqr(txy(i,j)));//Pa
+        PetscScalar sigmat=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
+        
+        //max shear stress
+        PetscScalar sspm=sqrt(PetscSqr(T1)+PetscSqr(T2)-T1*T2);
+        //if (j==100 && i==100){
+        //  ierr = verbPrintf(2,grid.com,"!!! max shear stress %.1f, von mises %.1f for  H=%.1f \n",sspm,sigmat,vH(i,j));    CHKERRQ(ierr);}
+      
+        //fracture density
+        if (sigmat > initThreshold) {
            if (fractured)
-             vFG(i,j)=gamma*(vPrinStrain1(i,j)-0.0)*(1-vFDnew(i,j)); 
-         } else {
-           vFG(i,j)=0.0;}
-         
-         // fracture healing rate      
-         if (vPrinStrain1(i,j) < healThreshold){
-           if (doitonce)
-             vFH(i,j)=gammaheal*(vPrinStrain1(i,j)-healThreshold); 
-         } else {
-           vFH(i,j)=0.0;}
-         //vFH(i,j)=gammaheal*(-healThreshold);//}              
-    
-         //fracture age since fracturing occured
-         //if (sigmat <= initThreshold){// && (vFA(i+1,j)>0.0 || vFA(i-1,j)>0.0 || vFA(i,j+1)>0.0 || vFA(i,j-1)>0.0)) {
-         if (doitonce){
-           vFAnew(i,j) -= dt * (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFA(i+1,j)-vFA(i, j):vFA(i, j)-vFA(i-1, j))/dx; 
-           vFAnew(i,j) -= dt * (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFA(i,j+1)-vFA(i, j):vFA(i, j)-vFA(i, j-1))/dy;
-           vFAnew(i,j)+= dt/secpera;
-         }
-         if (sigmat > initThreshold) 
-           vFAnew(i,j) = 0.0;
-
-         // additional flow enhancement due to fracture softening
-         PetscScalar softening = soft_offset + soft_rate*vFDnew(i,j);        
-         if (vH(i,j)>0.0)
-           vFE(i,j)=1.0/pow(softening,1/3.0);
-         else
-           vFE(i,j)=0.0;
-       }  
-   
-       //boundary condition
-       if (dirichlet_bc) {
-         if (vBCMask.as_int(i,j) == 1){
-            if (vBCvel(i,j).u != 0.0 || vBCvel(i,j).v != 0.0)
-              vFDnew(i,j)=fdBoundaryValue;
-            vFAnew(i,j)=0.0;
-            vFG(i,j)=0.0;
-            vFH(i,j)=0.0;
-         }
-       }
-             
-       //bounding        
-       if (vFDnew(i,j)<0.0)
-         vFDnew(i,j)=0.0;
-       if (vFDnew(i,j)>1.0)
-          vFDnew(i,j)=1.0;
-             
-       if (vH(i,j)==0.0){
-         vFDnew(i,j)=0.0;
-         vFAnew(i,j)=0.0;
-         vFG(i,j)=0.0;
-         vFH(i,j)=0.0;
-       }
+             vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-0.0)*dt*(1-vFDnew(i,j));       
+        //if (sigmat > initThreshold && vPrinStrain1(i,j)>3.0e-10) 
+           //vFDnew(i,j)+= gamma*(vPrinStrain1(i,j)-3.0e-10)*dt*(1-vFDnew(i,j));
+        //if (vPrinStrain1(i,j)>initThreshold) 
+           //vFDnew(i,j)+= gamma*(vPrinStrain1(i,j))*dt*(1-vFDnew(i,j)));
+        }
        
-       //fracture depth  
-       if (sigmat > initThreshold && do_fracdepth && fractured)
-         vFdepth(i,j) = vH(i,j) - fzlev[kk];
- 
-     }
-   } 
- }
+        //healing
+        //if (vPrinStrain1(i,j) < healThreshold  && (do_fracdepth==false || (do_fracdepth && kk = k_up))) {
+        if (vPrinStrain1(i,j) < healThreshold  && doitonce) {
+            vFDnew(i,j)+= gammaheal*(vPrinStrain1(i,j)-healThreshold)*dt;//*(1-vFD(i,j)); 
+        }
+        //vFDnew(i,j)+= gammaheal*(-healThreshold)*dt;
+        
+        // write related fracture quantities to nc-file
+        // if option -write_fd_fields is set
+        if (write_fd && vH(i,j)>0.0) {
+          // fracture growth rate
+          if (sigmat > initThreshold) {
+            if (fractured)
+              vFG(i,j)=gamma*(vPrinStrain1(i,j)-0.0)*(1-vFDnew(i,j)); 
+          } else {
+            vFG(i,j)=0.0;}
+          
+          // fracture healing rate      
+          if (vPrinStrain1(i,j) < healThreshold){
+            if (doitonce)
+              vFH(i,j)=gammaheal*(vPrinStrain1(i,j)-healThreshold); 
+          } else {
+            vFH(i,j)=0.0;}
+          //vFH(i,j)=gammaheal*(-healThreshold);//}              
+      
+          //fracture age since fracturing occured
+          //if (sigmat <= initThreshold){// && (vFA(i+1,j)>0.0 || vFA(i-1,j)>0.0 || vFA(i,j+1)>0.0 || vFA(i,j-1)>0.0)) {
+          if (doitonce){
+            vFAnew(i,j) -= dt * (*vel_advective)(i,j).u * ((*vel_advective)(i,j).u<0 ? vFA(i+1,j)-vFA(i, j):vFA(i, j)-vFA(i-1, j))/dx; 
+            vFAnew(i,j) -= dt * (*vel_advective)(i,j).v * ((*vel_advective)(i,j).v<0 ? vFA(i,j+1)-vFA(i, j):vFA(i, j)-vFA(i, j-1))/dy;
+            vFAnew(i,j)+= dt/secpera;
+          }
+          if (sigmat > initThreshold) 
+            vFAnew(i,j) = 0.0;
+      
+          // additional flow enhancement due to fracture softening
+          PetscScalar softening = soft_offset + soft_rate*vFDnew(i,j);        
+          if (vH(i,j)>0.0)
+            vFE(i,j)=1.0/pow(softening,1/3.0);
+          else
+            vFE(i,j)=0.0;
+        }  
+      
+        //boundary condition  
+        if (dirichlet_bc && !do_fracground) {
+          if (vBCMask.as_int(i,j) == 1){
+             if (vBCvel(i,j).u != 0.0 || vBCvel(i,j).v != 0.0)
+               vFDnew(i,j)=fdBoundaryValue;
+               vFAnew(i,j)=0.0;
+               vFG(i,j)=0.0;
+               vFH(i,j)=0.0;
+          }
+        }  
+       
+        //bounding        
+        if (vFDnew(i,j)<0.0)
+          vFDnew(i,j)=0.0;
+        if (vFDnew(i,j)>1.0)
+           vFDnew(i,j)=1.0;
+              
+        //if (vH(i,j)==0.0){
+        if (vH(i,j)==0.0 || i==0 || j==0 || i==Mx || j==My){
+          vFDnew(i,j)=0.0;
+          vFAnew(i,j)=0.0;
+          vFG(i,j)=0.0;
+          vFH(i,j)=0.0;
+        }
+        
+        //fracture depth  
+        if (sigmat > initThreshold && do_fracdepth && fractured)
+          vFdepth(i,j) = vH(i,j) - fzlev[kk];
+      
+      }
+     } 
+   }
     
     ierr = vel_advective->end_access(); CHKERRQ(ierr);
     ierr = vH.end_access(); CHKERRQ(ierr);
