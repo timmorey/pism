@@ -64,6 +64,12 @@ netcdf pism_config {
     pism_config:do_fracture_density = "no";
     pism_config:do_fracture_density_doc = "Calculation of fracture density according to stresses and strain rate field.";
 
+    pism_config:do_frac_at_depth = "no";
+    pism_config:do_frac_at_depth_doc = "Calculation of fracture density according to stresses and strain rate field at depth.";
+
+    pism_config:do_frac_on_grounded = "no";
+    pism_config:do_frac_on_grounded_doc = "Calculation of fracture density on grounded portions.";
+
     pism_config:write_fd_fields = "no";
     pism_config:write_fd_fields_doc = "Writing of fracture density related fields to nc-file.";
 

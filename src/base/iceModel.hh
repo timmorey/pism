@@ -225,6 +225,7 @@ protected:
 				vFH,		//!< fracture healing rate
 				vFE,		//!< fracture flow enhancement
 				vFA,		//!< fracture age
+				vFdepth,//!< fracture depth
 				txx,   //!< deviatoric stress component xx
     		tyy,   //!< deviatoric stress component yy
     		txy,   //!< deviatoric shear stress component xy      

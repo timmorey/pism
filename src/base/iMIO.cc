@@ -335,6 +335,16 @@ PetscErrorCode IceModel::write_model_state(string filename) {
                         CHKERRQ(ierr);
       output_vars.insert("liqfrac");
     }
+    
+    bool write_fd;
+    ierr = PISMOptionsIsSet("-write_fd_fields", write_fd); CHKERRQ(ierr);
+    if (write_fd ) {
+      ierr = verbPrintf(4, grid.com,
+                        "  writing principal strain rates ...\n");
+                        CHKERRQ(ierr);
+      output_vars.insert("edot_1");
+      output_vars.insert("edot_2");
+    }
   }
 
   // if user wants it, give it to them (ignor -o_size, except "none")

@@ -234,14 +234,20 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
             if (M.ice_free(M_w)) aMM = 0;
             if (M.ice_free(M_n)) bPP = 0;
             if (M.ice_free(M_s)) bMM = 0;
+            
+            if ((aPP==0 || aMM==0)&&(j==50)){
+            ierr = verbPrintf(1,grid.com, "\n!!!: RHS:app=%d and amm=%d at %d, %d \n\n",aPP,aMM,i,j); CHKERRQ(ierr);}
+            
           }
 
           double ice_pressure = ice_rho * standard_gravity * H_ij,
                        H_ij2        = H_ij*H_ij;
           double ocean_pressure,
                  h_ij = 0.0,
-                 tdx  = taud(i,j).u,
-                 tdy  = taud(i,j).v;
+                 tdx  = 0.0,
+                 tdy  = 0.0;
+                 //tdx  = taud(i,j).u,
+                 //tdy  = taud(i,j).v;
 
           if ((*bed)(i,j) < (sea_level - (ice_rho / ocean_rho) * H_ij)) {
             //calving front boundary condition for floating shelf
@@ -327,8 +333,11 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // Note that if the current cell is "marginal" but not a CFBC
           // location, the following two lines are equaivalent to the "usual
           // case" below.
-          rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
-          rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;   
+          rhs_uv[i][j].u = +tdx - (aMM - aPP)*ocean_pressure / dx;
+          rhs_uv[i][j].v = +tdy - (bMM - bPP)*ocean_pressure / dy;   
+          
+          //if (j==50 ){
+          //ierr = verbPrintf(1,grid.com, "\n!!!: RHS: tdx %.3e and tstat %.3e and rhsx %.3e for app=%d and amm=%d at %d, %d \n\n",tdx,(aPP - aMM)*ocean_pressure/dx,rhs_uv[i][j].u,aPP,aMM,i,j); CHKERRQ(ierr);}
 
           continue;
         } // end of "if (is_marginal(i, j))"
@@ -499,29 +508,61 @@ PetscErrorCode SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
       PetscScalar c_n = nuH(i,j,1);
 
       if (nuBedrockSet){
-       // if option is set, the viscosity at ice-bedrock boundary layer will
-       // be prescribed and is a temperature-independent free (user determined) parameter
+        // if option is set, the viscosity at ice-bedrock boundary layer will
+        // be prescribed and is a temperature-independent free (user determined) parameter
 
-	// direct neighbors
-	PetscInt  M_e = mask->as_int(i + 1,j),
-	          M_w = mask->as_int(i - 1,j),
-	          M_n = mask->as_int(i,j + 1),
-		  M_s = mask->as_int(i,j - 1);
+        // direct neighbors
+        PetscInt  M_e = mask->as_int(i + 1,j),
+                 M_w = mask->as_int(i - 1,j),
+                 M_n = mask->as_int(i,j + 1),
+                M_s = mask->as_int(i,j - 1);
 
-        if ((*thickness)(i,j) > HminFrozen) {  
-	  if ((*bed)(i-1,j) > (*surface)(i,j) && M.ice_free_land(M_w)) {
-	    c_w = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i-1,j));	    
-	  }
-	  if ((*bed)(i+1,j) > (*surface)(i,j) && M.ice_free_land(M_e)) {
-	   c_e = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i+1,j));
-	  }
-	  if ((*bed)(i,j+1) > (*surface)(i,j) && M.ice_free_land(M_n)) {
-	    c_n = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i,j+1));
-  	  }
-	  if ((*bed)(i,j-1) > (*surface)(i,j) && M.ice_free_land(M_s)) {
-	    c_s = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i+1,j));
-	  }
-        }
+        // if ((*thickness)(i,j) > HminFrozen) {  
+        //    if ((*bed)(i-1,j) > (*surface)(i,j) && M.ice_free_land(M_w)) {
+        //      c_w = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i-1,j));     
+        //    }
+        //    if ((*bed)(i+1,j) > (*surface)(i,j) && M.ice_free_land(M_e)) {
+        //      c_e = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i+1,j));
+        //    }
+        //    if ((*bed)(i,j+1) > (*surface)(i,j) && M.ice_free_land(M_n)) {
+        //      c_n = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i,j+1));
+        //    }
+        //    if ((*bed)(i,j-1) > (*surface)(i,j) && M.ice_free_land(M_s)) {
+        //      c_s = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i+1,j));
+        //    }
+        //  }
+         
+         // if ((*bed)(i-1,j) > (*surface)(i,j)){
+         //   c_w = nuBedrock * 0.5 * (*thickness)(i,j);     
+         // }
+         // if ((*bed)(i+1,j) > (*surface)(i,j)){
+         //   c_e = nuBedrock * 0.5 * (*thickness)(i,j);
+         // }
+         // if ((*bed)(i,j+1) > (*surface)(i,j)){
+         //   c_n = nuBedrock * 0.5  * (*thickness)(i,j);
+         // }
+         // if ((*bed)(i,j-1) > (*surface)(i,j)){
+         //   c_s = nuBedrock * 0.5 * (*thickness)(i,j);
+         // }
+         
+         if ((*thickness)(i,j) > HminFrozen && bc_locations) {
+            if (bc_locations->as_int(i-1,j) == 1) {
+               c_w = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i-1,j)); 
+               //ierr = verbPrintf(1,grid.com,"\n !!! nu bedrock south at %d %d \n", i,j); CHKERRQ(ierr);    
+            }
+            if (bc_locations->as_int(i+1,j) == 1) {
+              c_e = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i+1,j));
+              //ierr = verbPrintf(1,grid.com,"\n !!! nu bedrock north at %d %d \n", i,j); CHKERRQ(ierr);   
+            }
+            if (bc_locations->as_int(i,j+1) == 1) {
+              c_n = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i,j+1));
+              //ierr = verbPrintf(1,grid.com,"\n !!! nu bedrock east at %d %d \n", i,j); CHKERRQ(ierr); 
+            }
+            if (bc_locations->as_int(i,j-1) == 1) {
+              c_s = nuBedrock * 0.5 * ((*thickness)(i,j)+(*thickness)(i+1,j));
+              //ierr = verbPrintf(1,grid.com,"\n !!! nu bedrock west at %d %d \n", i,j); CHKERRQ(ierr); 
+            }
+         }   
       }
 
       // We use DAGetMatrix to obtain the SSA matrix, which means that all 18
