@@ -316,8 +316,8 @@ PetscErrorCode IceModel::createVecs() {
       ierr = vFA.create(grid, "fracture_age", true, WIDE_STENCIL); CHKERRQ(ierr); 
       ierr = vFA.set_attrs("model_state", "age since fracturing",	"yrs", ""); CHKERRQ(ierr);
       ierr = variables.add(vFA); CHKERRQ(ierr);
-
     }
+    
     if (config.get_flag("do_frac_at_depth")) {
       ierr = vFdepth.create(grid, "fracture_depth", true, WIDE_STENCIL); CHKERRQ(ierr); 
       ierr = vFdepth.set_attrs("model_state", "fracture depth",	"m", ""); CHKERRQ(ierr);

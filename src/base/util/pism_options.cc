@@ -665,6 +665,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("fractures", "do_fracture_density"); CHKERRQ(ierr);
   ierr = config.flag_from_option("write_fd_fields", "write_fd_fields"); CHKERRQ(ierr);
   ierr = config.flag_from_option("frac_at_depth", "do_frac_at_depth"); CHKERRQ(ierr);
+  ierr = config.flag_from_option("frac_depth_ratio", "do_frac_depth_ratio"); CHKERRQ(ierr);
   ierr = config.flag_from_option("frac_on_grounded", "do_frac_on_grounded"); CHKERRQ(ierr);
   
   ierr = config.flag_from_option("rift", "do_rift"); CHKERRQ(ierr);
