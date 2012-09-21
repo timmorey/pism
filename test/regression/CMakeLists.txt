@@ -18,6 +18,9 @@ macro(pism_python_test name script)
   add_test("${name}:${script}" ${PISM_TEST_DIR}/${script} ${PROJECT_BINARY_DIR} ${MPIEXEC} ${PROJECT_SOURCE_DIR} -python ${PYTHON_EXECUTABLE})
 endmacro()
 
+add_custom_target(test_base
+  ${CMAKE_MAKE_PROGRAM} -C${CMAKE_CURRENT_BINARY_DIR} test)
+
 # Tests themselves:
 pism_test (pism_testing_tools test_00.sh)
 
@@ -106,25 +109,4 @@ if(Pism_BUILD_PYTHON_BINDINGS)
 
         pism_python_test (verif_SSAFEM_regress_plug_flow_py ssa/ssafem_test_plug.sh)
 
-        execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import siple"
-          RESULT_VARIABLE IMPORT_SIPLE_ERRCODE
-          OUTPUT_QUIET ERROR_QUIET)
-
-        if (${IMPORT_SIPLE_ERRCODE} EQUAL 0) # siple is installed
-
-          message (STATUS "Enabling regression tests that use siple")
-
-          # copy the scripts the next test needs:
-          foreach (FILE
-              ${PROJECT_SOURCE_DIR}/examples/inverse/make_synth_ssa.py
-              ${PROJECT_SOURCE_DIR}/examples/inverse/vel2tauc.py
-              ${PROJECT_SOURCE_DIR}/examples/inverse/verify_ssa_inv.py
-              inverse/build_tiny.py)
-            get_filename_component(OUTPUT ${FILE} NAME)
-            configure_file (${FILE} ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT} COPYONLY)
-          endforeach()
-
-          pism_python_test (simple_inversion_test inverse/test_tiny.sh)
-
-        endif()
 endif()
