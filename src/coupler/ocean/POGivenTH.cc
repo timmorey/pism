@@ -396,7 +396,7 @@ PetscErrorCode POGivenTH::pttmpr(PetscReal salz,PetscReal temp_insitu,PetscReal 
   return 0;
 }
 
-PetscErrorCode POMeltingParam3eqn::potit(PetscReal salz,PetscReal thetao,PetscReal pres,PetscReal rfpres, PetscReal &temp_insitu_out){
+PetscErrorCode POGivenTH::potit(PetscReal salz,PetscReal thetao,PetscReal pres,PetscReal rfpres, PetscReal &temp_insitu_out){
   // *********************************************************************
   // Berechnet aus dem Salzgehalt[psu] (SALZ), der pot. Temperatur[oC]
   // (PT) und dem Referenzdruck[dbar] (REFPRES) die in-situ Temperatur
