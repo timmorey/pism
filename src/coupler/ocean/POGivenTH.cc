@@ -171,12 +171,13 @@ PetscErrorCode POGivenTH::shelf_base_mass_flux(IceModelVec2S &result) {
       temp_base = temp_boundlayer(i,j) - 273.15; // to degC
 
       compute_meltrate_3eqn(rhow, rhoi, temp_base, sal_base, sal_ocean, meltrate_3eqn);
-      result(i,j) = -1.0*meltrate_3eqn;
+      result(i,j) = -1.0*meltrate_3eqn;    
 //       ierr = verbPrintf(2, grid.com, "meltrate=%e at i=%d,j=%d\n",
 //                         meltrate_3eqn,i,j); CHKERRQ(ierr);
 
     }
   }
+  ierr = mass_flux.copy_to(result); CHKERRQ(ierr);
 
   ierr = result.end_access(); CHKERRQ(ierr);
   ierr = mass_flux.end_access(); CHKERRQ(ierr); //NOTE salinity instead of mass_flux
