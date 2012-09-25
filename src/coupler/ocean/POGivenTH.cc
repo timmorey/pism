@@ -69,19 +69,19 @@ PetscErrorCode POGivenTH::update(PetscReal my_t, PetscReal my_dt) {
 
 //NOTE Ported from Matthias 
 //NOTE is this needed?
-PetscErrorCode POGivenTH::update(PetscReal t_years, PetscReal dt_years) {
-  PetscErrorCode ierr = update_internal(t_years, dt_years); CHKERRQ(ierr);
+//PetscErrorCode POGivenTH::update(PetscReal t_years, PetscReal dt_years) {
+//  PetscErrorCode ierr = update_internal(t_years, dt_years); CHKERRQ(ierr);
+//
+//  if (enable_time_averaging) {
+//    ierr = mass_flux.average(t, dt); CHKERRQ(ierr);
+//    ierr = temp.average(t, dt); CHKERRQ(ierr);
+//  } else {
+//    ierr = mass_flux.get_record_years(t); CHKERRQ(ierr);
+//    ierr = temp.get_record_years(t); CHKERRQ(ierr);
+//  }
 
-  if (enable_time_averaging) {
-    ierr = mass_flux.average(t, dt); CHKERRQ(ierr);
-    ierr = temp.average(t, dt); CHKERRQ(ierr);
-  } else {
-    ierr = mass_flux.get_record_years(t); CHKERRQ(ierr);
-    ierr = temp.get_record_years(t); CHKERRQ(ierr);
-  }
-
-  return 0;
-}
+//  return 0;
+//}
 
 //NOTE Ported from Matthias
 PetscErrorCode POGivenTH::shelf_base_temperature(IceModelVec2S &result) {
