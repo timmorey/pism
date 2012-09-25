@@ -711,3 +711,9 @@ work_month		P work_year/12
 
 gp			S geopotential
 dynamic			S geopotential
+
+# NOTE: included
+#
+# SALINITY
+#
+psu                     S 0.001                 # exact 
