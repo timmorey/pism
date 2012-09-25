@@ -89,10 +89,9 @@ PetscErrorCode POGivenTH::update(PetscReal my_t, PetscReal my_dt) {
 //NOTE Ported from Matthias
 PetscErrorCode POGivenTH::shelf_base_temperature(IceModelVec2S &result) {
   // PetscErrorCode ierr = temp.copy_to(result); CHKERRQ(ierr);
-  PetscErrorCode ierr;
-  ierr = verbPrintf(2, grid.com,
+  PetscErrorCode ierr = verbPrintf(2, grid.com,
                     "shelf_base_temperature\n"); CHKERRQ(ierr);      
-  PetscErrorCode ierr = calculate_boundlayer_temp_and_salt(); CHKERRQ(ierr);
+                 ierr = calculate_boundlayer_temp_and_salt(); CHKERRQ(ierr);
                  ierr = temp_boundlayer.copy_to(result); CHKERRQ(ierr);
   return 0;
 }
@@ -211,7 +210,7 @@ PetscErrorCode POGivenTH::shelf_base_temp_salinity_3eqn( PetscReal sal_ocean,
   // and adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
   // adapted for PISM by matthias.mengel@pik-potsdam.de
 
-  PetscErrorCode ierr;
+  //PetscErrorCode ierr;
   PetscReal rhor, heat_flux, water_flux;
   PetscReal gats1, gats2, gas, gat;
   PetscReal ep1,ep2,ep3,ep4,ep5;
@@ -303,7 +302,7 @@ PetscErrorCode POGivenTH::compute_meltrate_3eqn( PetscReal rhow, PetscReal rhoi,
   // and adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
   // adapted for PISM by matthias.mengel@pik-potsdam.de
   
-  PetscErrorCode ierr;
+  //PetscErrorCode ierr;
   PetscReal rhor, heat_flux, water_flux;
   PetscReal gas, gat;
   PetscReal ep5;
@@ -376,6 +375,7 @@ PetscErrorCode POGivenTH::adlprt(PetscReal salz,PetscReal temp_insitu, PetscReal
 
 PetscErrorCode POGivenTH::pttmpr(PetscReal salz,PetscReal temp_insitu,PetscReal pres,PetscReal rfpres,
                                           PetscReal& thetao){
+  PetscErrorCode ierr;
   ierr = verbPrintf(2, grid.com,
                     "pttmpr()\n"); CHKERRQ(ierr);        
 // Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
@@ -421,6 +421,7 @@ PetscErrorCode POGivenTH::pttmpr(PetscReal salz,PetscReal temp_insitu,PetscReal 
 }
 
 PetscErrorCode POGivenTH::potit(PetscReal salz,PetscReal thetao,PetscReal pres,PetscReal rfpres, PetscReal &temp_insitu_out){
+  PetscErrorCode ierr;
   ierr = verbPrintf(2, grid.com,
                     "potit()\n"); CHKERRQ(ierr);        
   // *********************************************************************
