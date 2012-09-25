@@ -19,7 +19,7 @@
 #ifndef _PODIRECTFORCING_H_
 #define _PODIRECTFORCING_H_
 
-#include "POClimate.hh"
+#include "PGivenClimate.hh"
 #include "POModifier.hh"
 
 class POGivenTH : public PGivenClimate<POModifier,PISMOceanModel>
