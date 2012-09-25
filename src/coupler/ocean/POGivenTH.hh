@@ -26,7 +26,9 @@ class POGivenTH : public PGivenClimate<POModifier,PISMOceanModel>
 {
 public:
   POGivenTH(IceGrid &g, const NCConfigVariable &conf)
-    : PGivenClimate<POModifier,PISMOceanModel>(g, conf, NULL)
+    : PGivenClimate<POModifier,PISMOceanModel>(g, conf)
+//  POGivenTH(IceGrid &g, const NCConfigVariable &conf)
+//    : PGivenClimate<POModifier,PISMOceanModel>(g, conf, NULL)
   {
     temp_name       = "thetao";
     mass_flux_name  = "salinity"; //NOTE: salinity_name instead of mass_flux_name
