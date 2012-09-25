@@ -27,12 +27,21 @@ PetscErrorCode POGivenTH::init(PISMVars &) {
                     "reading ocean temperature and mass_flux from a file...\n"); CHKERRQ(ierr);
 
   ierr = process_options(); CHKERRQ(ierr);
+  
+  ierr = verbPrintf(2, grid.com,
+                    "PEEP0\n"); CHKERRQ(ierr);
 
   ierr = set_vec_parameters("", ""); CHKERRQ(ierr);
+  
+  ierr = verbPrintf(2, grid.com,
+                    "PEEP1\n"); CHKERRQ(ierr);  
 
   ierr = temp.create(grid, temp_name, false); CHKERRQ(ierr);
   ierr = mass_flux.create(grid, mass_flux_name, false); CHKERRQ(ierr); //NOTE: salinity instead of mass_flux
   
+  ierr = verbPrintf(2, grid.com,
+                    "PEEP2\n"); CHKERRQ(ierr);
+                    
   ierr = salinity_boundlayer.create(grid, "salt_bl", false); CHKERRQ(ierr);
   ierr = temp_boundlayer.create(grid, "temp_bl", false); CHKERRQ(ierr);
 
