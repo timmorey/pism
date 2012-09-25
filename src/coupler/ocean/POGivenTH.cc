@@ -47,7 +47,7 @@ PetscErrorCode POGivenTH::init(PISMVars &) {
   ierr = mass_flux.init(filename); CHKERRQ(ierr);
   
   ice_thickness = dynamic_cast<IceModelVec2S*>(vars.get("land_ice_thickness")); //NOTE: Is getting the ice thickness
-  if (!ice_thickness) { SETERRQ(1, "ERROR: ice thickness is not available"); }  //that way ok?
+  if (!ice_thickness) {SETERRQ(grid.com, 1, "ERROR: ice thickness is not available");} //that way ok?
 
   // read time-independent data right away:
   if (temp.get_n_records() == 1 && mass_flux.get_n_records() == 1) {
@@ -424,7 +424,7 @@ PetscErrorCode POGivenTH::potit(PetscReal salz,PetscReal thetao,PetscReal pres,P
     }else{
       epsi = epsi-ptd;
     }
-    if(iter==100){ SETERRQ(1, "in situ temperature calculation not converging."); }
+    if(iter==100){ SETERRQ(grid.com, 1, "in situ temperature calculation not converging."); }
   }
   
   temp_insitu_out = tin;
