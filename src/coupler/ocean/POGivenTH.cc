@@ -89,6 +89,7 @@ PetscErrorCode POGivenTH::update(PetscReal my_t, PetscReal my_dt) {
 //NOTE Ported from Matthias
 PetscErrorCode POGivenTH::shelf_base_temperature(IceModelVec2S &result) {
   // PetscErrorCode ierr = temp.copy_to(result); CHKERRQ(ierr);
+  PetscErrorCode ierr;
   ierr = verbPrintf(2, grid.com,
                     "shelf_base_temperature\n"); CHKERRQ(ierr);      
   PetscErrorCode ierr = calculate_boundlayer_temp_and_salt(); CHKERRQ(ierr);
@@ -200,6 +201,7 @@ PetscErrorCode POGivenTH::shelf_base_mass_flux(IceModelVec2S &result) {
 PetscErrorCode POGivenTH::shelf_base_temp_salinity_3eqn( PetscReal sal_ocean,
                PetscReal temp_insitu, PetscReal zice, PetscReal &temp_base,
                PetscReal &sal_base){
+  PetscErrorCode ierr;
   ierr = verbPrintf(2, grid.com,
                     "shelf_base_temp_salinity_3eqn()\n"); CHKERRQ(ierr); 
 
@@ -292,6 +294,7 @@ sal_base  = sf;
 PetscErrorCode POGivenTH::compute_meltrate_3eqn( PetscReal rhow, PetscReal rhoi,
                     PetscReal temp_base, PetscReal sal_base,
                     PetscReal sal_ocean, PetscReal &meltrate){
+  PetscErrorCode ierr;
   ierr = verbPrintf(2, grid.com,
                     "compute_meltrate_3eqn()\n"); CHKERRQ(ierr);     
 
@@ -344,6 +347,7 @@ PetscErrorCode POGivenTH::compute_meltrate_3eqn( PetscReal rhow, PetscReal rhoi,
 
 //FIXME: Is this class really needed???
 PetscErrorCode POGivenTH::adlprt(PetscReal salz,PetscReal temp_insitu, PetscReal pres, PetscReal &adlprt_out){
+  PetscErrorCode ierr;
   ierr = verbPrintf(2, grid.com,
                     "adlprt()\n"); CHKERRQ(ierr);         
 // Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
