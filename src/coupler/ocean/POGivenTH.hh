@@ -26,7 +26,7 @@ class POGivenTH : public PGivenClimate<POModifier,PISMOceanModel>
 {
 public:
   POGivenTH(IceGrid &g, const NCConfigVariable &conf)
-    : PGivenClimate<POModifier,PISMOceanModel>(g, conf)
+    : PGivenClimate<POModifier,PISMOceanModel>(g, conf, NULL)
 //  POGivenTH(IceGrid &g, const NCConfigVariable &conf)
 //    : PGivenClimate<POModifier,PISMOceanModel>(g, conf, NULL)
   {
