@@ -177,7 +177,7 @@ PetscErrorCode POGivenTH::shelf_base_mass_flux(IceModelVec2S &result) {
 
     }
   }
-  ierr = mass_flux.copy_to(result); CHKERRQ(ierr);
+//  ierr = mass_flux.copy_to(result); CHKERRQ(ierr);
 
   ierr = result.end_access(); CHKERRQ(ierr);
   ierr = mass_flux.end_access(); CHKERRQ(ierr); //NOTE salinity instead of mass_flux

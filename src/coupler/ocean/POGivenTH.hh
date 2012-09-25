@@ -16,8 +16,8 @@
 // along with PISM; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-#ifndef _PODIRECTFORCING_H_
-#define _PODIRECTFORCING_H_
+#ifndef _POGIVENTH_H_
+#define _POGIVENTH_H_
 
 #include "PGivenClimate.hh"
 #include "POModifier.hh"
@@ -67,4 +67,4 @@ public:
     IceModelVec2S temp_boundlayer, salinity_boundlayer;  
 };
 
-#endif /* _PODIRECTFORCING_H_ */
+#endif /* _POGIVENTH_H_ */
