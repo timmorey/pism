@@ -46,9 +46,9 @@ PetscErrorCode POGivenTH::init(PISMVars &) {
   ierr = temp.init(filename); CHKERRQ(ierr);
   ierr = mass_flux.init(filename); CHKERRQ(ierr);
   
-  IceModelVec2S *ice_thickness;
-  ice_thickness = dynamic_cast<IceModelVec2S*>(variables.get("land_ice_thickness")); //NOTE: Is getting the ice thickness
-  if (!ice_thickness) {SETERRQ(grid.com, 1, "ERROR: ice thickness is not available");} //that way ok?
+//  IceModelVec2S *ice_thickness;
+//  ice_thickness = dynamic_cast<IceModelVec2S*>(variables.get("land_ice_thickness")); //NOTE: Is getting the ice thickness
+//  if (!ice_thickness) {SETERRQ(grid.com, 1, "ERROR: ice thickness is not available");} //that way ok?
 
   // read time-independent data right away:
   if (temp.get_n_records() == 1 && mass_flux.get_n_records() == 1) {
