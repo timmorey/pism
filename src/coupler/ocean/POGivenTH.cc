@@ -60,6 +60,9 @@ PetscErrorCode POGivenTH::init(PISMVars &) {
 
 PetscErrorCode POGivenTH::update(PetscReal my_t, PetscReal my_dt) {
   PetscErrorCode ierr = update_internal(my_t, my_dt); CHKERRQ(ierr);
+  
+  ierr = verbPrintf(2, grid.com,
+                    "UPDATE\n"); CHKERRQ(ierr);  
 
   ierr = mass_flux.at_time(t); CHKERRQ(ierr);
   ierr = temp.at_time(t); CHKERRQ(ierr);
@@ -86,6 +89,8 @@ PetscErrorCode POGivenTH::update(PetscReal my_t, PetscReal my_dt) {
 //NOTE Ported from Matthias
 PetscErrorCode POGivenTH::shelf_base_temperature(IceModelVec2S &result) {
   // PetscErrorCode ierr = temp.copy_to(result); CHKERRQ(ierr);
+  ierr = verbPrintf(2, grid.com,
+                    "shelf_base_temperature\n"); CHKERRQ(ierr);      
   PetscErrorCode ierr = calculate_boundlayer_temp_and_salt(); CHKERRQ(ierr);
                  ierr = temp_boundlayer.copy_to(result); CHKERRQ(ierr);
   return 0;
@@ -95,6 +100,8 @@ PetscErrorCode POGivenTH::shelf_base_temperature(IceModelVec2S &result) {
 PetscErrorCode POGivenTH::calculate_boundlayer_temp_and_salt() {
 
   PetscErrorCode ierr;
+  ierr = verbPrintf(2, grid.com,
+                    "calculate_boundlayer_temp_and_salt()\n"); CHKERRQ(ierr);     
 //   ierr = verbPrintf(2, grid.com, "POMeltingParam3eqn::calculate_base_temperature called.\n");
 //          CHKERRQ(ierr);
 
@@ -146,6 +153,8 @@ PetscErrorCode POGivenTH::calculate_boundlayer_temp_and_salt() {
 //NOTE Ported from Matthias
 PetscErrorCode POGivenTH::shelf_base_mass_flux(IceModelVec2S &result) {
   PetscErrorCode ierr;
+  ierr = verbPrintf(2, grid.com,
+                    "shelf_base_mass_flux()\n"); CHKERRQ(ierr); 
 
 //   ierr = verbPrintf(2, grid.com, "POMeltingParam3eqn::shelf_base_mass_flux called.\n");
 //          CHKERRQ(ierr);
@@ -191,6 +200,9 @@ PetscErrorCode POGivenTH::shelf_base_mass_flux(IceModelVec2S &result) {
 PetscErrorCode POGivenTH::shelf_base_temp_salinity_3eqn( PetscReal sal_ocean,
                PetscReal temp_insitu, PetscReal zice, PetscReal &temp_base,
                PetscReal &sal_base){
+  ierr = verbPrintf(2, grid.com,
+                    "shelf_base_temp_salinity_3eqn()\n"); CHKERRQ(ierr); 
+
 
   // The three-equation model of ice-shelf ocean interaction (Hellmer and Olbers, 1989).
   // Code derived from BRIOS subroutine iceshelf (which goes back to H.Hellmer's 2D ice shelf model code)
@@ -280,6 +292,8 @@ sal_base  = sf;
 PetscErrorCode POGivenTH::compute_meltrate_3eqn( PetscReal rhow, PetscReal rhoi,
                     PetscReal temp_base, PetscReal sal_base,
                     PetscReal sal_ocean, PetscReal &meltrate){
+  ierr = verbPrintf(2, grid.com,
+                    "compute_meltrate_3eqn()\n"); CHKERRQ(ierr);     
 
   // The three-equation model of ice-shelf ocean interaction (Hellmer and Olbers, 1989).
   // Code derived from BRIOS subroutine iceshelf (which goes back to H.Hellmer's 2D ice shelf model code)
@@ -330,6 +344,8 @@ PetscErrorCode POGivenTH::compute_meltrate_3eqn( PetscReal rhow, PetscReal rhoi,
 
 //FIXME: Is this class really needed???
 PetscErrorCode POGivenTH::adlprt(PetscReal salz,PetscReal temp_insitu, PetscReal pres, PetscReal &adlprt_out){
+  ierr = verbPrintf(2, grid.com,
+                    "adlprt()\n"); CHKERRQ(ierr);         
 // Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
 // (TEMP) und dem in-situ Druck/dbar (PRES) den adiabatischen Temperatur-
 // gradienten/(K Dbar^-1) ADLPRT.
@@ -356,6 +372,8 @@ PetscErrorCode POGivenTH::adlprt(PetscReal salz,PetscReal temp_insitu, PetscReal
 
 PetscErrorCode POGivenTH::pttmpr(PetscReal salz,PetscReal temp_insitu,PetscReal pres,PetscReal rfpres,
                                           PetscReal& thetao){
+  ierr = verbPrintf(2, grid.com,
+                    "pttmpr()\n"); CHKERRQ(ierr);        
 // Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
 // (TEMP) und dem in-situ Druck/dbar (PRES) die potentielle Temperatur/
 // degC (PTTMPR) bezogen auf den Referenzdruck/dbar (RFPRES). Es wird
@@ -399,6 +417,8 @@ PetscErrorCode POGivenTH::pttmpr(PetscReal salz,PetscReal temp_insitu,PetscReal 
 }
 
 PetscErrorCode POGivenTH::potit(PetscReal salz,PetscReal thetao,PetscReal pres,PetscReal rfpres, PetscReal &temp_insitu_out){
+  ierr = verbPrintf(2, grid.com,
+                    "potit()\n"); CHKERRQ(ierr);        
   // *********************************************************************
   // Berechnet aus dem Salzgehalt[psu] (SALZ), der pot. Temperatur[oC]
   // (PT) und dem Referenzdruck[dbar] (REFPRES) die in-situ Temperatur
