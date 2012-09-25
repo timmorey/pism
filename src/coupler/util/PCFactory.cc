@@ -132,7 +132,7 @@ static void create_po_pik(IceGrid& g, const NCConfigVariable& conf, PISMOceanMod
 }
 
 //NOTE included
-static void create_po_TH(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
+static void create_po_th(IceGrid& g, const NCConfigVariable& conf, PISMOceanModel* &result) {
   result = new POGivenTH(g, conf);
 }
 
@@ -152,7 +152,7 @@ void POFactory::add_standard_types() {
   add_model("constant", &create_po_constant);
   add_model("given",    &create_po_given);
   add_model("pik",      &create_po_pik);
-  add_model("TH",       &create_po_TH); //NOTE: included
+  add_model("th",       &create_po_th); //NOTE: included
   set_default("constant");
 
   add_modifier("delta_SL",  &create_po_delta_SL);
