@@ -32,7 +32,7 @@ public:
   {
     temp_name       = "thetao";
     mass_flux_name  = "salinity"; //NOTE: salinity_name instead of mass_flux_name
-    option_prefix   = "-ocean_bc_file";
+    option_prefix   = "-ocean_bc";
   }
 
   virtual ~POGivenTH() {}
