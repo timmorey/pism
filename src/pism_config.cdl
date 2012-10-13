@@ -58,6 +58,12 @@ netcdf pism_config {
     pism_config:part_grid = "no";
     pism_config:part_grid_doc = "apply partially filled grid cell scheme";
 
+    pism_config:part_grid_ground = "no";
+    pism_config:part_grid_ground_doc = "apply partially filled grid cell scheme for grounded margins";
+
+    pism_config:do_const_pgg_scaling = "no";
+    pism_config:do_const_pgg_scaling_doc = "simplest way to scale partial grounded cell height";
+
     pism_config:part_redist = "no";
     pism_config:part_redist_doc = "for partially filled grid cell scheme, redistribute residuals Hresidual";
 
@@ -268,8 +274,6 @@ netcdf pism_config {
 
     pism_config:nuBedrock = 5.0e15;
     pism_config:nuBedrock_doc = "Pa s; Staggered Viscosity used as side friction parameterization.";
- 
-
 
     // for next constants, note (VELOCITY/LENGTH)^2  is very close to 10^-27; compare "\epsilon^2/L^2" which
     // appears in formula (4.1) in C. Schoof 2006 "A variational approach to ice streams" J Fluid Mech 556 pp 227--251

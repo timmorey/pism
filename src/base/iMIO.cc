@@ -404,9 +404,55 @@ PetscErrorCode IceModel::initFromFile(string filename) {
     }
   }
 
+  // check if the input file has HrefGround; set its pism_intent to "diagnostic" and
+  // set the field itself to 0 if it is not present
+  if (config.get_flag("part_grid_ground")) {
+    bool exists;
+    ierr = nc.inq_var("HrefGround", exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: HrefGround for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename.c_str()); CHKERRQ(ierr);
+      ierr = vHrefGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vHrefGround.set(0.0); CHKERRQ(ierr);
+    }
+    ierr = nc.inq_var("HavgGround", exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: HavgGround for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename.c_str()); CHKERRQ(ierr);
+      ierr = vHavgGround.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vHavgGround.set(0.0); CHKERRQ(ierr);
+    }
+    ierr = nc.inq_var("PartGridCoeff", exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: PartGridCoeff for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename.c_str()); CHKERRQ(ierr);
+      ierr = vPartGridCoeff.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vPartGridCoeff.set(0.0); CHKERRQ(ierr);
+    }
+    ierr = nc.inq_var("JustGotFullCell", exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: JustGotFullCell for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename.c_str()); CHKERRQ(ierr);
+      ierr = vJustGotFullCell.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vJustGotFullCell.set(0.0); CHKERRQ(ierr);
+    }
+    ierr = nc.inq_var("TestVar", exists); CHKERRQ(ierr);
+    if (!exists) {
+      ierr = verbPrintf(2, grid.com,
+        "PISM WARNING: TestVar for -part_grid_ground not found in %s. Setting it to zero...\n",
+        filename.c_str()); CHKERRQ(ierr);
+      ierr = vTestVar.set_attr("pism_intent", "diagnostic"); CHKERRQ(ierr);
+      ierr = vTestVar.set(0.0); CHKERRQ(ierr);
+    }
+  }
+
   // Find the index of the last record in the file:
   unsigned int last_record;
-  ierr = nc.inq_nrecords(last_record); CHKERRQ(ierr); 
+  ierr = nc.inq_nrecords(last_record); CHKERRQ(ierr);
   last_record -= 1;
 
   // Read the model state, mapping and climate_steady variables:
@@ -487,6 +533,14 @@ PetscErrorCode IceModel::initFromFile(string filename) {
     ierr = vHref.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
   }
 
+  if (config.get_flag("part_grid_ground")) {
+    ierr = vHrefGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vHavgGround.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vTestVar.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+  }
+
   string history;
   ierr = nc.get_att_text("PISM_GLOBAL", "history", history); CHKERRQ(ierr);
   global_attributes.prepend_history(history);
@@ -561,10 +615,10 @@ PetscErrorCode IceModel::initFromFile(string filename) {
     }
 
     if (dimensions == 0) {
-      ierr = regrid_variables(filename, vars, 2); CHKERRQ(ierr); 
-      ierr = regrid_variables(filename, vars, 3); CHKERRQ(ierr); 
+      ierr = regrid_variables(filename, vars, 2); CHKERRQ(ierr);
+      ierr = regrid_variables(filename, vars, 3); CHKERRQ(ierr);
     } else {
-      ierr = regrid_variables(filename, vars, dimensions); CHKERRQ(ierr); 
+      ierr = regrid_variables(filename, vars, dimensions); CHKERRQ(ierr);
     }
 
     return 0;

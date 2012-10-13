@@ -9,4 +9,5 @@ build/
 out.*
 examples/**/*.png
 examples/**/*.zip
-
+bin/
+lib/

@@ -255,7 +255,6 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
 	    //    (bPP==0 && (*bed)(i,j+1)>h_ij) || (bMM==0 && (*bed)(i,j-1)>h_ij)){
 	    //  ocean_pressure = 0.0; 
 	    //}
-
           } else {
             if( (*bed)(i,j) >= sea_level) {
               // boundary condition for a "cliff" (grounded ice next to
@@ -287,7 +286,6 @@ PetscErrorCode SSAFD::assemble_rhs(Vec rhs) {
           // case" below.
           rhs_uv[i][j].u = tdx - (aMM - aPP)*ocean_pressure / dx;
           rhs_uv[i][j].v = tdy - (bMM - bPP)*ocean_pressure / dy;
-
           continue;
         } // end of "if (is_marginal(i, j))"
 
@@ -778,7 +776,7 @@ PetscErrorCode SSAFD::solve() {
               "  writing linear system to PETSc binary file %s ...\n",filename);
               CHKERRQ(ierr);
           PetscViewer    viewer;
-          ierr = PetscViewerBinaryOpen(grid.com, filename, FILE_MODE_WRITE, 
+          ierr = PetscViewerBinaryOpen(grid.com, filename, FILE_MODE_WRITE,
                                        &viewer); CHKERRQ(ierr);
           ierr = MatView(A,viewer); CHKERRQ(ierr);
           ierr = VecView(SSARHS,viewer); CHKERRQ(ierr);
@@ -1242,7 +1240,7 @@ PetscErrorCode SSAFD::set_diagonal_matrix_entry(Mat A, int i, int j,
  * consistent.
  */
 bool SSAFD::is_marginal(int i, int j, bool ssa_dirichlet_bc) {
-	
+
   const PetscInt M_ij = mask->as_int(i,j),
     // direct neighbors
     M_e = mask->as_int(i + 1,j),

@@ -37,7 +37,7 @@ using namespace std;
    1      -verbose 1    less verbose than default: thresh must be 1 to print
    2      -verbose 2    DEFAULT
    3      -verbose 3    somewhat verbose
-          -verbose      same as "-verbose 3" 
+          -verbose      same as "-verbose 3"
    4      -verbose 4    fairly verbose
    5      -verbose 5    very verbose: print everything
 \endverbatim
@@ -47,8 +47,8 @@ PetscErrorCode verbosityLevelFromOptions() {
   PetscErrorCode ierr;
   PetscInt       myLevel;
   PetscBool     verbose, levelSet;
-  
-  ierr = setVerbosityLevel(2);  
+
+  ierr = setVerbosityLevel(2);
   ierr = PetscOptionsGetInt(PETSC_NULL, "-verbose", &myLevel, &levelSet); CHKERRQ(ierr);
   if (levelSet == PETSC_TRUE) {
     ierr = setVerbosityLevel(myLevel);
@@ -140,7 +140,7 @@ PetscErrorCode just_show_usage(
       "       http://www.pism-docs.org/doxy/html/index.html\n"
       "  3. view issues/bugs at source host: https://github.com/pism/pism/issues\n"
       "  4. do '%s -help | grep foo' to see PISM and PETSc options with 'foo'.\n"
-      "  5. email for help:  help@pism-docs.org\n", 
+      "  5. email for help:  help@pism-docs.org\n",
       execname,execname);  CHKERRQ(ierr);
   return 0;
 }
@@ -190,7 +190,7 @@ PetscErrorCode show_usage_check_req_opts(
     ierr = verbPrintf(1,com,"\n"); CHKERRQ(ierr);
     ierr = show_usage_and_quit(com, execname, usage); CHKERRQ(ierr);
   }
-     
+
   // show usage message with -help, but don't fail
   bool helpSet = false;
   ierr = PISMOptionsIsSet("-help", helpSet); CHKERRQ(ierr);
@@ -202,7 +202,7 @@ PetscErrorCode show_usage_check_req_opts(
 }
 
 
-/* 
+/*
    note on pass-by-reference for options: For the last argument "flag" to
    PetscOptionsXXXX(....,&flag), the flag always indicates whether the option
    has been set. Therefore "flag" is altered by this function call. For other
@@ -431,7 +431,7 @@ PetscErrorCode PISMOptionsRealArray(string option, string text,
 	result.push_back(d);
     }
   }
-  
+
   return 0;
 }
 
@@ -506,7 +506,7 @@ PetscErrorCode init_config(MPI_Comm com, PetscMPIInt rank,
   string alt_config = PISM_DefaultConfigFile,
     override_config;
   bool use_alt_config, use_override_config;
-  
+
   ierr = PetscOptionsBegin(com, "", "PISM config file options", ""); CHKERRQ(ierr);
   {
     ierr = PISMOptionsString("-config", "Specifies the name of an alternative config file",
@@ -612,7 +612,6 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   ierr = config.scalar_from_option("brutal_sliding_scale","sliding_scale_brutal"); CHKERRQ(ierr); 
  
-
   // Basal strength
 
   // plastic_till_c_0 is a parameter in the computation of the till yield stress tau_c
@@ -655,10 +654,12 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   ierr = config.flag_from_option("part_redist", "part_redist"); CHKERRQ(ierr);
 
+  ierr = config.flag_from_option("part_grid_ground", "part_grid_ground"); CHKERRQ(ierr);
+  ierr = config.flag_from_option("const_pgg_scaling", "do_const_pgg_scaling"); CHKERRQ(ierr);
+
   ierr = config.scalar_from_option("nuBedrock", "nuBedrock"); CHKERRQ(ierr);
   ierr = PISMOptionsIsSet("-nuBedrock", flag);  CHKERRQ(ierr);
   if (flag)  config.set_flag("nuBedrockSet", true);
-
 
   // Calving
 
@@ -717,7 +718,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   if (config.get_flag("kill_icebergs")) {
     config.set_flag("part_grid", true);
   }
-  
+
   ierr = PISMOptionsIsSet("-ssa_floating_only", flag);  CHKERRQ(ierr);
   if (flag) {
     config.set_flag("use_ssa_velocity", true);

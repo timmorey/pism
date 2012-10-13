@@ -51,6 +51,10 @@ PetscErrorCode IceModel::updateSurfaceElevationAndMask() {
     ierr = killIceBergs(); CHKERRQ(ierr);
   }
 
+  if (config.get_flag("part_grid_ground")) {
+    ierr = killLonelyPGGCells(); CHKERRQ(ierr);
+  }
+
   return 0;
 }
 
@@ -249,6 +253,11 @@ PetscErrorCode IceModel::massContExplicitStep() {
     ierr = ocean->shelf_base_mass_flux(shelfbmassflux); CHKERRQ(ierr);
   } else { SETERRQ(grid.com, 2, "PISM ERROR: ocean == NULL"); }
 
+  PetscReal ice_rho   = config.get("ice_density"),
+        ocean_rho = config.get("sea_water_density"),
+        rhoq      = ice_rho/ocean_rho;
+
+
   IceModelVec2S vHnew = vWork2d[0];
   ierr = vH.copy_to(vHnew); CHKERRQ(ierr);
 
@@ -267,6 +276,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = shelfbmassflux.begin_access(); CHKERRQ(ierr);
   ierr = vMask.begin_access();  CHKERRQ(ierr);
   ierr = vHnew.begin_access(); CHKERRQ(ierr);
+  ierr = vh.begin_access(); CHKERRQ(ierr);
+  ierr = vbed.begin_access();  CHKERRQ(ierr);
 
   // related to PIK part_grid mechanism; see Albrecht et al 2011
   const bool do_part_grid = config.get_flag("part_grid"),
@@ -280,6 +291,19 @@ PetscErrorCode IceModel::massContExplicitStep() {
       ierr = vHresidual.set(0.0); CHKERRQ(ierr);
     }
   }
+
+  // related to PIK part_grid mechanism at grounded margins; matthias.mengel@pik
+  const bool do_part_grid_ground = config.get_flag("part_grid_ground");
+
+  if (do_part_grid_ground) {
+    ierr = vHrefGround.begin_access(); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.begin_access(); CHKERRQ(ierr);
+    ierr = vHavgGround.begin_access(); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.begin_access(); CHKERRQ(ierr);
+    ierr = vTestVar.begin_access(); CHKERRQ(ierr);
+
+  }
+
   const bool dirichlet_bc = config.get_flag("ssa_dirichlet_bc");
   if (dirichlet_bc) {
     ierr = vBCMask.begin_access();  CHKERRQ(ierr);
@@ -299,17 +323,22 @@ PetscErrorCode IceModel::massContExplicitStep() {
   for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
 
-      PetscScalar divQ = 0.0;
+      PetscScalar coeff = 0.0;
+      PetscScalar divQ  = 0.0;
+      planeStar<PetscScalar> Q;
+      planeStar<PetscScalar> Qssa;
 
-      if (mask.grounded(i, j)) {
-        planeStar<PetscScalar> Q;
+      if (do_part_grid_ground) vTestVar(i,j) = 0.0;
+
+      if (mask.grounded(i, j) ||
+           (do_part_grid_ground && mask.next_to_grounded_ice(i, j))) {
         ierr = cell_interface_diffusive_flux(*Qdiff, i, j, Q); CHKERRQ(ierr);
         // staggered grid Div(Q) for diffusive non-sliding SIA deformation part:
         //    Qdiff = - D grad h
         divQ = (Q.e - Q.w) / dx + (Q.n - Q.s) / dy;
       }
 
-      planeStar<int> M = vMask.int_star(i, j);
+      planeStar<int> Msk = vMask.int_star(i, j);
 
       // get non-diffusive velocities according to old or -part_grid scheme
       planeStar<PetscScalar> v;
@@ -327,10 +356,12 @@ PetscErrorCode IceModel::massContExplicitStep() {
 
       // membrane stress (and/or basal sliding) part: upwind by staggered grid
       // PIK method;  this is   \nabla \cdot [(u, v) H]
-      divQ += (  v.e * (v.e > 0 ? vH(i, j) : vH(i + 1, j))
-                 - v.w * (v.w > 0 ? vH(i - 1, j) : vH(i, j)) ) / dx;
-      divQ += (  v.n * (v.n > 0 ? vH(i, j) : vH(i, j + 1))
-                 - v.s * (v.s > 0 ? vH(i, j - 1) : vH(i, j)) ) / dy;
+      Qssa.e =   v.e * (v.e > 0 ? vH(i, j) : vH(i + 1, j));
+      Qssa.w = - v.w * (v.w > 0 ? vH(i - 1, j) : vH(i, j));
+      Qssa.n =   v.n * (v.n > 0 ? vH(i, j) : vH(i, j + 1));
+      Qssa.s = - v.s * (v.s > 0 ? vH(i, j - 1) : vH(i, j));
+
+      divQ += Qssa.e/dx + Qssa.w/dx + Qssa.n/dy + Qssa.s/dy;
 
       PetscReal S = 0.0;
       if (include_bmr_in_continuity) {
@@ -347,13 +378,13 @@ PetscErrorCode IceModel::massContExplicitStep() {
       // applies for ice flux from floating ice shelf to open ocean only
       if (do_part_grid && mask.next_to_floating_ice(i, j) && mask.ocean(i, j)) {
         vHref(i, j) -= divQ * dt;
-        if (vHref(i, j) < 0.0) { 
+        if (vHref(i, j) < 0.0) {
           my_nonneg_rule_flux += ( - vHref(i, j));
           vHref(i, j) = 0.0;
           ierr = verbPrintf(2, grid.com,"!!! PISM_WARNING: vHref is negative at i=%d, j=%d\n",i,j); CHKERRQ(ierr);
         }
 
-        PetscReal H_average = get_average_thickness(do_redist, M, vH.star(i, j));
+        PetscReal H_average = get_average_thickness(do_redist, Msk, vH.star(i, j));
 
         // To calculate the surface balance contribution with respect to the
         // coverage ratio, let  X = vHref_new  be the new value of Href.  We assume
@@ -378,20 +409,57 @@ PetscErrorCode IceModel::massContExplicitStep() {
           vHnew(i, j)+= (acab(i, j) - S) * dt; // no implicit SMB in partially filled cells any more
           vHref(i, j) = 0.0;
         } else {
-          vHnew(i, j) = 0.0; // no change from vH value, actually
-          // vHref(i, j) not changed
+          vHnew(i, j) = 0.0; // no change from vH value, actually, vHref(i, j) not changed
         }
 
-      } else if (mask.grounded(i, j) ||
-                 mask.floating_ice(i, j) ||
-                 mask.next_to_grounded_ice(i, j) ) {
+      } else if ( do_part_grid_ground && mask.next_to_grounded_ice(i, j) ) {
+        // calc part grid criterum from surrounding boxes
+        vHavgGround(i,j) = get_average_thickness_fg(Msk, vH.star(i, j), vh.star(i,j), Q, Qssa, vbed(i,j), coeff);
+        vPartGridCoeff(i,j) = coeff;
+
+        if( vHrefGround(i,j) > vHavgGround(i,j) ){
+          // partial grid cell --> ice filled cell
+          if ( vHnew(i, j) != 0 )
+            PetscSynchronizedPrintf(grid.com, "Hnew should not be Hnew=%e > 0 at i=%d, j=%d\n",vHnew(i, j),i, j);
+
+          vHnew(i,j) = vHrefGround(i,j) + (acab(i, j) - S - divQ)*dt;
+          PetscSynchronizedPrintf(grid.com,"make HrefG=%e a Hnew+MB=%e at i=%d, j=%d\n",vHrefGround(i,j),vHnew(i, j),i,j);
+          vHrefGround(i,j) = 0.0;
+          vJustGotFullCell(i,j) = 1.;
+        } else{
+          // no surface mass balance here
+          vHrefGround(i,j) -= divQ * dt;
+          if (vHrefGround(i,j)*(1-rhoq) < -vbed(i,j)){
+            PetscSynchronizedPrintf(grid.com,"HrefG*(1-rhoq)=%e vbed=%e at i=%d, j=%d\n",vHrefGround(i,j)*(1-rhoq),vbed(i,j),i,j);
+            PetscReal meltarea = vHrefGround(i,j)/vHavgGround(i,j);
+            vHrefGround(i,j)  -= shelfbmassflux(i,j)*meltarea;
+            vTestVar(i,j) = shelfbmassflux(i,j)*meltarea;
+          }
+        }
+
+      } else if (mask.grounded(i, j) || mask.floating_ice(i, j)){
         // grounded/floating default case, and case of ice-free ocean adjacent to grounded
         vHnew(i, j) += (acab(i, j) - S - divQ) * dt;
+        if ( do_part_grid_ground && vHrefGround(i,j) > 0.0 ){
+          PetscSynchronizedPrintf(grid.com,"kill HrefG=%e inside ice at i=%d, j=%d\n",vHrefGround(i,j),i,j);
+          //vHnew(i,j) += vHrefGround(i,j);
+          vHrefGround(i,j) = 0.0;
+        }
+
+        if ( do_part_grid_ground ) vJustGotFullCell(i,j) = 0.;
+
       } else {
-        // last possibility: ice-free ocean not adjacent to a "full" cell at all
+        // last possibility: ice-free, not adjacent to a "full" cell at all
         vHnew(i, j) = 0.0;
       }
-      
+
+      if (do_part_grid_ground && vHrefGround(i, j) < 0.0 ){ //|| (vHrefGround(i, j) != 0  && !mask.next_to_grounded_ice(i, j))) {
+        ierr = verbPrintf(2, grid.com,
+        "!!! PISM_WARNING: negative or isolated vHrefGround=%e at i=%d, j=%d, kill it.\n",
+        vHrefGround(i, j),i,j); CHKERRQ(ierr);
+        vHrefGround(i, j) = 0.0;
+      }
+
       if (dirichlet_bc && vBCMask.as_int(i,j) == 1) {
         vHnew(i, j) = vH(i, j);
       }
@@ -463,6 +531,8 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = shelfbmassflux.end_access(); CHKERRQ(ierr);
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
+  ierr = vh.end_access(); CHKERRQ(ierr);
+  ierr = vbed.end_access();  CHKERRQ(ierr);
 
   if (compute_cumulative_acab) {
     ierr = acab_cumulative.end_access(); CHKERRQ(ierr);
@@ -473,6 +543,14 @@ PetscErrorCode IceModel::massContExplicitStep() {
     if (do_redist) {
       ierr = vHresidual.end_access(); CHKERRQ(ierr);
     }
+  }
+
+  if (do_part_grid_ground) {
+    ierr = vHrefGround.end_access(); CHKERRQ(ierr);
+    ierr = vHavgGround.end_access(); CHKERRQ(ierr);
+    ierr = vJustGotFullCell.end_access(); CHKERRQ(ierr);
+    ierr = vPartGridCoeff.end_access(); CHKERRQ(ierr);
+    ierr = vTestVar.end_access(); CHKERRQ(ierr);
   }
 
   if (dirichlet_bc) {

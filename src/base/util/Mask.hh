@@ -112,7 +112,7 @@ class MaskQuery : private Mask
 {
 public:
   MaskQuery(IceModelVec2Int &m) : mask(m) {}
-  
+
   inline bool ocean(int i, int j) { return Mask::ocean(mask.as_int(i, j)); }
 
   inline bool grounded(int i, int j) { return !ocean(i, j); }

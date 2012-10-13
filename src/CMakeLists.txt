@@ -114,6 +114,7 @@ add_library (pismbase
   base/iMIO.cc
   base/iMoptions.cc
   base/iMpartgrid.cc
+  base/iMpartgridground.cc
   base/iMreport.cc
   base/iMtemp.cc
   base/iMtimeseries.cc
