@@ -19,6 +19,17 @@ if (INSTALL_PREFIX_LENGTH)
   message (STATUS "Setting PISM install prefix to ${CMAKE_INSTALL_PREFIX}.")
 endif()
 
+# Define the directory structure.
+set (Pism_BIN_DIR "bin")
+set (Pism_LIB_DIR "lib/pism")
+set (Pism_DOC_DIR "share/doc/pism")
+
+# Set Pism_DEFAULT_CONFIG_FILE (*after* we set the CMAKE_INSTALL_PREFIX).
+pism_check_build_dir_location()
+set (Pism_DEFAULT_CONFIG_FILE "${CMAKE_INSTALL_PREFIX}/${Pism_LIB_DIR}/pism_config.nc" CACHE STRING "" FORCE)
+mark_as_advanced (Pism_DEFAULT_CONFIG_FILE)
+file (WRITE ${PROJECT_BINARY_DIR}/.petscrc "-config ${PROJECT_BINARY_DIR}/pism_config.nc")
+
 if (NOT Pism_MANUAL_BUILD)
 
   find_package (PETSc)
@@ -111,10 +122,6 @@ option (Pism_ADD_FPIC "Add -fPIC to C++ compiler flags (CMAKE_CXX_FLAGS). Try tu
 option (Pism_LINK_STATICALLY "Set CMake flags to try to ensure that everything is linked statically")
 option (Pism_BUILD_DEBIAN_PACKAGE "Use settings appropriate for building a .deb package" OFF)
 
-set (Pism_BIN_DIR "bin")
-set (Pism_LIB_DIR "lib/pism")
-set (Pism_DOC_DIR "share/doc/pism")
-
 # Use rpath by default; this has to go first, because rpath settings may be overridden later.
 pism_use_rpath()
 
@@ -155,12 +162,6 @@ if (Pism_ADD_FPIC)
   endif()
 endif ()
 
-# set Pism_DEFAULT_CONFIG_FILE
-if (NOT Pism_DEFAULT_CONFIG_FILE)
-  set (Pism_DEFAULT_CONFIG_FILE "${CMAKE_INSTALL_PREFIX}/${Pism_LIB_DIR}/pism_config.nc")
-endif ()
-file (WRITE ${PROJECT_BINARY_DIR}/.petscrc "-config ${PROJECT_BINARY_DIR}/pism_config.nc")
-
 if (Pism_PEDANTIC_WARNINGS)
   pism_set_pedantic_flags()
 endif (Pism_PEDANTIC_WARNINGS)
@@ -170,11 +171,7 @@ if (Pism_GPROF_FLAGS)
   set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -pg -fno-omit-frame-pointer -fno-inline-functions -fno-inline-functions-called-once -fno-optimize-sibling-calls")
 endif ()
 
-if (${FFTW_FOUND})
-  include_directories (${PETSC_INCLUDES} ${GSL_INCLUDES} ${NETCDF_INCLUDES} ${MPI_C_INCLUDE_PATH} ${FFTW_INCLUDES})
-else ()
-  include_directories (${PETSC_INCLUDES} ${GSL_INCLUDES} ${NETCDF_INCLUDES} ${MPI_C_INCLUDE_PATH})
-endif ()
+include_directories (${PETSC_INCLUDES} ${GSL_INCLUDES} ${NETCDF_INCLUDES} ${MPI_C_INCLUDE_PATH})
 
 set (Pism_EXTERNAL_LIBS
   ${PETSC_LIBRARIES} ${GSL_LIBRARIES} ${NETCDF_LIBRARIES} ${MPI_LIBRARY} ${MPI_C_LIBRARIES})
@@ -187,7 +184,7 @@ endif()
 # Build the Lingle-Clark bed deformation model if FFTW was found
 if (FFTW_FOUND)
   add_definitions (-DPISM_HAVE_FFTW=1)
-  include_directories (${FFTW_INCLUDE_DIRS})
+  include_directories (${FFTW_INCLUDE_DIRS} ${FFTW_INCLUDES})
   list (APPEND Pism_EXTERNAL_LIBS ${FFTW_LIBRARIES})
 else (FFTW_FOUND)
   add_definitions (-DPISM_HAVE_FFTW=0)
