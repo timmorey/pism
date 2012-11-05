@@ -27,6 +27,7 @@ static char help[] =
 #include "eismint/iceEISModel.hh"
 #include "eismint/icePSTexModel.hh"
 #include "pism_options.hh"
+#include "PISMProf.hh"
 
 #include "PSDummy.hh"
 #include "POConstant.hh"
@@ -38,6 +39,8 @@ int main(int argc, char *argv[]) {
   PetscMPIInt rank, size;
 
   ierr = PetscInitialize(&argc, &argv, PETSC_NULL, help); CHKERRQ(ierr);
+    
+  PISMLogStagePush(PISM_INIT_STAGE);
 
   com = PETSC_COMM_WORLD;
   ierr = MPI_Comm_rank(com, &rank); CHKERRQ(ierr);
@@ -102,10 +105,22 @@ int main(int argc, char *argv[]) {
 
     ierr = m->init(); CHKERRQ(ierr);
 
+    PISMLogStagePop(); // PISM_INIT_STAGE
+
+    PISMLogStagePush(PISM_STEPPING_STAGE);
+
     ierr = m->run(); CHKERRQ(ierr);
+
+    PISMLogStagePop(); // PISM_STEPPING_STAGE
+
+    PISMLogStagePush(PISM_PRIMARY_OUTPUT_STAGE);
 
     ierr = verbPrintf(2,com, "... done with run \n"); CHKERRQ(ierr);
     ierr = m->writeFiles("simp_exper.nc"); CHKERRQ(ierr);
+
+    PISMLogStagePop(); // PISM_PRIMARY_OUTPUT_STAGE
+
+    PISMLogStagePush(PISM_SHUTDOWN_STAGE);
 
     delete m;
   }

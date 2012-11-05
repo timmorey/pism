@@ -90,4 +90,77 @@ protected:
   PetscErrorCode create_dimensions(const PISMNCFile &nc);
 };
 
+/**
+   The following functions were added to provide easy access to PETSc's
+   profiling features, while bypassing some of the odd PISM profiling code.
+   For example, the PISM profiling stuff above may segfault if the events do not
+   follow a hierarchical order (start-a, start-b, end-b, end-a is expected; 
+   start-a, start-b, end-a, end-b will cause problems).  The following will
+   allow this event pattern, though still will have trouble with events that 
+   intersect themselves (start-a, start-a, end-a, end-a).  This is a limitation
+   of PETSc's profiling, and we can live with it.
+
+   These also get around the problem of having to pass a single instance of
+   PISMProf to every bit of code that wishes to do some profiling.  
+
+   Note: this functionality isn't currently thread safe, though it wouldn't take
+   but a mutex or two to fix that.
+*/
+
+/**
+   The following is a list of known event identifiers.  This is certainly not an 
+   exhaustive listing, as events not listed here may be used.
+*/
+#define PISM_IO_EVENT "IO"
+#define PISM_IO_DATASET_EVENT "IO-Dataset"
+#define PISM_IO_METADATA_EVENT "IO-Metadata"
+#define PISM_IO_READ_EVENT "IO-Read"
+#define PISM_IO_WRITE_EVENT "IO-Write"
+
+#define PISM_INIT_STAGE "Initialization"
+#define PISM_STEPPING_STAGE "Stepping"
+#define PISM_PRIMARY_OUTPUT_STAGE "PrimaryOutput"
+#define PISM_SHUTDOWN_STAGE "Shutdown"
+
+//! Starts recording the named event.
+/*!
+  Starts recording the named event.  If this is the first use of the event, it
+  will be registered with PETSc.
+
+  \param name A name that uniquely identifies the log event.  
+  \return 0 if the operation was successful, and an error code otherwise.
+ */
+PetscErrorCode PISMLogEventBegin(string name);
+
+//! Stops recording the named event.
+/*!
+  Stops recording the named event.  It is assumed that this event was previously
+  started with a call to PISMLogEventBegin.
+
+  \param name A name that uniquely identifies the log event.
+  \return 0 if the operation was successful, and an error code otherwise.
+ */
+PetscErrorCode PISMLogEventEnd(string name);
+
+//! Indicates the beginning of an application stage.
+/*!
+  Indicates the beginning of an application stage (like initializatin, shutdown,
+  stepping, etc.).  This is basically a wrapper around the PetscLogStagePush
+  function, and it will take care of the stage registration the first time this
+  function is called with a given stage name.
+
+  \param name The name of the stage that will be activated.
+  \return 0 if the operation was successful, and an error code otherwise.
+*/
+PetscErrorCode PISMLogStagePush(string name);
+
+//! Indicates the end of the currently active log stage.
+/*!
+  Indicates the end of the currently active log stage.  This is basically a
+  wrapper around PetscLogStagePop().
+  
+  \return 0 if the operation was successful, and an error code otherwise.
+*/
+PetscErrorCode PISMLogStagePop();
+
 #endif // __PISMProf_hh
