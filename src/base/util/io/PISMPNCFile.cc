@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "PISMPNCFile.hh"
+#include "PISMProf.hh"
 #include "pism_type_conversion.hh" // has to go after pnetcdf.h
 
 PISMPNCFile::PISMPNCFile(MPI_Comm c, int r)
@@ -48,7 +49,9 @@ int PISMPNCFile::open(string fname, int mode) {
 
   filename = fname;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   stat = ncmpi_open(com, filename.c_str(), mode, mpi_info, &ncid); check(stat);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = false;
 
@@ -63,8 +66,10 @@ int PISMPNCFile::create(string fname) {
 
   filename = fname;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   stat = ncmpi_create(com, filename.c_str(), NC_CLOBBER|NC_64BIT_OFFSET,
                       mpi_info, &ncid); check(stat);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
   define_mode = true;
 
   return stat;
@@ -72,7 +77,9 @@ int PISMPNCFile::create(string fname) {
 
 
 int PISMPNCFile::close() {
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   int stat = ncmpi_close(ncid); check(stat);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   ncid = -1;
 
@@ -87,7 +94,9 @@ int PISMPNCFile::enddef() const {
   if (define_mode == false)
     return 0;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   int stat = ncmpi_enddef(ncid); check(stat);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = false;
 
@@ -100,7 +109,9 @@ int PISMPNCFile::redef() const {
   if (define_mode == true)
     return 0;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   int stat = ncmpi_redef(ncid); check(stat);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = true;
 
@@ -111,7 +122,9 @@ int PISMPNCFile::redef() const {
 int PISMPNCFile::def_dim(string name, size_t length) const {
   int dimid = 0, stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_def_dim(ncid, name.c_str(), length, &dimid); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -120,7 +133,9 @@ int PISMPNCFile::def_dim(string name, size_t length) const {
 int PISMPNCFile::inq_dimid(string dimension_name, bool &exists) const {
   int tmp, stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_dimid(ncid, dimension_name.c_str(), &tmp);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   if (stat == NC_NOERR) {
     exists = true;
@@ -136,9 +151,11 @@ int PISMPNCFile::inq_dimlen(string dimension_name, unsigned int &result) const {
   int stat, dimid = -1;
   MPI_Offset len;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_dimid(ncid, dimension_name.c_str(), &dimid);
 
   stat = ncmpi_inq_dimlen(ncid, dimid, &len); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = static_cast<unsigned int>(len);
 
@@ -150,6 +167,7 @@ int PISMPNCFile::inq_unlimdim(string &result) const {
   int stat, dimid;
   char dimname[NC_MAX_NAME];
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_unlimdim(ncid, &dimid); check(stat);
 
   if (dimid == -1) {
@@ -159,6 +177,7 @@ int PISMPNCFile::inq_unlimdim(string &result) const {
 
     result = dimname;
   }
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -168,6 +187,7 @@ int PISMPNCFile::def_var(string name, PISM_IO_Type nctype, vector<string> dims) 
   vector<int> dimids;
   int stat, varid;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   vector<string>::iterator j;
   for (j = dims.begin(); j != dims.end(); ++j) {
     int dimid = -1;
@@ -177,6 +197,7 @@ int PISMPNCFile::def_var(string name, PISM_IO_Type nctype, vector<string> dims) 
 
   stat = ncmpi_def_var(ncid, name.c_str(), pism_type_to_nc_type(nctype),
                        static_cast<int>(dims.size()), &dimids[0], &varid); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
 #if (PISM_DEBUG==1)
   if (stat != NC_NOERR) {
@@ -234,7 +255,9 @@ int PISMPNCFile::put_varm_double(string variable_name,
 int PISMPNCFile::inq_nvars(int &result) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_nvars(ncid, &result); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -244,9 +267,11 @@ int PISMPNCFile::inq_vardimid(string variable_name, vector<string> &result) cons
   int stat, ndims, varid = -1;
   vector<int> dimids;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_varid(ncid, variable_name.c_str(), &varid); check(stat);
 
   stat = ncmpi_inq_varndims(ncid, varid, &ndims); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   if (ndims == 0) {
     result.clear();
@@ -256,6 +281,7 @@ int PISMPNCFile::inq_vardimid(string variable_name, vector<string> &result) cons
   result.resize(ndims);
   dimids.resize(ndims);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_vardimid(ncid, varid, &dimids[0]); check(stat);
 
   for (int k = 0; k < ndims; ++k) {
@@ -266,6 +292,7 @@ int PISMPNCFile::inq_vardimid(string variable_name, vector<string> &result) cons
 
     result[k] = name;
   }
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return 0;
 }
@@ -274,6 +301,7 @@ int PISMPNCFile::inq_vardimid(string variable_name, vector<string> &result) cons
 int PISMPNCFile::inq_varnatts(string variable_name, int &result) const {
   int stat, varid = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
   } else {
@@ -281,6 +309,7 @@ int PISMPNCFile::inq_varnatts(string variable_name, int &result) const {
   }
 
   stat = ncmpi_inq_varnatts(ncid, varid, &result); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return 0;
 }
@@ -289,7 +318,9 @@ int PISMPNCFile::inq_varnatts(string variable_name, int &result) const {
 int PISMPNCFile::inq_varid(string variable_name, bool &exists) const {
   int stat, flag = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_varid(ncid, variable_name.c_str(), &flag);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   if (stat == NC_NOERR)
     flag = 1;
@@ -307,7 +338,9 @@ int PISMPNCFile::inq_varname(unsigned int j, string &result) const {
   char varname[NC_MAX_NAME];
   memset(varname, 0, NC_MAX_NAME);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_varname(ncid, j, varname); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = varname;
 
@@ -319,6 +352,7 @@ int PISMPNCFile::get_att_double(string variable_name, string att_name, vector<do
   int stat, len, varid = -1;
   MPI_Offset attlen;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Read the attribute length:
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
@@ -327,6 +361,7 @@ int PISMPNCFile::get_att_double(string variable_name, string att_name, vector<do
   }
 
   stat = ncmpi_inq_attlen(ncid, varid, att_name.c_str(), &attlen);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   if (stat == NC_NOERR)
     len = static_cast<int>(attlen);
@@ -344,8 +379,10 @@ int PISMPNCFile::get_att_double(string variable_name, string att_name, vector<do
 
   result.resize(len);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Now read data and broadcast stat to see if we succeeded:
   stat = ncmpi_get_att_double(ncid, varid, att_name.c_str(), &result[0]); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   // On error, print a message and stop.
   if (stat != NC_NOERR) {
@@ -364,6 +401,7 @@ int PISMPNCFile::get_att_text(string variable_name, string att_name, string &res
   // Read the attribute length:
   MPI_Offset attlen;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
   } else {
@@ -371,6 +409,7 @@ int PISMPNCFile::get_att_text(string variable_name, string att_name, string &res
   }
 
   stat = ncmpi_inq_attlen(ncid, varid, att_name.c_str(), &attlen);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
   if (stat == NC_NOERR)
     len = static_cast<int>(attlen);
   else
@@ -385,8 +424,10 @@ int PISMPNCFile::get_att_text(string variable_name, string att_name, string &res
   str = new char[len + 1];
   memset(str, 0, len + 1);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Now read the string and see if we succeeded:
   stat = ncmpi_get_att_text(ncid, varid, att_name.c_str(), str);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   // On success, broadcast the string. On error, set str to "".
   if (stat != NC_NOERR) {
@@ -411,6 +452,7 @@ int PISMPNCFile::put_att_double(string variable_name, string att_name, PISM_IO_T
 
   int varid = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
   } else {
@@ -419,6 +461,7 @@ int PISMPNCFile::put_att_double(string variable_name, string att_name, PISM_IO_T
 
   stat = ncmpi_put_att_double(ncid, varid, att_name.c_str(),
                               pism_type_to_nc_type(nctype), data.size(), &data[0]); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -429,6 +472,7 @@ int PISMPNCFile::put_att_text(string variable_name, string att_name, string valu
 
   stat = redef(); check(stat);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
   } else {
@@ -436,6 +480,7 @@ int PISMPNCFile::put_att_text(string variable_name, string att_name, string valu
   }
 
   stat = ncmpi_put_att_text(ncid, varid, att_name.c_str(), value.size(), value.c_str()); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -448,6 +493,7 @@ int PISMPNCFile::inq_attname(string variable_name, unsigned int n, string &resul
 
   int varid = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
   } else {
@@ -455,6 +501,7 @@ int PISMPNCFile::inq_attname(string variable_name, unsigned int n, string &resul
   }
 
   stat = ncmpi_inq_attname(ncid, varid, n, name); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = name;
 
@@ -466,6 +513,7 @@ int PISMPNCFile::inq_atttype(string variable_name, string att_name, PISM_IO_Type
   int stat, varid = -1;
   nc_type tmp;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (variable_name == "PISM_GLOBAL") {
     varid = NC_GLOBAL;
   } else {
@@ -473,6 +521,7 @@ int PISMPNCFile::inq_atttype(string variable_name, string att_name, PISM_IO_Type
   }
 
   stat = ncmpi_inq_atttype(ncid, varid, att_name.c_str(), &tmp); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
   if (stat == NC_ENOTATT) {
     tmp = NC_NAT;
   } else {
@@ -488,7 +537,9 @@ int PISMPNCFile::inq_atttype(string variable_name, string att_name, PISM_IO_Type
 int PISMPNCFile::set_fill(int fillmode, int &old_modep) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   stat = ncmpi_set_fill(ncid, fillmode, &old_modep); check(stat);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   return stat;
 }
@@ -522,7 +573,9 @@ int PISMPNCFile::get_var_double(string variable_name,
   vector<MPI_Offset> nc_start(ndims), nc_count(ndims),
     nc_imap(ndims), nc_stride(ndims);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_varid(ncid, variable_name.c_str(), &varid); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   for (int j = 0; j < ndims; ++j) {
     nc_start[j] = start[j];
@@ -530,6 +583,8 @@ int PISMPNCFile::get_var_double(string variable_name,
     nc_imap[j]  = imap[j];
     nc_stride[j] = 1;
   }
+
+  PISMLogEventBegin(PISM_IO_READ_EVENT);
 
   if (mapped) {
     stat = ncmpi_get_varm_double_all(ncid, varid,
@@ -540,6 +595,8 @@ int PISMPNCFile::get_var_double(string variable_name,
                                      &nc_start[0], &nc_count[0],
                                      ip); check(stat);
   }
+
+  PISMLogEventEnd(PISM_IO_READ_EVENT);
 
   return stat;
 }
@@ -573,7 +630,9 @@ int PISMPNCFile::put_var_double(string variable_name,
   vector<MPI_Offset> nc_start(ndims), nc_count(ndims),
     nc_imap(ndims), nc_stride(ndims);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_varid(ncid, variable_name.c_str(), &varid); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   for (int j = 0; j < ndims; ++j) {
     nc_start[j] = start[j];
@@ -581,6 +640,8 @@ int PISMPNCFile::put_var_double(string variable_name,
     nc_imap[j]  = imap[j];
     nc_stride[j] = 1;
   }
+
+  PISMLogEventBegin(PISM_IO_WRITE_EVENT);
 
   if (mapped) {
     stat = ncmpi_put_varm_double_all(ncid, varid,
@@ -591,6 +652,8 @@ int PISMPNCFile::put_var_double(string variable_name,
                                      &nc_start[0], &nc_count[0],
                                      op); check(stat);
   }
+
+  PISMLogEventEnd(PISM_IO_WRITE_EVENT);
 
   return stat;
 }

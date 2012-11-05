@@ -25,6 +25,7 @@
 #include "NCVariable.hh"
 #include "PISMTime.hh"
 #include "PISMNC3File.hh"
+#include "PISMProf.hh"
 
 #if (PISM_PARALLEL_NETCDF4==1)
 #include "PISMNC4File.hh"
@@ -83,6 +84,8 @@ PIO::~PIO() {
 
 
 PetscErrorCode PIO::open(string filename, int mode, bool append) {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   // opening for reading
@@ -93,6 +96,8 @@ PetscErrorCode PIO::open(string filename, int mode, bool append) {
       PetscPrintf(com, "PISM ERROR: Can't open '%s'. Exiting...\n", filename.c_str());
       PISMEnd();
     }
+
+    PISMLogEventEnd(PISM_IO_EVENT);
     return 0;
   }
 
@@ -123,23 +128,30 @@ PetscErrorCode PIO::open(string filename, int mode, bool append) {
 
   }
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 PetscErrorCode PIO::close() {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->close(); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 PetscErrorCode PIO::redef() const {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->redef(); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 PetscErrorCode PIO::enddef() const {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->enddef(); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -150,6 +162,8 @@ string PIO::inq_filename() const {
 
 //! \brief Get the number of records. Uses the length of an unlimited dimension.
 PetscErrorCode PIO::inq_nrecords(unsigned int &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   string dim;
 
@@ -161,6 +175,7 @@ PetscErrorCode PIO::inq_nrecords(unsigned int &result) const {
     ierr = nc->inq_dimlen(dim, result); CHKERRQ(ierr);
   }
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -180,7 +195,9 @@ PetscErrorCode PIO::inq_nrecords(string name, string std_name, unsigned int &res
   }
 
   vector<string> dims;
+  PISMLogEventBegin(PISM_IO_EVENT);
   ierr = nc->inq_vardimid(name_found, dims); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
 
   for (unsigned int j = 0; j < dims.size(); ++j) {
     AxisType dimtype;
@@ -188,7 +205,9 @@ PetscErrorCode PIO::inq_nrecords(string name, string std_name, unsigned int &res
     ierr = this->inq_dimtype(dims[j], dimtype); CHKERRQ(ierr);
 
     if (dimtype == T_AXIS) {
+      PISMLogEventBegin(PISM_IO_EVENT);
       ierr = nc->inq_dimlen(dims[j], result); CHKERRQ(ierr);
+      PISMLogEventEnd(PISM_IO_EVENT);
       return 0;
     }
   }
@@ -205,6 +224,8 @@ PetscErrorCode PIO::inq_nrecords(string name, string std_name, unsigned int &res
  */
 PetscErrorCode PIO::inq_var(string short_name, string std_name, bool &exists,
                             string &result, bool &found_by_standard_name) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   exists = false;
@@ -252,28 +273,31 @@ PetscErrorCode PIO::inq_var(string short_name, string std_name, bool &exists,
     found_by_standard_name = false;
   }
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Checks if a variable exists.
 PetscErrorCode PIO::inq_var(string name, bool &exists) const {
-
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->inq_varid(name, exists); CHKERRQ(ierr);
-
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 PetscErrorCode PIO::inq_vardims(string name, vector<string> &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->inq_vardimid(name, result); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 //! \brief Checks if a dimension exists.
 PetscErrorCode PIO::inq_dim(string name, bool &exists) const {
-
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->inq_dimid(name, exists); CHKERRQ(ierr);
-
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -282,6 +306,8 @@ PetscErrorCode PIO::inq_dim(string name, bool &exists) const {
  * Sets result to 0 if a dimension does not exist.
  */
 PetscErrorCode PIO::inq_dimlen(string name, unsigned int &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   bool exists = false;
   PetscErrorCode ierr;
 
@@ -293,6 +319,7 @@ PetscErrorCode PIO::inq_dimlen(string name, unsigned int &result) const {
     result = 0;
   }
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -301,6 +328,8 @@ PetscErrorCode PIO::inq_dimlen(string name, unsigned int &result) const {
  * The "type" is one of X_AXIS, Y_AXIS, Z_AXIS, T_AXIS.
  */
 PetscErrorCode PIO::inq_dimtype(string name, AxisType &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   string axis, standard_name, units;
   utUnit ut_units;
@@ -316,6 +345,8 @@ PetscErrorCode PIO::inq_dimtype(string name, AxisType &result) const {
   ierr = nc->get_att_text(name, "axis", axis); CHKERRQ(ierr);
   ierr = nc->get_att_text(name, "standard_name", standard_name); CHKERRQ(ierr);
   ierr = nc->get_att_text(name, "units", units); CHKERRQ(ierr);
+
+  PISMLogEventEnd(PISM_IO_EVENT);
 
   // check if it has units compatible with "seconds":
   ierr = utScan(units.c_str(), &ut_units);
@@ -468,11 +499,14 @@ PetscErrorCode PIO::inq_grid(string var_name, IceGrid *grid, Periodicity periodi
 
 PetscErrorCode PIO::inq_units(string name, bool &has_units, utUnit &units,
                               bool use_reference_date) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   string units_string;
 
   // Get the string:
   ierr = nc->get_att_text(name, "units", units_string); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
 
   // If a variables does not have the units attribute, set the flag and return:
   if (units_string.empty()) {
@@ -523,7 +557,9 @@ PetscErrorCode PIO::inq_grid_info(string name, grid_info &g) const {
     SETERRQ2(com, 1, "Could not find variable %s in %s", name.c_str(),
              this->inq_filename().c_str());
 
+  PISMLogEventBegin(PISM_IO_EVENT);
   ierr = nc->inq_vardimid(name_found, dims); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
 
   int ndims = (int)dims.size();
   for (int i = 0; i < ndims; ++i) {
@@ -535,28 +571,36 @@ PetscErrorCode PIO::inq_grid_info(string name, grid_info &g) const {
     switch (dimtype) {
     case X_AXIS:
       {
+        PISMLogEventBegin(PISM_IO_EVENT);
         ierr = nc->inq_dimlen(dimname, g.x_len); CHKERRQ(ierr);
+        PISMLogEventEnd(PISM_IO_EVENT);
         ierr = this->inq_dim_limits(dimname, &g.x_min, &g.x_max); CHKERRQ(ierr);
         ierr = this->get_dim(dimname, g.x); CHKERRQ(ierr);
         break;
       }
     case Y_AXIS:
       {
+        PISMLogEventBegin(PISM_IO_EVENT);
         ierr = nc->inq_dimlen(dimname, g.y_len); CHKERRQ(ierr);
+        PISMLogEventEnd(PISM_IO_EVENT);
         ierr = this->inq_dim_limits(dimname, &g.y_min, &g.y_max); CHKERRQ(ierr);
         ierr = this->get_dim(dimname, g.y); CHKERRQ(ierr);
         break;
       }
     case Z_AXIS:
       {
+        PISMLogEventBegin(PISM_IO_EVENT);
         ierr = nc->inq_dimlen(dimname, g.z_len); CHKERRQ(ierr);
+        PISMLogEventEnd(PISM_IO_EVENT);
         ierr = this->inq_dim_limits(dimname, &g.z_min, &g.z_max); CHKERRQ(ierr);
         ierr = this->get_dim(dimname, g.z); CHKERRQ(ierr);
         break;
       }
     case T_AXIS:
       {
+        PISMLogEventBegin(PISM_IO_EVENT);
         ierr = nc->inq_dimlen(dimname, g.t_len); CHKERRQ(ierr);
+        PISMLogEventEnd(PISM_IO_EVENT);
         ierr = this->inq_dim_limits(dimname, NULL, &g.time); CHKERRQ(ierr);
         break;
       }
@@ -574,6 +618,8 @@ PetscErrorCode PIO::inq_grid_info(string name, grid_info &g) const {
 
 //! \brief Define a dimension \b and the associated coordinate variable. Set string attributes.
 PetscErrorCode PIO::def_dim(string name, long int length, map<string,string> attrs) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->redef();
@@ -594,19 +640,24 @@ PetscErrorCode PIO::def_dim(string name, long int length, map<string,string> att
     ierr = nc->put_att_text(name, att_name, att_value); CHKERRQ(ierr);
   }
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Define a variable.
 PetscErrorCode PIO::def_var(string name, PISM_IO_Type nctype, vector<string> dims) const {
-  PetscErrorCode ierr;
+  PISMLogEventBegin(PISM_IO_EVENT);
 
+  PetscErrorCode ierr;
   ierr = nc->def_var(name, nctype, dims); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 PetscErrorCode PIO::get_1d_var(string name, unsigned int s, unsigned int c,
                                vector<double> &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   vector<unsigned int> start(1), count(1);
 
@@ -618,13 +669,16 @@ PetscErrorCode PIO::get_1d_var(string name, unsigned int s, unsigned int c,
   ierr = nc->enddef(); CHKERRQ(ierr);
 
   ierr = nc->get_vara_double(name, start, count, &result[0]); CHKERRQ(ierr);
-
+  
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 PetscErrorCode PIO::put_1d_var(string name, unsigned int s, unsigned int c,
                                const vector<double> &data) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   vector<unsigned int> start(1), count(1);
 
@@ -635,18 +689,23 @@ PetscErrorCode PIO::put_1d_var(string name, unsigned int s, unsigned int c,
 
   ierr = nc->put_vara_double(name, start, count, &data[0]); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 //! \brief Get dimension data (a coordinate variable).
 PetscErrorCode PIO::get_dim(string name, vector<double> &data) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   unsigned int dim_length = 0;
   ierr = nc->inq_dimlen(name, dim_length); CHKERRQ(ierr);
 
   ierr = nc->enddef(); CHKERRQ(ierr);
+
+  PISMLogEventEnd(PISM_IO_EVENT);
 
   ierr = this->get_1d_var(name, 0, dim_length, data); CHKERRQ(ierr);
 
@@ -655,17 +714,23 @@ PetscErrorCode PIO::get_dim(string name, vector<double> &data) const {
 
 //! \brief Write dimension data (a coordinate variable).
 PetscErrorCode PIO::put_dim(string name, const vector<double> &data) const {
+  // NOTE: Not profiling with PISM_IO_EVENT, due to recursion
+
   PetscErrorCode ierr = this->put_1d_var(name, 0,
                                          (unsigned int)data.size(), data); CHKERRQ(ierr);
   return 0;
 }
 
 PetscErrorCode PIO::def_time(string name, string calendar, string units) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   map<string,string> attrs;
 
   bool time_exists;
   ierr = nc->inq_varid(name, time_exists); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
+
   if (time_exists)
     return 0;
 
@@ -683,6 +748,8 @@ PetscErrorCode PIO::def_time(string name, string calendar, string units) const {
 
 //! \brief Append to the time dimension.
 PetscErrorCode PIO::append_time(string name, double value) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   vector<unsigned int> start(1), count(1);
@@ -697,6 +764,7 @@ PetscErrorCode PIO::append_time(string name, double value) const {
 
   ierr = nc->put_vara_double(name, start, count, &value); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -705,6 +773,8 @@ PetscErrorCode PIO::append_time(string name, double value) const {
  * Use put_att_text("PISM_GLOBAL", "history", ...) to overwrite "history".
  */
 PetscErrorCode PIO::append_history(string history) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   string old_history;
 
@@ -713,24 +783,30 @@ PetscErrorCode PIO::append_history(string history) const {
   ierr = nc->get_att_text("PISM_GLOBAL", "history", old_history); CHKERRQ(ierr);
   ierr = nc->put_att_text("PISM_GLOBAL", "history", history + old_history); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Write a multiple-valued double attribute.
 PetscErrorCode PIO::put_att_double(string var_name, string att_name, PISM_IO_Type nctype,
                                    vector<double> values) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->redef(); CHKERRQ(ierr);
 
   ierr = nc->put_att_double(var_name, att_name, nctype, values); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Write a single-valued double attribute.
 PetscErrorCode PIO::put_att_double(string var_name, string att_name, PISM_IO_Type nctype,
                                    double value) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   vector<double> tmp; tmp.push_back(value);
 
@@ -738,11 +814,14 @@ PetscErrorCode PIO::put_att_double(string var_name, string att_name, PISM_IO_Typ
 
   ierr = nc->put_att_double(var_name, att_name, nctype, tmp); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Write a text attribute.
 PetscErrorCode PIO::put_att_text(string var_name, string att_name, string value) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->redef(); CHKERRQ(ierr);
@@ -751,12 +830,15 @@ PetscErrorCode PIO::put_att_text(string var_name, string att_name, string value)
 
   ierr = nc->put_att_text(var_name, att_name, tmp); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Get a double attribute.
 PetscErrorCode PIO::get_att_double(string var_name, string att_name,
                                    vector<double> &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
 
   PetscErrorCode ierr;
   PISM_IO_Type att_type;
@@ -782,14 +864,15 @@ PetscErrorCode PIO::get_att_double(string var_name, string att_name,
     ierr = nc->get_att_double(var_name, att_name, result); CHKERRQ(ierr);
   }
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 //! \brief Get a text attribute.
 PetscErrorCode PIO::get_att_text(string var_name, string att_name, string &result) const {
-
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->get_att_text(var_name, att_name, result); CHKERRQ(ierr);
-
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -800,6 +883,8 @@ PetscErrorCode PIO::get_att_text(string var_name, string att_name, string &resul
  * Vec g has to be "global" (i.e. without ghosts).
  */
 PetscErrorCode PIO::get_vec(IceGrid *grid, string var_name, unsigned int z_count, int t, Vec g) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   vector<unsigned int> start, count, imap;
@@ -821,27 +906,32 @@ PetscErrorCode PIO::get_vec(IceGrid *grid, string var_name, unsigned int z_count
 
   ierr = VecRestoreArray(g, &a_petsc); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 PetscErrorCode PIO::inq_nattrs(string var_name, int &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->inq_varnatts(var_name, result); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 PetscErrorCode PIO::inq_attname(string var_name, unsigned int n, string &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->inq_attname(var_name, n, result); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
 
 PetscErrorCode PIO::inq_atttype(string var_name, string att_name, PISM_IO_Type &result) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
   PetscErrorCode ierr = nc->inq_atttype(var_name, att_name, result); CHKERRQ(ierr);
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
-
-
 
 //! \brief Write a PETSc Vec using the grid "grid".
 /*!
@@ -852,6 +942,8 @@ PetscErrorCode PIO::inq_atttype(string var_name, string att_name, PISM_IO_Type &
  * This method always writes to the last record in the file.
  */
 PetscErrorCode PIO::put_vec(IceGrid *grid, string var_name, unsigned int z_count, Vec g) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   unsigned int t;
@@ -886,6 +978,7 @@ PetscErrorCode PIO::put_vec(IceGrid *grid, string var_name, unsigned int z_count
 
   ierr = VecRestoreArray(g, &a_petsc); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -894,6 +987,8 @@ PetscErrorCode PIO::put_vec(IceGrid *grid, string var_name, unsigned int z_count
 PetscErrorCode PIO::regrid_vec(IceGrid *grid, string var_name,
                                const vector<double> &zlevels_out,
                                LocalInterpCtx *lic, Vec g) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
   const int T = 0, X = 1, Y = 2, Z = 3; // indices, just for clarity
   vector<unsigned int> start, count, imap;
@@ -920,6 +1015,7 @@ PetscErrorCode PIO::regrid_vec(IceGrid *grid, string var_name,
 
   ierr = regrid(grid, zlevels_out, lic, g);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -1159,12 +1255,15 @@ PetscErrorCode PIO::get_vara_double(string variable_name,
                                     vector<unsigned int> start,
                                     vector<unsigned int> count,
                                     double *ip) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->enddef(); CHKERRQ(ierr);
 
   ierr = nc->get_vara_double(variable_name, start, count, ip); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -1173,12 +1272,15 @@ PetscErrorCode PIO::put_vara_double(string variable_name,
                                     vector<unsigned int> start,
                                     vector<unsigned int> count,
                                     const double *op) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->enddef(); CHKERRQ(ierr);
 
   ierr = nc->put_vara_double(variable_name, start, count, op); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -1186,12 +1288,15 @@ PetscErrorCode PIO::get_varm_double(string variable_name,
                                     vector<unsigned int> start,
                                     vector<unsigned int> count,
                                     vector<unsigned int> imap, double *ip) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->enddef(); CHKERRQ(ierr);
 
   ierr = nc->get_varm_double(variable_name, start, count, imap, ip); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 
@@ -1200,12 +1305,15 @@ PetscErrorCode PIO::put_varm_double(string variable_name,
                                     vector<unsigned int> start,
                                     vector<unsigned int> count,
                                     vector<unsigned int> imap, const double *op) const {
+  PISMLogEventBegin(PISM_IO_EVENT);
+
   PetscErrorCode ierr;
 
   ierr = nc->enddef(); CHKERRQ(ierr);
 
   ierr = nc->put_varm_double(variable_name, start, count, imap, op); CHKERRQ(ierr);
 
+  PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
 }
 

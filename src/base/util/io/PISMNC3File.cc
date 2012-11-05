@@ -17,6 +17,7 @@
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "PISMNC3File.hh"
+#include "PISMProf.hh"
 
 // The following is a stupid kludge necessary to make NetCDF 4.x work in
 // serial mode in an MPI program:
@@ -36,11 +37,13 @@ PISMNC3File::PISMNC3File(MPI_Comm c, int r)
 
 PISMNC3File::~PISMNC3File() {
   if (ncid >= 0) {
+    PISMLogEventBegin(PISM_IO_DATASET_EVENT);
     if (rank == 0) {
       nc_close(ncid);
       fprintf(stderr, "PISMNC3File::~PISMNC3File: NetCDF file %s is still open\n",
               filename.c_str());
     }
+    PISMLogEventEnd(PISM_IO_DATASET_EVENT);
     ncid = -1;
   }
 }
@@ -51,6 +54,7 @@ int PISMNC3File::open(string fname, int mode) {
 
   filename = fname;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   if (rank == 0) {
     stat = nc_open(filename.c_str(), mode, &ncid);
   }
@@ -58,6 +62,7 @@ int PISMNC3File::open(string fname, int mode) {
   MPI_Barrier(com);
   MPI_Bcast(&ncid, 1, MPI_INT, 0, com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = false;
 
@@ -70,6 +75,7 @@ int PISMNC3File::create(string fname) {
 
   filename = fname;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   if (rank == 0) {
     stat = nc_create(filename.c_str(), NC_CLOBBER|NC_64BIT_OFFSET, &ncid);
   }
@@ -77,6 +83,7 @@ int PISMNC3File::create(string fname) {
   MPI_Barrier(com);
   MPI_Bcast(&ncid, 1, MPI_INT, 0, com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = true;
 
@@ -87,6 +94,7 @@ int PISMNC3File::create(string fname) {
 int PISMNC3File::close() {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   if (rank == 0) {
     stat = nc_close(ncid);
     ncid = -1;
@@ -95,6 +103,7 @@ int PISMNC3File::close() {
   MPI_Barrier(com);
   MPI_Bcast(&ncid, 1, MPI_INT, 0, com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   filename.clear();
 
@@ -109,6 +118,7 @@ int PISMNC3File::enddef() const {
   if (define_mode == false)
     return 0;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   if (rank == 0) {
     //! 50000 (below) means that we allocate ~50Kb for metadata in NetCDF files
     //! created by PISM.
@@ -117,6 +127,7 @@ int PISMNC3File::enddef() const {
 
   MPI_Barrier(com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = false;
 
@@ -130,12 +141,14 @@ int PISMNC3File::redef() const {
   if (define_mode == true)
     return 0;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   if (rank == 0) {
     stat = nc_redef(ncid);
   }
 
   MPI_Barrier(com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = true;
 
@@ -147,6 +160,7 @@ int PISMNC3File::redef() const {
 int PISMNC3File::def_dim(string name, size_t length) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int dimid;
     stat = nc_def_dim(ncid, name.c_str(), length, &dimid); check(stat);
@@ -154,6 +168,7 @@ int PISMNC3File::def_dim(string name, size_t length) const {
 
   MPI_Barrier(com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -161,6 +176,7 @@ int PISMNC3File::def_dim(string name, size_t length) const {
 int PISMNC3File::inq_dimid(string dimension_name, bool &exists) const {
   int stat, flag = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     stat = nc_inq_dimid(ncid, dimension_name.c_str(), &flag);
 
@@ -172,6 +188,7 @@ int PISMNC3File::inq_dimid(string dimension_name, bool &exists) const {
   }
   MPI_Barrier(com);
   MPI_Bcast(&flag, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   exists = (flag == 1);
 
@@ -183,6 +200,7 @@ int PISMNC3File::inq_dimid(string dimension_name, bool &exists) const {
 int PISMNC3File::inq_dimlen(string dimension_name, unsigned int &result) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int dimid;
     size_t length;
@@ -197,6 +215,7 @@ int PISMNC3File::inq_dimlen(string dimension_name, unsigned int &result) const {
   MPI_Barrier(com);
   MPI_Bcast(&result, 1, MPI_UNSIGNED, 0, com);
   MPI_Bcast(&stat,   1, MPI_INT,      0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -207,6 +226,7 @@ int PISMNC3File::inq_unlimdim(string &result) const {
   char dimname[NC_MAX_NAME];
   memset(dimname, 0, NC_MAX_NAME);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int dimid;
     stat = nc_inq_unlimdim(ncid, &dimid); check(stat);
@@ -220,6 +240,7 @@ int PISMNC3File::inq_unlimdim(string &result) const {
 
   MPI_Bcast(&stat,   1, MPI_INT, 0, com);
   MPI_Bcast(dimname, NC_MAX_NAME, MPI_CHAR, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = dimname;
 
@@ -231,6 +252,7 @@ int PISMNC3File::inq_unlimdim(string &result) const {
 int PISMNC3File::def_var(string name, PISM_IO_Type nctype, vector<string> dims) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     vector<int> dimids;
     int varid;
@@ -248,6 +270,7 @@ int PISMNC3File::def_var(string name, PISM_IO_Type nctype, vector<string> dims) 
 
   MPI_Barrier(com);
   MPI_Bcast(&stat,   1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -300,6 +323,8 @@ int PISMNC3File::get_var_double(string variable_name,
     }
   }
 #endif
+
+  PISMLogEventBegin(PISM_IO_READ_EVENT);
 
   if (mapped == false)
     imap.resize(ndims);
@@ -380,6 +405,8 @@ int PISMNC3File::get_var_double(string variable_name,
     MPI_Recv(ip, local_chunk_size, MPI_DOUBLE, 0, data_tag, com, &mpi_stat);
   }
 
+  PISMLogEventEnd(PISM_IO_READ_EVENT);
+
   return stat;
 }
 
@@ -432,6 +459,8 @@ int PISMNC3File::put_var_double(string variable_name,
     }
   }
 #endif
+
+  PISMLogEventBegin(PISM_IO_WRITE_EVENT);
 
   if (mapped == false)
     imap.resize(ndims);
@@ -523,6 +552,8 @@ int PISMNC3File::put_var_double(string variable_name,
     MPI_Send(const_cast<double*>(op), local_chunk_size, MPI_DOUBLE, 0, data_tag, com);
   }
 
+  PISMLogEventEnd(PISM_IO_WRITE_EVENT);
+
   return stat;
 }
 
@@ -530,11 +561,13 @@ int PISMNC3File::put_var_double(string variable_name,
 int PISMNC3File::inq_nvars(int &result) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     stat = nc_inq_nvars(ncid, &result); check(stat);
   }
   MPI_Barrier(com);
   MPI_Bcast(&result, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return 0;
 }
@@ -544,12 +577,14 @@ int PISMNC3File::inq_vardimid(string variable_name, vector<string> &result) cons
   int stat, ndims, varid = -1;
   vector<int> dimids;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     stat = nc_inq_varid(ncid, variable_name.c_str(), &varid); check(stat);
 
     stat = nc_inq_varndims(ncid, varid, &ndims); check(stat);
   }
   MPI_Bcast(&ndims, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   if (ndims == 0) {
     result.clear();
@@ -559,6 +594,7 @@ int PISMNC3File::inq_vardimid(string variable_name, vector<string> &result) cons
   result.resize(ndims);
   dimids.resize(ndims);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     stat = nc_inq_vardimid(ncid, varid, &dimids[0]); check(stat);
   }
@@ -578,6 +614,7 @@ int PISMNC3File::inq_vardimid(string variable_name, vector<string> &result) cons
 
     result[k] = name;
   }
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return 0;
 }
@@ -589,6 +626,7 @@ int PISMNC3File::inq_vardimid(string variable_name, vector<string> &result) cons
 int PISMNC3File::inq_varnatts(string variable_name, int &result) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int varid = -1;
 
@@ -602,6 +640,7 @@ int PISMNC3File::inq_varnatts(string variable_name, int &result) const {
   }
   MPI_Barrier(com);
   MPI_Bcast(&result, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return 0;
 }
@@ -610,6 +649,7 @@ int PISMNC3File::inq_varnatts(string variable_name, int &result) const {
 int PISMNC3File::inq_varid(string variable_name, bool &exists) const {
   int stat, flag = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     stat = nc_inq_varid(ncid, variable_name.c_str(), &flag);
 
@@ -621,6 +661,7 @@ int PISMNC3File::inq_varid(string variable_name, bool &exists) const {
   }
   MPI_Barrier(com);
   MPI_Bcast(&flag, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   exists = (flag == 1);
 
@@ -632,6 +673,7 @@ int PISMNC3File::inq_varname(unsigned int j, string &result) const {
   char varname[NC_MAX_NAME];
   memset(varname, 0, NC_MAX_NAME);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     stat = nc_inq_varname(ncid, j, varname); check(stat);
   }
@@ -640,6 +682,7 @@ int PISMNC3File::inq_varname(unsigned int j, string &result) const {
 
   MPI_Bcast(&stat,   1, MPI_INT, 0, com);
   MPI_Bcast(varname, NC_MAX_NAME, MPI_CHAR, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = varname;
 
@@ -655,6 +698,7 @@ int PISMNC3File::inq_varname(unsigned int j, string &result) const {
 int PISMNC3File::get_att_double(string variable_name, string att_name, vector<double> &result) const {
   int stat, len, varid = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Read and broadcast the attribute length:
   if (rank == 0) {
     size_t attlen;
@@ -677,6 +721,7 @@ int PISMNC3File::get_att_double(string variable_name, string att_name, vector<do
     }
   }
   MPI_Bcast(&len, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   if (len == 0) {
     result.clear();
@@ -685,6 +730,7 @@ int PISMNC3File::get_att_double(string variable_name, string att_name, vector<do
 
   result.resize(len);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Now read data and broadcast stat to see if we succeeded:
   if (rank == 0) {
     stat = nc_get_att_double(ncid, varid, att_name.c_str(), &result[0]); check(stat);
@@ -698,6 +744,7 @@ int PISMNC3File::get_att_double(string variable_name, string att_name, vector<do
     fprintf(stderr, "Error reading the %s attribute; (varid %d, NetCDF error %s)",
             att_name.c_str(), varid, nc_strerror(stat));
   }
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return 0;
 }
@@ -710,6 +757,7 @@ int PISMNC3File::get_att_text(string variable_name, string att_name, string &res
   char *str = NULL;
   int stat, len, varid = -1;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Read and broadcast the attribute length:
   if (rank == 0) {
     size_t attlen;
@@ -727,6 +775,7 @@ int PISMNC3File::get_att_text(string variable_name, string att_name, string &res
       len = 0;
   }
   MPI_Bcast(&len, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   // Allocate some memory or set result to NULL and return:
   if (len == 0) {
@@ -739,6 +788,7 @@ int PISMNC3File::get_att_text(string variable_name, string att_name, string &res
   // harmless bytes and potential memory errors)
   memset(str, 0, len + 1);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   // Now read the string and broadcast stat to see if we succeeded:
   if (rank == 0) {
     stat = nc_get_att_text(ncid, varid, att_name.c_str(), str);
@@ -751,6 +801,7 @@ int PISMNC3File::get_att_text(string variable_name, string att_name, string &res
   } else {
     strcpy(str, "");
   }
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = str;
 
@@ -769,6 +820,7 @@ int PISMNC3File::put_att_double(string variable_name, string att_name,
 
   stat = redef(); check(stat);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int varid = -1;
 
@@ -784,6 +836,7 @@ int PISMNC3File::put_att_double(string variable_name, string att_name,
 
   MPI_Barrier(com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -799,6 +852,7 @@ int PISMNC3File::put_att_text(string variable_name, string att_name, string valu
 
   stat = redef(); check(stat);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int varid = -1;
 
@@ -813,6 +867,7 @@ int PISMNC3File::put_att_text(string variable_name, string att_name, string valu
 
   MPI_Barrier(com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -826,6 +881,7 @@ int PISMNC3File::inq_attname(string variable_name, unsigned int n, string &resul
   char name[NC_MAX_NAME];
   memset(name, 0, NC_MAX_NAME);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int varid = -1;
 
@@ -840,6 +896,7 @@ int PISMNC3File::inq_attname(string variable_name, unsigned int n, string &resul
   MPI_Barrier(com);
   MPI_Bcast(name, NC_MAX_NAME, MPI_CHAR, 0, com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = name;
 
@@ -853,6 +910,7 @@ int PISMNC3File::inq_attname(string variable_name, unsigned int n, string &resul
 int PISMNC3File::inq_atttype(string variable_name, string att_name, PISM_IO_Type &result) const {
   int stat, tmp;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   if (rank == 0) {
     int varid = -1;
 
@@ -874,6 +932,7 @@ int PISMNC3File::inq_atttype(string variable_name, string att_name, PISM_IO_Type
   }
   MPI_Barrier(com);
   MPI_Bcast(&tmp, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = nc_type_to_pism_type(static_cast<nc_type>(tmp));
 
@@ -885,6 +944,7 @@ int PISMNC3File::inq_atttype(string variable_name, string att_name, PISM_IO_Type
 int PISMNC3File::set_fill(int fillmode, int &old_modep) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   if (rank == 0) {
     stat = nc_set_fill(ncid, fillmode, &old_modep); check(stat);
   }
@@ -892,6 +952,7 @@ int PISMNC3File::set_fill(int fillmode, int &old_modep) const {
   MPI_Barrier(com);
   MPI_Bcast(&old_modep, 1, MPI_INT, 0, com);
   MPI_Bcast(&stat, 1, MPI_INT, 0, com);
+  PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   return stat;
 }

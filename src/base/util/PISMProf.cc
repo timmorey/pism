@@ -20,6 +20,8 @@
 #include "PISMNC3File.hh"
 #include "pism_const.hh"
 
+#include <map>
+
 /// PISMEvent
 PISMEvent::PISMEvent() {
   name = "unknown";
@@ -220,4 +222,96 @@ PetscErrorCode PISMProf::barrier() {
 #endif
 
   return 0;
+}
+
+/**
+   The following is the implementation of the profiling functions defined at the
+   bottom of PISMProf.hh.  We use global variables here to ensure that we have
+   exactly one instance of these per process.
+ */
+
+PetscClassId g_DefaultEventClassId = -1;
+std::map<string, PetscLogEvent> g_RegisteredEvents;
+std::map<string, PetscLogStage> g_RegisteredStages;
+
+PetscErrorCode PISMLogEventBegin(string name) {
+  PetscErrorCode retval = 0;
+  std::map<string, PetscLogEvent>::iterator iter;
+  PetscLogEvent event = -1;
+
+  iter = g_RegisteredEvents.find(name);
+  if(iter == g_RegisteredEvents.end()) {
+    // The event has not yet been registered, so we must do that first.
+
+    if(0 > g_DefaultEventClassId) {
+      // We have not even registered our class id yet, and we must do that
+      // before we register the event.
+      retval = PetscClassIdRegister("PISM-DefaultClassId", &g_DefaultEventClassId); 
+      CHKERRQ(retval);
+    }
+
+    PetscLogEventRegister(name.c_str(), g_DefaultEventClassId, &event); 
+    CHKERRQ(retval);
+
+    g_RegisteredEvents[name] = event;
+  
+  } else {
+    event = iter->second;
+  }
+
+  if(0 > event) {
+    // Something went wrong, and we failed to register the event.
+    fprintf(stderr, "Failed to register event \"%s\"\n", name.c_str());
+    retval = -1;
+  } else {
+    retval = PetscLogEventBegin(event, 0, 0, 0, 0);  CHKERRQ(retval);
+  }
+
+  return retval;
+}
+
+PetscErrorCode PISMLogEventEnd(string name) {
+  PetscErrorCode retval = 0;
+  std::map<string, PetscLogEvent>::iterator iter;
+
+  iter = g_RegisteredEvents.find(name);
+  if(iter != g_RegisteredEvents.end()) {
+    retval = PetscLogEventEnd(iter->second, 0, 0, 0, 0);  CHKERRQ(retval);
+  } else {
+    // The event is not registered, so we can't end it.
+    fprintf(stderr, "Event \"%s\" is not registered.\n", name.c_str());
+    retval = -1;
+  }
+
+  return retval;
+}
+
+PetscErrorCode PISMLogStagePush(string name) {
+  PetscErrorCode retval = 0;
+  std::map<string, PetscLogStage>::iterator iter;
+  PetscLogStage stage = -1;
+
+  iter = g_RegisteredStages.find(name);
+  if(iter == g_RegisteredStages.end()) {
+    PetscLogStageRegister(name.c_str(), &stage);  CHKERRQ(retval);
+    g_RegisteredStages[name] = stage;
+  } else {
+    stage = iter->second;
+  }
+
+  if(0 > stage) {
+    // Something went wrong, and we failed to register the stage.
+    fprintf(stderr, "Failed to register stage \"%s\"\n", name.c_str());
+    retval = -1;
+  } else {
+    retval = PetscLogStagePush(stage);  CHKERRQ(retval);
+  }
+
+  return retval;
+}
+
+PetscErrorCode PISMLogStagePop() {
+  PetscErrorCode retval = 0;
+  retval = PetscLogStagePop();  CHKERRQ(retval);
+  return retval;
 }
