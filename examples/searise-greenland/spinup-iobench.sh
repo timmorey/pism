@@ -111,7 +111,7 @@ else
   PISM_SLSERIES=pism_dSL.nc
 fi
 if [ -n "${PISM_CONFIG:+1}" ] ; then
-  echo "$SCRIPTNAME   PISM_CONFIG = $PISM_CONFIG (already set)"
+  echo "$SCRIPTNAME     PISM_CONFIG = $PISM_CONFIG (already set)"
 else
   PISM_CONFIG=searise_config.nc
 fi
