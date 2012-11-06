@@ -18,7 +18,6 @@
 
 #include <pnetcdf.h>
 #include <sstream>
-#include <string.h>
 
 #include "PISMPNCFile.hh"
 #include "PISMProf.hh"
