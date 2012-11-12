@@ -67,7 +67,7 @@ int PISMPNCFile::create(string fname) {
   filename = fname;
 
   PISMLogEventBegin(PISM_IO_DATASET_EVENT);
-  stat = ncmpi_create(com, filename.c_str(), NC_CLOBBER|NC_64BIT_OFFSET,
+  stat = ncmpi_create(com, filename.c_str(), NC_CLOBBER|NC_64BIT_DATA,
                       mpi_info, &ncid); check(stat);
   PISMLogEventEnd(PISM_IO_DATASET_EVENT);
   define_mode = true;

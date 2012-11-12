@@ -791,7 +791,7 @@ void IceGrid::check_parameters() {
   }
 
   if (Mx * My * Mz * sizeof(double) > pow(2, 32) - 4 &&
-      config.get_string("output_format") != "netcdf4_parallel") {
+      config.get_string("output_format") == "netcdf3") {
     PetscPrintf(com,
                 "PISM ERROR: The computational grid is too big to fit in a NetCDF-3 file.\n"
                 "            Each 3D variable requires %lu Mb.\n"
