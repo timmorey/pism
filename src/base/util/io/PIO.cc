@@ -773,7 +773,7 @@ PetscErrorCode PIO::append_time(string name, double value) const {
  * Use put_att_text("PISM_GLOBAL", "history", ...) to overwrite "history".
  */
 PetscErrorCode PIO::append_history(string history) const {
-  PISMLogEventBegin(PISM_IO_EVENT);
+/*  PISMLogEventBegin(PISM_IO_EVENT);
 
   PetscErrorCode ierr;
   string old_history;
@@ -784,7 +784,7 @@ PetscErrorCode PIO::append_history(string history) const {
   ierr = nc->put_att_text("PISM_GLOBAL", "history", history + old_history); CHKERRQ(ierr);
 
   PISMLogEventEnd(PISM_IO_EVENT);
-  return 0;
+*/  return 0;
 }
 
 //! \brief Write a multiple-valued double attribute.
@@ -828,7 +828,9 @@ PetscErrorCode PIO::put_att_text(string var_name, string att_name, string value)
 
   string tmp = value + "\0";    // ensure that the string is null-terminated
 
-  ierr = nc->put_att_text(var_name, att_name, tmp); CHKERRQ(ierr);
+  if(att_name != "history" && att_name != ":history") {
+    ierr = nc->put_att_text(var_name, att_name, tmp); CHKERRQ(ierr);
+  }
 
   PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
