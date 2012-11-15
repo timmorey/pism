@@ -127,7 +127,12 @@ PetscErrorCode IceModel::dumpToFile(string filename) {
   string time_name = config.get_string("time_dimension_name");
   ierr = nc.open(filename, PISM_WRITE); CHKERRQ(ierr); // append == false
   ierr = nc.def_time(time_name, config.get_string("calendar"), grid.time->CF_units()); CHKERRQ(ierr);
-  ierr = nc.append_time(time_name, grid.time->current()); CHKERRQ(ierr);
+
+  // Writing any part of any record variable before defining all variables is
+  // detrimental to pnetcdf performance.  We will now do the append_time
+  // operation in the write_variables method, which will be called from 
+  // write_model_state.
+  //ierr = nc.append_time(time_name, grid.time->current()); CHKERRQ(ierr);
 
   // Write metadata *before* variables:
   ierr = write_metadata(nc); CHKERRQ(ierr);
@@ -203,6 +208,15 @@ PetscErrorCode IceModel::write_variables(const PIO &nc, set<string> vars,
 
   }
   grid.profiler->end(event_output_define);
+
+  // We are done defining variables, so now is a good time to finally write the
+  // the dimension variable data
+  string time_name = config.get_string("time_dimension_name");
+  ierr = nc.append_time(time_name, grid.time->current()); CHKERRQ(ierr);
+  ierr = nc.put_dim("x", grid.x);  CHKERRQ(ierr);
+  ierr = nc.put_dim("y", grid.y);  CHKERRQ(ierr);
+  ierr = nc.put_dim("z", grid.zlevels);  CHKERRQ(ierr);
+  ierr = nc.put_dim("zb", grid.zblevels);  CHKERRQ(ierr);
 
   // Write all the IceModel variables:
   set<string>::iterator i;

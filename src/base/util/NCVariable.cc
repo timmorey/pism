@@ -761,7 +761,7 @@ PetscErrorCode NCSpatialVariable::define_dimensions(const PIO &nc) {
   ierr = nc.inq_dim(dimname, exists); CHKERRQ(ierr);
   if (!exists) {
     ierr = nc.def_dim(dimname, grid->Mx, x_attrs); CHKERRQ(ierr); 
-    ierr = nc.put_dim(dimname, grid->x); CHKERRQ(ierr);
+    //ierr = nc.put_dim(dimname, grid->x); CHKERRQ(ierr);
   }
 
   // y
@@ -769,7 +769,7 @@ PetscErrorCode NCSpatialVariable::define_dimensions(const PIO &nc) {
   ierr = nc.inq_dim(dimname, exists); CHKERRQ(ierr);
   if (!exists) {
     ierr = nc.def_dim(dimname, grid->My, y_attrs); CHKERRQ(ierr); 
-    ierr = nc.put_dim(dimname, grid->y); CHKERRQ(ierr);
+    //ierr = nc.put_dim(dimname, grid->y); CHKERRQ(ierr);
   }
 
   // z
@@ -778,7 +778,7 @@ PetscErrorCode NCSpatialVariable::define_dimensions(const PIO &nc) {
     ierr = nc.inq_dim(dimname, exists); CHKERRQ(ierr);
     if (!exists) {
       ierr = nc.def_dim(dimname, nlevels, z_attrs); CHKERRQ(ierr); 
-      ierr = nc.put_dim(dimname, zlevels); CHKERRQ(ierr);
+      //ierr = nc.put_dim(dimname, zlevels); CHKERRQ(ierr);
     }
   }
 

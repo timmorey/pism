@@ -140,6 +140,7 @@ public:
     ym; //!< number of grid points (in the y-direction) in a processor sub-domain
 
   vector<double> zlevels; //!< vertical grid levels in the ice; correspond to the storage grid
+  vector<double> zblevels; //!< vertical grid levels in bedrock.
 
   vector<double> x,             //!< x-coordinates of grid points
     y;          //!< y-coordinates of grid points
