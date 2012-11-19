@@ -160,9 +160,11 @@ public:
 protected:
 
   void check(int return_code) const;
+  void init_hints() const;
 
   int rank;
   MPI_Comm com;
+  MPI_Info mpi_info;
 
   int ncid;
   string filename;

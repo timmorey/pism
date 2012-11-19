@@ -25,13 +25,12 @@
 
 PISMPNCFile::PISMPNCFile(MPI_Comm c, int r)
   : PISMNCFile(c, r) {
-  // MPI_Info_create(&mpi_info);
-  mpi_info = MPI_INFO_NULL;
+
 }
 
 
 PISMPNCFile::~PISMPNCFile() {
-  // MPI_Info_free(&mpi_info);
+
 }
 
 void PISMPNCFile::check(int return_code) const {
@@ -43,8 +42,6 @@ void PISMPNCFile::check(int return_code) const {
 
 int PISMPNCFile::open(string fname, int mode) {
   int stat;
-
-  init_hints();
 
   filename = fname;
 
@@ -60,8 +57,6 @@ int PISMPNCFile::open(string fname, int mode) {
 
 int PISMPNCFile::create(string fname) {
   int stat;
-
-  init_hints();
 
   filename = fname;
 
@@ -656,34 +651,3 @@ int PISMPNCFile::put_var_double(string variable_name,
 
   return stat;
 }
-
-
-void PISMPNCFile::init_hints() {
-
-  vector<string>::iterator j = mpi_io_hints.begin();
-  while (j != mpi_io_hints.end()) {
-    istringstream arg(*j);
-    vector<string> words;
-    string word;
-    while (getline(arg, word, ':'))
-      words.push_back(word);
-
-    if (words.size() == 2) {
-      // printf("Setting MPI I/O hint \"%s\" to \"%s\"...\n",
-      //        words[0].c_str(), words[1].c_str());
-
-      MPI_Info_set(mpi_info,
-                   const_cast<char*>(words[0].c_str()),
-                   const_cast<char*>(words[1].c_str()));
-    } else {
-      if (rank == 0) {
-        printf("PISM WARNING: invalid MPI I/O hint: %s. Ignoring it...\n",
-               j->c_str());
-      }
-    }
-
-    ++j;
-  }
-
-}
-

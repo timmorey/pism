@@ -99,7 +99,6 @@ public:
   // misc
   int set_fill(int fillmode, int &old_modep) const;
 
-  vector<string> mpi_io_hints;
 protected:
   void check(int return_code) const;
 
@@ -116,9 +115,6 @@ private:
                      vector<unsigned int> imap, const double *op,
                      bool mapped) const;
 
-  void init_hints();
-
-  MPI_Info mpi_info;            // MPI hints
 };
 
 #endif /* _PISMPNCFILE_H_ */

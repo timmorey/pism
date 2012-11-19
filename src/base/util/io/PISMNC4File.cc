@@ -40,7 +40,6 @@ PISMNC4File::~PISMNC4File() {
 // open/create/close
 
 int PISMNC4File::open(string fname, int mode) {
-  MPI_Info info = MPI_INFO_NULL;
   int stat;
 
   filename = fname;
@@ -48,7 +47,7 @@ int PISMNC4File::open(string fname, int mode) {
   PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   stat = nc_open_par(filename.c_str(),
                      mode | NC_MPIIO,
-                     com, info, &ncid); check(stat);
+                     com, mpi_info, &ncid); check(stat);
   PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
   define_mode = false;
@@ -57,7 +56,6 @@ int PISMNC4File::open(string fname, int mode) {
 }
 
 int PISMNC4File::create(string fname) {
-  MPI_Info info = MPI_INFO_NULL;
   int stat;
 
   filename = fname;
@@ -65,7 +63,7 @@ int PISMNC4File::create(string fname) {
   PISMLogEventBegin(PISM_IO_DATASET_EVENT);
   stat = nc_create_par(filename.c_str(),
                        NC_NETCDF4 | NC_MPIIO,
-                       com, info, &ncid); check(stat);
+                       com, mpi_info, &ncid); check(stat);
   PISMLogEventEnd(PISM_IO_DATASET_EVENT);
   define_mode = true;
 
