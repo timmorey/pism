@@ -35,9 +35,12 @@
 #include "PISMPNCFile.hh"
 #endif
 
+std::map<string,string> g_IOMode;
+
 PIO::PIO(MPI_Comm c, int r, string mode) {
   com = c;
   rank = r;
+  nc = 0;
   shallow_copy = false;
 
   // Initialize UDUNITS if needed
@@ -48,25 +51,7 @@ PIO::PIO(MPI_Comm c, int r, string mode) {
     }
   }
 
-  if (mode == "netcdf3") {
-    nc = new PISMNC3File(com, rank);
-  }
-#if (PISM_PARALLEL_NETCDF4==1)
-  else if (mode == "netcdf4_parallel") {
-    nc = new PISMNC4File(com, rank);
-  }
-#endif
-#if (PISM_PNETCDF==1)
-  else if (mode == "pnetcdf") {
-    nc = new PISMPNCFile(com, rank);
-  }
-#endif
-  else {
-    nc = NULL;
-    PetscPrintf(com, "PISM ERROR: output format '%s' is not supported.\n",
-                mode.c_str());
-    PISMEnd();
-  }
+  this->io_mode = mode;
 }
 
 PIO::PIO(const PIO &other) {
@@ -78,7 +63,7 @@ PIO::PIO(const PIO &other) {
 }
 
 PIO::~PIO() {
-  if (shallow_copy == false)
+  if (shallow_copy == false && nc != 0)
     delete nc;
 }
 
@@ -87,6 +72,29 @@ PetscErrorCode PIO::open(string filename, int mode, bool append) {
   PISMLogEventBegin(PISM_IO_EVENT);
 
   PetscErrorCode ierr;
+
+  std::map<string,string>::iterator iter = g_IOMode.find(filename);
+  if(iter == g_IOMode.end()) {
+    g_IOMode[filename] = io_mode;
+  } else {
+    this->io_mode = iter->second;
+  }
+
+  PetscPrintf(com, "Opening '%s' with '%s'...\n", 
+              filename.c_str(), this->io_mode.c_str());
+  
+  if (this->io_mode == "netcdf3") {
+    nc = new PISMNC3File(com, rank);
+  } else if (this->io_mode == "netcdf4_parallel") {
+    nc = new PISMNC4File(com, rank);
+  } else if (this->io_mode == "pnetcdf") {
+    nc = new PISMPNCFile(com, rank);
+  } else {
+    nc = NULL;
+    PetscPrintf(com, "PISM ERROR: output format '%s' is not supported.\n",
+                this->io_mode.c_str());
+    PISMEnd();
+  }
 
   // opening for reading
 
@@ -622,7 +630,8 @@ PetscErrorCode PIO::def_dim(string name, long int length, map<string,string> att
 
   PetscErrorCode ierr;
 
-  ierr = nc->redef(); CHKERRQ(ierr);
+  ierr = nc->redef();
+  CHKERRQ(ierr);
 
   ierr = nc->def_dim(name, length); CHKERRQ(ierr);
 
@@ -783,6 +792,7 @@ PetscErrorCode PIO::append_history(string history) const {
   ierr = nc->put_att_text("PISM_GLOBAL", "history", history + old_history); CHKERRQ(ierr);
 
   PISMLogEventEnd(PISM_IO_EVENT);
+
   return 0;
 }
 
@@ -825,7 +835,11 @@ PetscErrorCode PIO::put_att_text(string var_name, string att_name, string value)
 
   ierr = nc->redef(); CHKERRQ(ierr);
 
-  ierr = nc->put_att_text(var_name, att_name, value); CHKERRQ(ierr);
+  string tmp = value + "\0";    // ensure that the string is null-terminated
+
+  if(att_name != "history" && att_name != ":history") {
+    ierr = nc->put_att_text(var_name, att_name, tmp); CHKERRQ(ierr);
+  }
 
   PISMLogEventEnd(PISM_IO_EVENT);
   return 0;

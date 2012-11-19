@@ -50,6 +50,7 @@ PetscErrorCode IceModelVec3BTU::create(IceGrid &mygrid, const char my_short_name
   for (int i = 0; i < n_levels; ++i)
     zlevels[i] = -Lbz + i * dz;
   zlevels.back() = 0;
+  mygrid.zblevels = zlevels;
 
   da_stencil_width = stencil_width;
   ierr = create_2d_da(da, n_levels, da_stencil_width); CHKERRQ(ierr);
@@ -244,11 +245,11 @@ PetscErrorCode PISMBedThermalUnit::define_variables(
   return 0;
 }
 
-PetscErrorCode PISMBedThermalUnit::write_variables(set<string> vars, string filename) {
+PetscErrorCode PISMBedThermalUnit::write_variables(set<string> vars, const PIO &nc) {
   if (temp.was_created()) {
     PetscErrorCode ierr;
     if (set_contains(vars, temp.string_attr("short_name"))) {
-      ierr = temp.write(filename.c_str()); CHKERRQ(ierr); 
+      ierr = temp.write(nc); CHKERRQ(ierr); 
     }
   }
   return 0;

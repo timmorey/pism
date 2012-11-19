@@ -157,6 +157,7 @@ protected:
   int rank;
   bool shallow_copy;
   PISMNCFile *nc;
+  string io_mode;
 
   virtual PetscErrorCode move_if_exists(string filename);
   PetscErrorCode compute_start_and_count(string name, int t_start,
