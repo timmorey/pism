@@ -23,6 +23,22 @@
 #include "PISMProf.hh"
 #include "pism_type_conversion.hh" // has to go after pnetcdf.h
 
+void PrintInfo(MPI_Info info, const char* filename) {
+  int nkeys;
+  char key[MPI_MAX_INFO_KEY];
+  char value[MPI_MAX_INFO_VAL];
+  int i;
+  int flag;
+
+  printf("MPI_Info for '%s':\n", filename);
+  MPI_Info_get_nkeys(info, &nkeys);
+  for(i = 0; i < nkeys; i++) {
+    MPI_Info_get_nthkey(info, i, key);
+    MPI_Info_get(info, key, MPI_MAX_INFO_VAL, value, &flag);
+    printf("  %s : %s\n", key, value);
+  }
+}
+
 PISMPNCFile::PISMPNCFile(MPI_Comm c, int r)
   : PISMNCFile(c, r) {
 
@@ -49,6 +65,12 @@ int PISMPNCFile::open(string fname, int mode) {
   stat = ncmpi_open(com, filename.c_str(), mode, mpi_info, &ncid); check(stat);
   PISMLogEventEnd(PISM_IO_DATASET_EVENT);
 
+  if(0 == rank && getenv("PISM_ECHO_HINTS")) {
+    MPI_Info info;
+    ncmpi_get_file_info(ncid, &info);
+    PrintInfo(info, filename.c_str());
+  }
+
   define_mode = false;
 
   return stat;
@@ -65,6 +87,12 @@ int PISMPNCFile::create(string fname) {
                       mpi_info, &ncid); check(stat);
   PISMLogEventEnd(PISM_IO_DATASET_EVENT);
   define_mode = true;
+
+  if(0 == rank && getenv("PISM_ECHO_HINTS")) {
+    MPI_Info info;
+    ncmpi_get_file_info(ncid, &info);
+    PrintInfo(info, filename.c_str());
+  }
 
   return stat;
 }
