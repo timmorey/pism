@@ -216,7 +216,12 @@ PetscErrorCode IceModel::write_variables(const PIO &nc, set<string> vars,
   ierr = nc.put_dim("x", grid.x);  CHKERRQ(ierr);
   ierr = nc.put_dim("y", grid.y);  CHKERRQ(ierr);
   ierr = nc.put_dim("z", grid.zlevels);  CHKERRQ(ierr);
-  ierr = nc.put_dim("zb", grid.zblevels);  CHKERRQ(ierr);
+  
+  if(! grid.zblevels.empty()) {
+    // pisms runs don't use the zb dimension, so we'll get an error if we try to
+    // write it.  Check if we have data to write before we write it.
+    ierr = nc.put_dim("zb", grid.zblevels);  CHKERRQ(ierr);
+  }
 
   // Write all the IceModel variables:
   set<string>::iterator i;
