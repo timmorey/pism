@@ -203,6 +203,8 @@ if [ "$PISM_OFORMAT" == "netcdf4_parallel" ] ; then
   echo "Using output format netcdf4_parallel"
 elif [ "$PISM_OFORMAT" == "pnetcdf" ] ; then
   echo "Using output format pnetcdf"
+elif [ "$PISM_OFORMAT" == "quilt" ] ; then
+  echo "Using output format quilt"
 else
   PISM_OFORMAT=netcdf3
   echo "Using output format netcdf3"
@@ -249,13 +251,13 @@ $PISM_DO $cmd
 
 # Run #2
 # quick look at climate in 500 a recent period; see also delta_T in pism_dT.nc
-CLIMSTARTTIME=-500
-PRE0CLIMATE=g${CS}km_climate${CLIMSTARTTIME}a.nc
-PCLIM="${PISM_PREFIX}pclimate"
-echo
-echo "$SCRIPTNAME  running pclimate to show climate in modern period [${CLIMSTARTTIME} a,0 a], using current geometry and 10 year subintervals"
-cmd="$PISM_MPIDO $PCLIM -i $PRE0NAME $COUPLER_FORCING -times $CLIMSTARTTIME:10:0 -o $PRE0CLIMATE -o_format $PISM_OFORMAT -log_summary $PISM_DEFAULT_CONFIG"
-$PISM_DO $cmd
+#CLIMSTARTTIME=-500
+#PRE0CLIMATE=g${CS}km_climate${CLIMSTARTTIME}a.nc
+#PCLIM="${PISM_PREFIX}pclimate"
+#echo
+#echo "$SCRIPTNAME  running pclimate to show climate in modern period [${CLIMSTARTTIME} a,0 a], using current geometry and 10 year subintervals"
+#cmd="$PISM_MPIDO $PCLIM -i $PRE0NAME $COUPLER_FORCING -times $CLIMSTARTTIME:10:0 -o $PRE0CLIMATE -o_format $PISM_OFORMAT -log_summary $PISM_DEFAULT_CONFIG"
+#$PISM_DO $cmd
 
 
 # Run #3

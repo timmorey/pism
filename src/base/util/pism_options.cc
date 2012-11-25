@@ -586,7 +586,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.scalar_from_option("bed_smoother_range", "bed_smoother_range"); CHKERRQ(ierr);
 
   ierr = config.keyword_from_option("gradient", "surface_gradient_method",
-                                    "eta,haseloff,mahaffy"); CHKERRQ(ierr);
+                                    "eta,haseloff,mahaffy,new"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("sia_e", "sia_enhancement_factor"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("ssa_e", "ssa_enhancement_factor"); CHKERRQ(ierr);
@@ -702,7 +702,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
                                     "xyz,yxz,zyx"); CHKERRQ(ierr);
 
   ierr = config.keyword_from_option("o_format", "output_format",
-                                    "netcdf3,netcdf4_parallel,pnetcdf"); CHKERRQ(ierr);
+                                    "netcdf3,quilt,quilt-with-compression,netcdf4_parallel,pnetcdf,hdf5"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("summary_volarea_scale_factor_log10",
                                    "summary_volarea_scale_factor_log10"); CHKERRQ(ierr);

@@ -43,7 +43,7 @@ static char help[] =
 static PetscErrorCode setupIceGridFromFile(string filename, IceGrid &grid) {
   PetscErrorCode ierr;
 
-  PIO nc(grid.com, grid.rank, "netcdf3");
+  PIO nc(grid, "guess_format");
 
   ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
   // filename should point to a PISM output file, which is guaranteed to have
@@ -194,7 +194,7 @@ static PetscErrorCode writePCCStateAtTimes(PISMVars &variables,
 
   MPI_Comm com = grid.com;
   PetscErrorCode ierr;
-  PIO nc(grid.com, grid.rank, grid.config.get_string("output_format"));
+  PIO nc(grid, grid.config.get_string("output_format"));
   NCGlobalAttributes global_attrs;
   IceModelVec2S *usurf, *ice_surface_temp, *climatic_mass_balance, *shelfbasetemp, *shelfbasemassflux;
 
@@ -218,7 +218,7 @@ static PetscErrorCode writePCCStateAtTimes(PISMVars &variables,
   global_attrs.set_string("source", string("pclimate ") + PISM_Revision);
 
   // Create a string with space-separated command-line arguments:
-  string history = pism_username_prefix() + pism_args_string();
+  string history = pism_username_prefix(com) + pism_args_string();
 
   global_attrs.prepend_history(history);
 
@@ -422,7 +422,7 @@ int main(int argc, char *argv[]) {
     ierr = createVecs(grid, variables); CHKERRQ(ierr);
 
     // read data from a PISM input file (including the projection parameters)
-    PIO nc(grid.com, grid.rank, "netcdf3");
+    PIO nc(grid, "guess_format");
     unsigned int last_record;
     bool mapping_exists;
 

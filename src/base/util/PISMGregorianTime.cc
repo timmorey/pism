@@ -71,7 +71,7 @@ PetscErrorCode PISMGregorianTime::init_from_file(string filename) {
   bool exists;
 
   ierr = MPI_Comm_rank(com, &rank); CHKERRQ(ierr);
-  PIO nc(com, rank, "netcdf3");
+  PIO nc(com, rank, "netcdf3"); // OK to use netcdf3
 
   ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
   ierr = nc.inq_var(time_name, exists); CHKERRQ(ierr);
@@ -126,8 +126,8 @@ PetscErrorCode PISMGregorianTime::init_from_file(string filename) {
     ierr = time_axis.read(nc, false, time); CHKERRQ(ierr);
   }
 
-  run_start = time[0];
-  run_end = time[time.size() - 1];
+  run_start = time.front();
+  run_end = time.back();
   time_in_seconds = run_start;
 
   ierr = nc.close(); CHKERRQ(ierr);

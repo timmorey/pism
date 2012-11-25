@@ -26,22 +26,60 @@
 #include "PISMTime.hh"
 #include "PISMNC3File.hh"
 #include "PISMProf.hh"
+#include "PISMNC4_Quilt.hh"
+#include <assert.h>
 
 #if (PISM_PARALLEL_NETCDF4==1)
-#include "PISMNC4File.hh"
+#include "PISMNC4_Par.hh"
 #endif
 
 #if (PISM_PNETCDF==1)
 #include "PISMPNCFile.hh"
 #endif
 
-std::map<string,string> g_IOMode;
+#if (PISM_HDF5==1)
+#include "PISMNC4_HDF5.hh"
+#endif
 
-PIO::PIO(MPI_Comm c, int r, string mode) {
+static PISMNCFile* create_backend(MPI_Comm com, int rank, string mode) {
+  if (mode == "netcdf3") {
+    return new PISMNC3File(com, rank);
+  } else if (mode == "quilt") {
+    return new PISMNC4_Quilt(com, rank, false);
+  } else if (mode == "quilt-with-compression") {
+    return new PISMNC4_Quilt(com, rank, true);
+  }
+#if (PISM_PARALLEL_NETCDF4==1)
+  else if (mode == "netcdf4_parallel") {
+    return new PISMNC4_Par(com, rank);
+  }
+#endif
+#if (PISM_PNETCDF==1)
+  else if (mode == "pnetcdf") {
+    return new PISMPNCFile(com, rank);
+  }
+#endif
+#if (PISM_HDF5==1)
+  else if (mode == "hdf5") {
+    return new PISMNC4_HDF5(com, rank);
+  }
+#endif
+  else {
+    return NULL;
+  }
+}
+
+//! \brief The code shared by different PIO constructors.
+void PIO::constructor(MPI_Comm c, int r, string mode) {
   com = c;
   rank = r;
-  nc = 0;
   shallow_copy = false;
+  m_mode = mode;
+  m_xs = 0;
+  m_xm = 0;
+  m_ys = 0;
+  m_ym = 0;
+  nc = 0;
 
   // Initialize UDUNITS if needed
   if (utIsInit() == 0) {
@@ -50,14 +88,22 @@ PIO::PIO(MPI_Comm c, int r, string mode) {
       PISMEnd();
     }
   }
+}
 
-  this->io_mode = mode;
+PIO::PIO(MPI_Comm c, int r, string mode) {
+  constructor(c, r, mode);
+}
+
+PIO::PIO(IceGrid &grid, string mode) {
+  constructor(grid.com, grid.rank, mode);
+  set_local_extent(grid.xs, grid.xm, grid.ys, grid.ym);
 }
 
 PIO::PIO(const PIO &other) {
   com = other.com;
   rank = other.rank;
   nc = other.nc;
+  m_mode = other.m_mode;
 
   shallow_copy = true;
 }
@@ -67,40 +113,77 @@ PIO::~PIO() {
     delete nc;
 }
 
+// Chooses the best I/O backend for reading from 'filename'.
+PetscErrorCode PIO::detect_mode(string filename) {
+  int stat;
+
+  // Bail if someone made a decision already.
+  if (nc != NULL)
+    return 1;
+
+  vector<string> modes;
+  PISMNC3File nc3(com, rank);
+  stat = nc3.open(filename, PISM_NOWRITE);
+  if (0 == stat) {
+    // We successfully opened with Unidata's NetCDF, so the file must be CDF-1,
+    // CDF-2, or HDF-5.
+
+    string format = nc3.get_format();
+    
+    stat = nc3.close(); CHKERRQ(stat);
+    
+    if (format == "netcdf4") {
+      modes.push_back("netcdf4_parallel");
+      modes.push_back("netcdf3");
+    } else {
+      modes.push_back("pnetcdf");
+      modes.push_back("netcdf3");
+    }
+  } else {
+    // Unidata wasn't able to open the file, which means it is either CDF-5, or
+    // we don't support it.
+
+    modes.push_back("pnetcdf");
+  }
+
+  for (unsigned int j = 0; j < modes.size(); ++j) {
+    nc = create_backend(com, rank, modes[j]);
+
+    if (nc != NULL) {
+      m_mode = modes[j];
+      stat = verbPrintf(3, com,
+                        "  - Using the %s backend to read from %s...\n",
+                        modes[j].c_str(), filename.c_str()); CHKERRQ(stat);
+      break;
+    }
+  }
+
+  if (nc == NULL) {
+    PetscPrintf(com, "PISM ERROR: Unable to allocate an I/O backend. This should never happen!\n");
+    PISMEnd();
+  }
+
+  nc->set_local_extent(m_xs, m_xm, m_ys, m_ym);
+
+  return 0;
+}
 
 PetscErrorCode PIO::open(string filename, int mode, bool append) {
   PISMLogEventBegin(PISM_IO_EVENT);
 
-  PetscErrorCode ierr;
-
-  std::map<string,string>::iterator iter = g_IOMode.find(filename);
-  if(iter == g_IOMode.end()) {
-    g_IOMode[filename] = io_mode;
-  } else {
-    this->io_mode = iter->second;
-  }
-
-  PetscPrintf(com, "Opening '%s' with '%s'...\n", 
-              filename.c_str(), this->io_mode.c_str());
-  
-  if (this->io_mode == "netcdf3") {
-    nc = new PISMNC3File(com, rank);
-  } else if (this->io_mode == "netcdf4_parallel") {
-    nc = new PISMNC4File(com, rank);
-  } else if (this->io_mode == "pnetcdf") {
-    nc = new PISMPNCFile(com, rank);
-  } else {
-    nc = NULL;
-    PetscPrintf(com, "PISM ERROR: output format '%s' is not supported.\n",
-                this->io_mode.c_str());
-    PISMEnd();
-  }
+  PetscErrorCode stat;
 
   // opening for reading
 
   if (!(mode & PISM_WRITE)) {
-    ierr = nc->open(filename, mode);
-    if (ierr != 0) {
+    if (nc == NULL) {
+      stat = detect_mode(filename); CHKERRQ(stat);
+    }
+
+    assert(nc != NULL);
+
+    stat = nc->open(filename, mode);
+    if (stat != 0) {
       PetscPrintf(com, "PISM ERROR: Can't open '%s'. Exiting...\n", filename.c_str());
       PISMEnd();
     }
@@ -112,27 +195,42 @@ PetscErrorCode PIO::open(string filename, int mode, bool append) {
   // opening for writing
 
   if (append == false) {
-    ierr = move_if_exists(filename); CHKERRQ(ierr);
 
-    ierr = nc->create(filename);
-    if (ierr != 0) {
+    // We are creating a new file, so use whatever mode the user requested
+    nc = create_backend(com, rank, m_mode);
+    if(0 == nc) {
+      PetscPrintf(com, "PISM ERROR: Unable to create I/O backend. \n", filename.c_str());
+      PISMEnd();
+    }
+
+    nc->set_local_extent(m_xs, m_xm, m_ys, m_ym);
+
+    stat = nc->move_if_exists(filename); CHKERRQ(stat);
+
+    stat = nc->create(filename);
+    if (stat != 0) {
       PetscPrintf(com, "PISM ERROR: Can't create '%s'. Exiting...\n", filename.c_str());
       PISMEnd();
     }
 
     int old_fill;
-    ierr = nc->set_fill(PISM_NOFILL, old_fill); CHKERRQ(ierr);
+    stat = nc->set_fill(PISM_NOFILL, old_fill); CHKERRQ(stat);
   } else {
+    if (nc == NULL) {
+      stat = detect_mode(filename); CHKERRQ(stat);
+    }
 
-    ierr = nc->open(filename, mode);
+    assert(nc != NULL);
 
-    if (ierr != 0) {
+    stat = nc->open(filename, mode);
+
+    if (stat != 0) {
       PetscPrintf(com, "PISM ERROR: Can't open '%s' (rank = %d). Exiting...\n", filename.c_str(), rank);
       PISMEnd();
     }
 
     int old_fill;
-    ierr = nc->set_fill(PISM_NOFILL, old_fill); CHKERRQ(ierr);
+    stat = nc->set_fill(PISM_NOFILL, old_fill); CHKERRQ(stat);
 
   }
 
@@ -569,8 +667,18 @@ PetscErrorCode PIO::inq_grid_info(string name, grid_info &g) const {
   ierr = nc->inq_vardimid(name_found, dims); CHKERRQ(ierr);
   PISMLogEventEnd(PISM_IO_EVENT);
 
-  int ndims = (int)dims.size();
-  for (int i = 0; i < ndims; ++i) {
+  // use "global" dimensions (as opposed to dimensions of a patch)
+  if (m_mode == "quilt") {
+    for (unsigned int i = 0; i < dims.size(); ++i) {
+      if (dims[i] == "x_patch")
+        dims[i] = "x";
+
+      if (dims[i] == "y_patch")
+        dims[i] = "y";
+    }
+  }
+
+  for (unsigned int i = 0; i < dims.size(); ++i) {
     string dimname = dims[i];
 
     AxisType dimtype = UNKNOWN_AXIS;
@@ -695,7 +803,8 @@ PetscErrorCode PIO::put_1d_var(string name, unsigned int s, unsigned int c,
 
   ierr = nc->enddef(); CHKERRQ(ierr);
 
-  ierr = nc->put_vara_double(name, start, count, &data[0]); CHKERRQ(ierr);
+  ierr = nc->put_vara_double(name, start, count,
+                             const_cast<double*>(&data[0])); CHKERRQ(ierr);
 
   PISMLogEventEnd(PISM_IO_EVENT);
   return 0;
@@ -1160,44 +1269,6 @@ PetscErrorCode PIO::regrid(IceGrid *grid, const vector<double> &zlevels_out, Loc
   return 0;
 }
 
-//! \brief Moves the file aside (file.nc -> file.nc~).
-/*!
- * Note: only processor 0 does the renaming.
- */
-PetscErrorCode PIO::move_if_exists(string filename) {
-  PetscErrorCode ierr;
-
-  if (rank == 0) {
-    bool exists = false;
-
-    // Check if the file exists:
-    if (FILE *f = fopen(filename.c_str(), "r")) {
-      fclose(f);
-      exists = true;
-    } else {
-      exists = false;
-    }
-
-    if (exists) {
-      string tmp = filename + "~";
-
-      ierr = rename(filename.c_str(), tmp.c_str());
-      if (ierr != 0) {
-        ierr = verbPrintf(1, com, "PISM ERROR: can't move '%s' to '%s'.\n",
-                          filename.c_str(), tmp.c_str());
-        PISMEnd();
-      }
-      ierr = verbPrintf(2, com,
-                        "PISM WARNING: output file '%s' already exists. Moving it to '%s'.\n",
-                        filename.c_str(), tmp.c_str());
-
-    }
-
-  }
-
-
-  return 0;
-}
 
 PetscErrorCode PIO::compute_start_and_count(string short_name, int t_start,
                                             int x_start, int x_count,
@@ -1282,7 +1353,7 @@ PetscErrorCode PIO::get_vara_double(string variable_name,
 PetscErrorCode PIO::put_vara_double(string variable_name,
                                     vector<unsigned int> start,
                                     vector<unsigned int> count,
-                                    const double *op) const {
+                                    double *op) const {
   PISMLogEventBegin(PISM_IO_EVENT);
 
   PetscErrorCode ierr;
@@ -1315,7 +1386,7 @@ PetscErrorCode PIO::get_varm_double(string variable_name,
 PetscErrorCode PIO::put_varm_double(string variable_name,
                                     vector<unsigned int> start,
                                     vector<unsigned int> count,
-                                    vector<unsigned int> imap, const double *op) const {
+                                    vector<unsigned int> imap, double *op) const {
   PISMLogEventBegin(PISM_IO_EVENT);
 
   PetscErrorCode ierr;
@@ -1328,3 +1399,13 @@ PetscErrorCode PIO::put_varm_double(string variable_name,
   return 0;
 }
 
+void PIO::set_local_extent(unsigned int xs, unsigned int xm,
+                           unsigned int ys, unsigned int ym) {  
+  if(nc)
+    nc->set_local_extent(xs, xm, ys, ym);
+
+  m_xs = xs;
+  m_xm = xm;
+  m_ys = ys;
+  m_ym = ym;
+}
