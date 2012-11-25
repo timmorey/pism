@@ -209,7 +209,9 @@ int PISMPNCFile::inq_dimname(int j, string &result) const {
   char dimname[NC_MAX_NAME];
   memset(dimname, 0, NC_MAX_NAME);
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_dimname(ncid, j, dimname); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = dimname;
 
@@ -220,7 +222,9 @@ int PISMPNCFile::inq_dimname(int j, string &result) const {
 int PISMPNCFile::inq_ndims(int &result) const {
   int stat;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_ndims(ncid, &result); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   return stat;
 }
@@ -393,9 +397,11 @@ int PISMPNCFile::inq_vartype(string variable_name, PISM_IO_Type &result) const {
   int stat, varid;
   nc_type var_type;
 
+  PISMLogEventBegin(PISM_IO_METADATA_EVENT);
   stat = ncmpi_inq_varid(ncid, variable_name.c_str(), &varid); check(stat);
 
   stat = ncmpi_inq_vartype(ncid, varid, &var_type); check(stat);
+  PISMLogEventEnd(PISM_IO_METADATA_EVENT);
 
   result = nc_type_to_pism_type(var_type);
 
