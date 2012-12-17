@@ -69,7 +69,7 @@ void PISMNCFile::init_hints() const {
     env = temp;
 
   while(env.size() > 0) {
-    pos = env.find(";");
+    pos = env.find(":");
     if(string::npos == pos) {
       hint = env;
       env = "";
