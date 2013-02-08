@@ -1,4 +1,4 @@
-// Copyright (C) 2010, 2011 Ed Bueler and Constantine Khroulev
+// Copyright (C) 2010, 2011, 2012, 2013 Ed Bueler and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -70,12 +70,14 @@ VecScatterBegin/End() to scatter the natural vector onto process 0.
 
 PetscErrorCode PISMBedSmoother::allocate() {
   PetscErrorCode ierr;
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
 
-  ierr = DMCreateGlobalVector(grid.da2, &g2); CHKERRQ(ierr);
+  ierr = DMCreateGlobalVector(da2, &g2); CHKERRQ(ierr);
 
   // note we want a global Vec but reordered in the natural ordering so when it
   // is scattered to proc zero it is not all messed up; see above
-  ierr = DMDACreateNaturalVector(grid.da2, &g2natural); CHKERRQ(ierr);
+  ierr = DMDACreateNaturalVector(da2, &g2natural); CHKERRQ(ierr);
   // next get scatter context *and* allocate one of Vecs on proc zero
   ierr = VecScatterCreateToZero(g2natural, &scatter, &topgp0); CHKERRQ(ierr);
       
@@ -147,8 +149,7 @@ PetscErrorCode PISMBedSmoother::preprocess_bed(
   if (lambda <= 0.0) {
     // smoothing completely inactive.  we transfer the original bed topg,
     //   including ghosts, to public member topgsmooth ...
-    ierr = topg.beginGhostComm(topgsmooth); CHKERRQ(ierr);
-    ierr = topg.endGhostComm(topgsmooth); CHKERRQ(ierr);
+    ierr = topg.update_ghosts(topgsmooth); CHKERRQ(ierr);
     // and we tell get_theta() to return theta=1
     Nx = -1;
     Ny = -1;
@@ -184,8 +185,7 @@ PetscErrorCode PISMBedSmoother::preprocess_bed(
   if ((Nx < 0) || (Ny < 0)) {
     // smoothing completely inactive.  we transfer the original bed topg,
     //   including ghosts, to public member topgsmooth ...
-    ierr = topg.beginGhostComm(topgsmooth); CHKERRQ(ierr);
-    ierr = topg.endGhostComm(topgsmooth); CHKERRQ(ierr);
+    ierr = topg.update_ghosts(topgsmooth); CHKERRQ(ierr);
     return 0;
   }
 

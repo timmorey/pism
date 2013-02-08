@@ -215,7 +215,7 @@ PetscErrorCode InvSSAForwardProblem::apply_jacobian_design(IceModelVec2V &u,IceM
 
   // Aliases to help with notation consistency below.
   IceModelVec2Int *m_dirichletLocations = bc_locations;
-  IceModelVec2V   *m_dirichletValues    = vel_bc;
+  IceModelVec2V   *m_dirichletValues    = m_vel_bc;
   PetscReal        m_dirichletWeight    = dirichletScale;
 
   PISMVector2 u_e[FEQuadrature::Nk];
@@ -328,9 +328,12 @@ PetscErrorCode InvSSAForwardProblem::apply_jacobian_design_transpose(IceModelVec
 PetscErrorCode InvSSAForwardProblem::apply_jacobian_design_transpose(IceModelVec2V &u,IceModelVec2V &du,Vec dzeta) {
   PetscErrorCode ierr;
   PetscReal **dzeta_a;
-  ierr = DMDAVecGetArray(m_grid.da2,dzeta,&dzeta_a); CHKERRQ(ierr);
+  DM da2;
+  ierr = m_grid.get_dm(1, m_grid.max_stencil_width, da2); CHKERRQ(ierr);
+
+  ierr = DMDAVecGetArray(da2,dzeta,&dzeta_a); CHKERRQ(ierr);
   ierr = this->apply_jacobian_design_transpose(u,du,dzeta_a);CHKERRQ(ierr);
-  ierr = DMDAVecRestoreArray(m_grid.da2,dzeta,&dzeta_a); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da2,dzeta,&dzeta_a); CHKERRQ(ierr);
   return 0;
 }
 
@@ -361,7 +364,7 @@ PetscErrorCode InvSSAForwardProblem::apply_jacobian_design_transpose(IceModelVec
   DirichletData dirichletBC;
   // Aliases to help with notation consistency.
   IceModelVec2Int *m_dirichletLocations = bc_locations;
-  IceModelVec2V   *m_dirichletValues    = vel_bc;
+  IceModelVec2V   *m_dirichletValues    = m_vel_bc;
   PetscReal        m_dirichletWeight    = dirichletScale;
   ierr = dirichletBC.init(m_dirichletLocations,m_dirichletValues,m_dirichletWeight); CHKERRQ(ierr);
 
@@ -453,11 +456,11 @@ PetscErrorCode InvSSAForwardProblem::apply_linearization(IceModelVec2S &dzeta, I
   PetscErrorCode ierr;
 
   if(m_rebuild_J_state) {
-    ierr = this->assemble_jacobian_state(velocity,m_J_state); CHKERRQ(ierr);
+    ierr = this->assemble_jacobian_state(m_velocity, m_J_state); CHKERRQ(ierr);
     m_rebuild_J_state = false;
   }
 
-  ierr = this->apply_jacobian_design(velocity,dzeta,m_du_global); CHKERRQ(ierr);
+  ierr = this->apply_jacobian_design(m_velocity,dzeta,m_du_global); CHKERRQ(ierr);
   ierr = m_du_global.scale(-1); CHKERRQ(ierr);
  
   // call PETSc to solve linear system by iterative method.
@@ -484,13 +487,13 @@ PetscErrorCode InvSSAForwardProblem::apply_linearization_transpose(IceModelVec2V
   PetscErrorCode ierr;
   
   if(m_rebuild_J_state) {
-    ierr = this->assemble_jacobian_state(velocity,m_J_state); CHKERRQ(ierr);
+    ierr = this->assemble_jacobian_state(m_velocity,m_J_state); CHKERRQ(ierr);
     m_rebuild_J_state = false;
   }
 
   // Aliases to help with notation consistency below.
   IceModelVec2Int *m_dirichletLocations = bc_locations;
-  IceModelVec2V   *m_dirichletValues    = vel_bc;
+  IceModelVec2V   *m_dirichletValues    = m_vel_bc;
   PetscReal        m_dirichletWeight    = dirichletScale;
   
   ierr = m_du_global.copy_from(du); CHKERRQ(ierr);
@@ -518,7 +521,7 @@ PetscErrorCode InvSSAForwardProblem::apply_linearization_transpose(IceModelVec2V
   }
   
   ierr = m_du_local.copy_from(m_du_global); CHKERRQ(ierr);
-  ierr = this->apply_jacobian_design_transpose(velocity,m_du_local,dzeta); CHKERRQ(ierr);
+  ierr = this->apply_jacobian_design_transpose(m_velocity,m_du_local,dzeta); CHKERRQ(ierr);
   ierr = dzeta.scale(-1); CHKERRQ(ierr);
 
   return 0;

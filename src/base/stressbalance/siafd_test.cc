@@ -1,4 +1,4 @@
-// Copyright (C) 2010, 2011, 2012 Ed Bueler and Constantine Khroulev
+// Copyright (C) 2010, 2011, 2012, 2013 Ed Bueler and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -194,8 +194,7 @@ PetscErrorCode enthalpy_from_temperature_cold(EnthalpyConverter &EC,
   ierr = temperature.end_access(); CHKERRQ(ierr);
   ierr = thickness.end_access(); CHKERRQ(ierr);
 
-  ierr = enthalpy.beginGhostComm(); CHKERRQ(ierr);
-  ierr = enthalpy.endGhostComm(); CHKERRQ(ierr);
+  ierr = enthalpy.update_ghosts(); CHKERRQ(ierr);
   return 0;
 }
 
@@ -250,8 +249,7 @@ PetscErrorCode setInitStateF(IceGrid &grid,
   ierr = thickness->end_access(); CHKERRQ(ierr);
   ierr =  enthalpy->end_access(); CHKERRQ(ierr);
 
-  ierr = thickness->beginGhostComm(); CHKERRQ(ierr);
-  ierr = thickness->endGhostComm(); CHKERRQ(ierr);
+  ierr = thickness->update_ghosts(); CHKERRQ(ierr);
 
   ierr = thickness->copy_to(*surface); CHKERRQ(ierr);
 
@@ -362,7 +360,7 @@ int main(int argc, char *argv[]) {
     grid.compute_ownership_ranges();
     ierr = grid.compute_vertical_levels(); CHKERRQ(ierr); 
     ierr = grid.compute_horizontal_spacing(); CHKERRQ(ierr);
-    ierr = grid.createDA(); CHKERRQ(ierr);
+    ierr = grid.allocate(); CHKERRQ(ierr);
 
     ierr = setVerbosityLevel(5); CHKERRQ(ierr);
     ierr = grid.printInfo(1); CHKERRQ(ierr);
@@ -430,11 +428,7 @@ int main(int argc, char *argv[]) {
 
     // This is never used (but it is a required argument of the
     // PISMStressBalance constructor).
-    IceBasalResistancePlasticLaw basal(
-           config.get("plastic_regularization", "1/year", "1/second"), 
-           config.get_flag("do_pseudo_plastic_till"),
-           config.get("pseudo_plastic_q"),
-           config.get("pseudo_plastic_uthreshold", "m/year", "m/second"));
+    IceBasalResistancePlasticLaw basal(config);
 
     // Create the SIA solver object:
 
@@ -471,7 +465,7 @@ int main(int argc, char *argv[]) {
                         &vH, u_sia, v_sia, w_sia, sigma); CHKERRQ(ierr);
 
     // Write results to an output file:
-    PIO pio(grid, "guess_format");
+    PIO pio(grid, "guess_mode");
 
     ierr = pio.open(output_file, PISM_WRITE); CHKERRQ(ierr);
     ierr = pio.def_time(config.get_string("time_dimension_name"),

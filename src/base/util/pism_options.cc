@@ -1,4 +1,4 @@
-// Copyright (C) 2011, 2012 PISM Authors
+// Copyright (C) 2011, 2012, 2013 PISM Authors
 //
 // This file is part of PISM.
 //
@@ -217,6 +217,13 @@ PetscErrorCode show_usage_check_req_opts(
 */
 
 //! PISM wrapper replacing PetscOptionsEList.
+/*
+  Ignores everything after the first colon, i.e. if "-foo bar" is allowed, then
+  "-foo bar:baz" is also allowed.
+
+  This is to make it possible to pass a parameter to a module selected using a
+  command-line option without adding one mode option.
+ */
 PetscErrorCode PISMOptionsList(MPI_Comm com, string opt, string description, set<string> choices,
 			       string default_value, string &result, bool &flag) {
   PetscErrorCode ierr;
@@ -247,8 +254,14 @@ PetscErrorCode PISMOptionsList(MPI_Comm com, string opt, string description, set
     return 0;
   }
 
+  string keyword = tmp;
+  // find ":" and discard everything that goes after
+  size_t n = keyword.find(":");
+  if (n != string::npos)
+    keyword.resize(n);
+
   // return the choice if it is valid and stop if it is not
-  if (choices.find(tmp) != choices.end()) {
+  if (choices.find(keyword) != choices.end()) {
     flag = true;
     result = tmp;
   } else {
@@ -322,6 +335,24 @@ PetscErrorCode PISMOptionsStringArray(string opt, string text, string default_va
       result.push_back(word);
 
     flag = false;
+  }
+
+  return 0;
+}
+
+//! Process a command-line option and return a set of strings.
+PetscErrorCode PISMOptionsStringSet(string opt, string text, string default_value,
+                                    set<string>& result, bool &flag) {
+  vector<string> tmp;
+  PetscErrorCode ierr;
+
+  ierr = PISMOptionsStringArray(opt, text, default_value, tmp, flag); CHKERRQ(ierr);
+
+  result.clear();
+  vector<string>::iterator j = tmp.begin();
+  while(j != tmp.end()) {
+    result.insert(*j);
+    ++j;
   }
 
   return 0;
@@ -542,19 +573,11 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("varc", "use_linear_in_temperature_heat_capacity");  CHKERRQ(ierr);
   ierr = config.flag_from_option("vark", "use_temperature_dependent_thermal_conductivity");  CHKERRQ(ierr);
 
-  // see getBasalWaterPressure()
-  ierr = config.flag_from_option("bmr_enhance",
-                                 "bmr_enhance_basal_water_pressure"); CHKERRQ(ierr);
-  // in units m a-1 :
-  ierr = config.scalar_from_option("bmr_enhance_scale", "bmr_enhance_scale"); CHKERRQ(ierr);
-
   ierr = config.flag_from_option("bmr_in_cont", "include_bmr_in_continuity"); CHKERRQ(ierr);
 
   // if set, use old IceModel::temperatureStep(), and set enthalpy as though
   //   ice is cold
   ierr = config.flag_from_option("cold", "do_cold_ice_methods"); CHKERRQ(ierr);
-
-  ierr = config.flag_from_option("diffuse_bwat", "do_diffuse_bwat"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("low_temp", "global_min_allowed_temp"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("max_low_temps", "max_low_temp_count"); CHKERRQ(ierr);
@@ -565,6 +588,33 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("mass", "do_mass_conserve"); CHKERRQ(ierr);
   ierr = config.flag_from_option("energy", "do_energy"); CHKERRQ(ierr);
   ierr = config.flag_from_option("sia", "do_sia"); CHKERRQ(ierr);
+
+  // choose hydrology submodel (and options that apply to all objects)
+  ierr = config.keyword_from_option("hydrology", "hydrology_model",
+                                    "tillcan,diffuseonly,lakes,distributed"); CHKERRQ(ierr);
+  ierr = config.flag_from_option("hydrology_use_const_bmelt",
+                                 "hydrology_use_const_bmelt"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_const_bmelt",
+                                   "hydrology_const_bmelt"); CHKERRQ(ierr);
+  // these only apply to PISMLakesHydrology and PISMDistributedHydrology:
+  ierr = config.scalar_from_option("hydrology_hydraulic_conductivity",
+                                   "hydrology_hydraulic_conductivity"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_thickness_power_in_flux",
+                                   "hydrology_thickness_power_in_flux"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_roughness_scale",
+                                   "hydrology_roughness_scale"); CHKERRQ(ierr);
+  //FIXME issue #127:  till_pw_fraction too, but renamed
+  // these only apply to PISMDistributedHydrology:
+  ierr = config.scalar_from_option("hydrology_cavitation_opening_coefficient",
+                                   "hydrology_cavitation_opening_coefficient"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_creep_closure_coefficient",
+                                   "hydrology_creep_closure_coefficient"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_lower_bound_creep_regularization",
+                                   "hydrology_lower_bound_creep_regularization"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_englacial_porosity",
+                                   "hydrology_englacial_porosity"); CHKERRQ(ierr);
+  ierr = config.scalar_from_option("hydrology_regularizing_porosity",
+                                   "hydrology_regularizing_porosity"); CHKERRQ(ierr);
 
   // Time-stepping
   ierr = config.keyword_from_option("calendar", "calendar",
@@ -577,9 +627,6 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   ierr = config.flag_from_option("count_steps", "count_time_steps"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("max_dt", "maximum_time_step_years"); CHKERRQ(ierr);
-
-	// evaluates the adaptive timestep based on a CFL criterion with respect to the eigenCalving rate
-  ierr = config.flag_from_option("cfl_eigencalving", "cfl_eigencalving"); CHKERRQ(ierr);
 
 
   // SIA
@@ -608,16 +655,21 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   ierr = config.flag_from_option("ssa_dirichlet_bc", "ssa_dirichlet_bc"); CHKERRQ(ierr);
   ierr = config.flag_from_option("cfbc", "calving_front_stress_boundary_condition"); CHKERRQ(ierr);
-  ierr = config.flag_from_option("brutal_sliding", "scalebrutalSet"); CHKERRQ(ierr);
 
+  // Basal sliding fiddles
+  ierr = config.flag_from_option("brutal_sliding", "scalebrutalSet"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("brutal_sliding_scale","sliding_scale_brutal"); CHKERRQ(ierr); 
 
- 
+  ierr = config.scalar_from_option("sliding_scale", "sliding_scale_factor_reduces_tauc"); CHKERRQ(ierr);
+
   // SSA Inversion
 
-  ierr = config.keyword_from_option("inv_method","inv_ssa_method","sd,nlcg,ign,tikhonov_lmvm,tikhonov_cg,tikhonov_blmvm,tikhonov_lcl,tikhonov_gn"); CHKERRQ(ierr);
+  ierr = config.keyword_from_option("inv_method","inv_ssa_method",
+                                    "sd,nlcg,ign,tikhonov_lmvm,tikhonov_cg,tikhonov_blmvm,tikhonov_lcl,tikhonov_gn");
+  CHKERRQ(ierr);
 
-  ierr = config.keyword_from_option("inv_ssa_tauc_param","inv_ssa_tauc_param","ident,trunc,square,exp"); CHKERRQ(ierr);
+  ierr = config.keyword_from_option("inv_ssa_tauc_param",
+                                    "inv_ssa_tauc_param","ident,trunc,square,exp"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("rms_error","inv_ssa_target_rms_misfit"); CHKERRQ(ierr);
 
@@ -626,8 +678,12 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.scalar_from_option("tikhonov_rtol","tikhonov_rtol"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("tikhonov_ptol","tikhonov_ptol"); CHKERRQ(ierr);
 
+  ierr = config.keyword_from_option("inv_ssa_tauc_norm","inv_ssa_tauc_norm","hilbert,tv"); CHKERRQ(ierr);
+
   ierr = config.scalar_from_option("inv_ssa_cL2","inv_ssa_cL2"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("inv_ssa_cH1","inv_ssa_cH1"); CHKERRQ(ierr);
+
+  ierr = config.scalar_from_option("inv_ssa_tv_exponent","inv_ssa_tv_exponent"); CHKERRQ(ierr);
 
   // Basal strength
 
@@ -639,6 +695,7 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   // till_pw_fraction is a parameter in the computation of the till yield stress tau_c
   // from the thickness of the basal melt water; see updateYieldStressFromHmelt()
   // option a pure number (a fraction); no conversion
+  // FIXME: issue #127
   ierr = config.scalar_from_option("plastic_pwfrac", "till_pw_fraction"); CHKERRQ(ierr);
 
   // controls regularization of plastic basal sliding law
@@ -655,15 +712,6 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   // threshold; at this velocity tau_c is basal shear stress
   ierr = config.scalar_from_option("pseudo_plastic_uthreshold", "pseudo_plastic_uthreshold"); CHKERRQ(ierr);
-
-  // If set, makes the thickness affect the pore_pressure; near margin there is
-  // a reduction in basal water pressure, a conceptual drainage mechanism
-  ierr = config.flag_from_option("thk_eff", "thk_eff_basal_water_pressure"); CHKERRQ(ierr);
-  // next two in  m  :
-  ierr = config.scalar_from_option("thk_eff_H_high","thk_eff_H_high");  CHKERRQ(ierr);
-  ierr = config.scalar_from_option("thk_eff_H_low","thk_eff_H_low");  CHKERRQ(ierr);
-  // pure number :
-  ierr = config.scalar_from_option("thk_eff_reduced","thk_eff_reduced");  CHKERRQ(ierr);
   
   ierr = config.flag_from_option("subgl", "sub_groundingline"); CHKERRQ(ierr);
 
@@ -675,7 +723,9 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   ierr = config.scalar_from_option("nuBedrock", "nuBedrock"); CHKERRQ(ierr);
   ierr = PISMOptionsIsSet("-nuBedrock", flag);  CHKERRQ(ierr);
-  if (flag)  config.set_flag("nuBedrockSet", true);
+  if (flag) {
+    config.set_flag_from_option("nuBedrockSet", true);
+  }
 
 
   // Calving
@@ -690,19 +740,19 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
   ierr = config.flag_from_option("thickness_calving", "do_thickness_calving"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("calving_at_thickness", "calving_at_thickness"); CHKERRQ(ierr);
 
+  // evaluates the adaptive timestep based on a CFL criterion with respect to the eigenCalving rate
+  ierr = config.flag_from_option("cfl_eigencalving", "cfl_eigencalving"); CHKERRQ(ierr);
   ierr = config.scalar_from_option("eigen_calving_K", "eigen_calving_K"); CHKERRQ(ierr);
   ierr = config.flag_from_option("eigen_calving", "do_eigen_calving"); CHKERRQ(ierr);
 
   ierr = config.flag_from_option("kill_icebergs", "kill_icebergs"); CHKERRQ(ierr);
 
   // Output
-  ierr = config.flag_from_option("f3d", "force_full_diagnostics"); CHKERRQ(ierr);
-
   ierr = config.keyword_from_option("o_order", "output_variable_order",
                                     "xyz,yxz,zyx"); CHKERRQ(ierr);
 
   ierr = config.keyword_from_option("o_format", "output_format",
-                                    "netcdf3,quilt,quilt-with-compression,netcdf4_parallel,pnetcdf,hdf5"); CHKERRQ(ierr);
+                                    "netcdf3,quilt,netcdf4_parallel,pnetcdf,hdf5"); CHKERRQ(ierr);
 
   ierr = config.scalar_from_option("summary_volarea_scale_factor_log10",
                                    "summary_volarea_scale_factor_log10"); CHKERRQ(ierr);
@@ -719,33 +769,36 @@ PetscErrorCode set_config_from_options(MPI_Comm /*com*/, NCConfigVariable &confi
 
   // Shortcuts
 
-  if (getVerbosityLevel() > 2)  config.set_flag("verbose_pik_messages", true);
-
   // option "-pik" turns on a suite of PISMPIK effects (but not -eigen_calving)
   ierr = PISMOptionsIsSet("-pik", "enable suite of PISM-PIK mechanisms", flag); CHKERRQ(ierr);
   if (flag) {
-    config.set_flag("calving_front_stress_boundary_condition", true);
-    config.set_flag("part_grid", true);
-    config.set_flag("part_redist", true);
-    config.set_flag("kill_icebergs", true);
+    config.set_flag_from_option("calving_front_stress_boundary_condition", true);
+    config.set_flag_from_option("part_grid", true);
+    config.set_flag_from_option("part_redist", true);
+    config.set_flag_from_option("kill_icebergs", true);
   }
 
   // kill_icebergs requires part_grid
   if (config.get_flag("kill_icebergs")) {
-    config.set_flag("part_grid", true);
+    config.set_flag_from_option("part_grid", true);
+
+    if (getVerbosityLevel() > 2) {
+      config.set_flag_from_option("verbose_pik_messages", true);
+    }
   }
+
   
   ierr = PISMOptionsIsSet("-ssa_floating_only", flag);  CHKERRQ(ierr);
   if (flag) {
-    config.set_flag("use_ssa_velocity", true);
-    config.set_flag("use_ssa_when_grounded", false);
+    config.set_flag_from_option("use_ssa_velocity", true);
+    config.set_flag_from_option("use_ssa_when_grounded", false);
   }
 
   // check -ssa_sliding
   ierr = PISMOptionsIsSet("-ssa_sliding", flag);  CHKERRQ(ierr);
   if (flag) {
-    config.set_flag("use_ssa_velocity", true);
-    config.set_flag("use_ssa_when_grounded", true);
+    config.set_flag_from_option("use_ssa_velocity", true);
+    config.set_flag_from_option("use_ssa_when_grounded", true);
   }
 
   return 0;

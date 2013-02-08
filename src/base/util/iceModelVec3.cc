@@ -1,4 +1,4 @@
-// Copyright (C) 2008--2012 Ed Bueler and Constantine Khroulev
+// Copyright (C) 2008--2013 Ed Bueler and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -64,9 +64,9 @@ PetscErrorCode  IceModelVec3D::allocate(IceGrid &my_grid, string my_name,
 
   zlevels = levels;
   n_levels = (int)zlevels.size();
-
   da_stencil_width = stencil_width;
-  ierr = create_2d_da(da, n_levels, da_stencil_width); CHKERRQ(ierr);
+
+  ierr = grid->get_dm(this->n_levels, this->da_stencil_width, da); CHKERRQ(ierr);
 
   if (local) {
     ierr = DMCreateLocalVector(da, &v); CHKERRQ(ierr);
@@ -106,41 +106,6 @@ PetscErrorCode IceModelVec3D::destroy() {
 
   return 0;
 }
-
-PetscErrorCode  IceModelVec3D::beginGhostCommTransfer(IceModelVec3D &imv3_source) {
-  PetscErrorCode ierr;
-  if (!localp) {
-    SETERRQ1(grid->com, 1,"makes no sense to communicate ghosts for GLOBAL IceModelVec3!\n"
-               "  (has name='%s')\n", name.c_str());
-  }
-  if (imv3_source.localp) {
-    SETERRQ1(grid->com, 2,"source IceModelVec3 must be GLOBAL! (has name='%s')\n",
-               imv3_source.name.c_str());
-  }
-  ierr = checkAllocated(); CHKERRQ(ierr);
-  ierr = imv3_source.checkAllocated(); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalBegin(da, imv3_source.v, INSERT_VALUES, v); CHKERRQ(ierr);
-  return 0;
-}
-
-
-PetscErrorCode  IceModelVec3D::endGhostCommTransfer(IceModelVec3D &imv3_source) {
-  PetscErrorCode ierr;
-  if (!localp) {
-    SETERRQ1(grid->com, 1,"makes no sense to communicate ghosts for GLOBAL IceModelVec3!\n"
-               "  (has name='%s')\n",
-               name.c_str());
-  }
-  if (imv3_source.localp) {
-    SETERRQ1(grid->com, 2,"source IceModelVec3 must be GLOBAL! (has name='%s')\n",
-               imv3_source.name.c_str());
-  }
-  ierr = checkAllocated(); CHKERRQ(ierr);
-  ierr = imv3_source.checkAllocated(); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(da, imv3_source.v, INSERT_VALUES, v); CHKERRQ(ierr);
-  return 0;
-}
-
 
 PetscErrorCode  IceModelVec3D::isLegalLevel(PetscScalar z) {
   double z_min = zlevels.front(),
@@ -184,13 +149,20 @@ PetscErrorCode  IceModelVec3::setValColumnPL(PetscInt i, PetscInt j, PetscScalar
 
 //! Set all values of scalar quantity to given a single value in a particular column.
 PetscErrorCode IceModelVec3D::setColumn(PetscInt i, PetscInt j, PetscScalar c) {
+  PetscErrorCode ierr;
 #if (PISM_DEBUG==1)
-  PetscErrorCode ierr = checkHaveArray();  CHKERRQ(ierr);
+  ierr = checkHaveArray();  CHKERRQ(ierr);
   check_array_indices(i, j);
 #endif
+
   PetscScalar ***arr = (PetscScalar***) array;
-  for (PetscInt k=0; k < n_levels; k++) {
-    arr[i][j][k] = c;
+
+  if (c == 0.0) {
+    ierr = PetscMemzero(arr[i][j], n_levels * sizeof(PetscScalar)); CHKERRQ(ierr);
+  } else {
+    for (PetscInt k=0; k < n_levels; k++) {
+      arr[i][j][k] = c;
+    }
   }
   return 0;
 }
@@ -283,7 +255,7 @@ PetscErrorCode   IceModelVec3::getPlaneStarZ(PetscInt i, PetscInt j, PetscScalar
 //! Gets a map-plane star stencil directly from the storage grid.
 PetscErrorCode IceModelVec3::getPlaneStar(PetscInt i, PetscInt j, PetscInt k,
 						  planeStar<PetscScalar> *star) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
   check_array_indices(i, j);
 #endif
 
@@ -301,7 +273,7 @@ PetscErrorCode IceModelVec3::getPlaneStar(PetscInt i, PetscInt j, PetscInt k,
 //! Gets a map-plane star stencil on the fine vertical grid.
 PetscErrorCode IceModelVec3::getPlaneStar_fine(PetscInt i, PetscInt j, PetscInt k,
 					       planeStar<PetscScalar> *star) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
   check_array_indices(i, j);
 #endif
 
@@ -339,7 +311,7 @@ the \f$z\f$ values in \c levelsIN.
  */
 PetscErrorCode IceModelVec3::getValColumnPL(PetscInt i, PetscInt j, PetscInt ks,
 					    PetscScalar *result) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
   PetscErrorCode ierr = checkAllocated(); CHKERRQ(ierr);
   check_array_indices(i, j);
 #endif
@@ -377,7 +349,7 @@ Return array \c valsOUT must be an allocated array of \c grid.Mz_fine scalars
  */
 PetscErrorCode  IceModelVec3::getValColumnQUAD(PetscInt i, PetscInt j, PetscInt ks,
 					       PetscScalar *result) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
   check_array_indices(i, j);
 #endif
 
@@ -441,14 +413,17 @@ PetscErrorCode  IceModelVec3::getHorSlice(Vec &gslice, PetscScalar z) {
   PetscErrorCode ierr;
   PetscScalar    **slice_val;
 
+  DM da2;
+  ierr = grid->get_dm(1, grid->max_stencil_width, da2); CHKERRQ(ierr);
+
   ierr = begin_access(); CHKERRQ(ierr);
-  ierr = DMDAVecGetArray(grid->da2, gslice, &slice_val); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(da2, gslice, &slice_val); CHKERRQ(ierr);
   for (PetscInt i=grid->xs; i<grid->xs+grid->xm; i++) {
     for (PetscInt j=grid->ys; j<grid->ys+grid->ym; j++) {
       slice_val[i][j] = getValZ(i,j,z);
     }
   }
-  ierr = DMDAVecRestoreArray(grid->da2, gslice, &slice_val); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da2, gslice, &slice_val); CHKERRQ(ierr);
   ierr = end_access(); CHKERRQ(ierr);
 
   return 0;
@@ -494,8 +469,12 @@ PetscErrorCode  IceModelVec3::getSurfaceValues(IceModelVec2S &gsurf, IceModelVec
 PetscErrorCode  IceModelVec3::getSurfaceValues(Vec &gsurf, IceModelVec2S &myH) {
   PetscErrorCode ierr;
   PetscScalar    **H, **surf_val;
+
+  DM da2;
+  ierr = grid->get_dm(1, grid->max_stencil_width, da2); CHKERRQ(ierr);
+
   ierr = begin_access(); CHKERRQ(ierr);
-  ierr = DMDAVecGetArray(grid->da2, gsurf, &surf_val); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(da2, gsurf, &surf_val); CHKERRQ(ierr);
   ierr = myH.get_array(H); CHKERRQ(ierr);
   for (PetscInt i=grid->xs; i<grid->xs+grid->xm; i++) {
     for (PetscInt j=grid->ys; j<grid->ys+grid->ym; j++) {
@@ -503,7 +482,7 @@ PetscErrorCode  IceModelVec3::getSurfaceValues(Vec &gsurf, IceModelVec2S &myH) {
     }
   }
   ierr = myH.end_access(); CHKERRQ(ierr);
-  ierr = DMDAVecRestoreArray(grid->da2, gsurf, &surf_val); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da2, gsurf, &surf_val); CHKERRQ(ierr);
   ierr = end_access(); CHKERRQ(ierr);
   return 0;
 }
@@ -528,7 +507,7 @@ PetscErrorCode  IceModelVec3::getSurfaceValues(IceModelVec2S &gsurf, PetscScalar
 
 
 PetscErrorCode  IceModelVec3D::getInternalColumn(PetscInt i, PetscInt j, PetscScalar **valsPTR) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
   check_array_indices(i, j);
 #endif
   PetscScalar ***arr = (PetscScalar***) array;
@@ -538,7 +517,7 @@ PetscErrorCode  IceModelVec3D::getInternalColumn(PetscInt i, PetscInt j, PetscSc
 
 
 PetscErrorCode  IceModelVec3D::setInternalColumn(PetscInt i, PetscInt j, PetscScalar *valsIN) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
   check_array_indices(i, j);
 #endif
   PetscScalar ***arr = (PetscScalar***) array;
@@ -578,8 +557,7 @@ PetscErrorCode IceModelVec3::extend_vertically(int old_Mz, PetscScalar fill_valu
   // This communicates the ghosts just to update the new levels. Since this
   // only happens when the grid is extended it should not matter.
   if (localp) {
-    ierr = beginGhostComm(); CHKERRQ(ierr);
-    ierr = endGhostComm(); CHKERRQ(ierr);
+    ierr = update_ghosts(); CHKERRQ(ierr);
   }
 
   return 0;
@@ -609,8 +587,7 @@ PetscErrorCode IceModelVec3::extend_vertically(int old_Mz, IceModelVec2S &fill_v
   // This communicates the ghosts just to update the new levels. Since this
   // only happens when the grid is extended it should not matter.
   if (localp) {
-    ierr = beginGhostComm(); CHKERRQ(ierr);
-    ierr = endGhostComm(); CHKERRQ(ierr);
+    ierr = update_ghosts(); CHKERRQ(ierr);
   }
 
   return 0;
@@ -629,8 +606,8 @@ PetscErrorCode IceModelVec3::extend_vertically_private(int old_Mz) {
   for (int i = 0; i < dof; ++i)
     vars[0].set_levels(zlevels);
 
-  ierr = create_2d_da(da_new, n_levels, da_stencil_width); CHKERRQ(ierr);
-  
+  ierr = grid->get_dm(this->n_levels, this->da_stencil_width, da_new); CHKERRQ(ierr);
+
   if (localp) {
     ierr = DMCreateLocalVector(da_new, &v_new); CHKERRQ(ierr);
   } else {
@@ -651,12 +628,12 @@ PetscErrorCode IceModelVec3::extend_vertically_private(int old_Mz) {
   ierr = DMDAVecRestoreArrayDOF(da, v, &a_old); CHKERRQ(ierr);
   ierr = DMDAVecRestoreArrayDOF(da_new, v_new, &a_new); CHKERRQ(ierr);
 
-  // Deallocate old DA and Vec:
+  // Deallocate old Vec:
   ierr = VecDestroy(&v); CHKERRQ(ierr);
   v = v_new;
-
-  ierr = DMDestroy(&da); CHKERRQ(ierr);
   da = da_new;
+
+  // IceGrid will dispose of the old DA
 
   // de-allocate the sounding buffer because we'll need a bigger one
   if (sounding_buffer != NULL) {
@@ -687,7 +664,7 @@ PetscErrorCode IceModelVec3D::view_sounding(int i, int j, PetscViewer my_viewer)
   PetscErrorCode ierr;
   PetscScalar *ivals;
 
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
     check_array_indices(i, j);
 #endif
 

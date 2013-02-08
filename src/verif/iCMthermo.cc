@@ -1,4 +1,4 @@
-// Copyright (C) 2004-2011 Jed Brown, Ed Bueler and Constantine Khroulev
+// Copyright (C) 2004-2013 Jed Brown, Ed Bueler and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -105,11 +105,9 @@ PetscErrorCode IceCompModel::initTestFG() {
   ierr = acab.end_access(); CHKERRQ(ierr);
   ierr = artm.end_access(); CHKERRQ(ierr);
 
-  ierr = vH.beginGhostComm(); CHKERRQ(ierr);
-  ierr = vH.endGhostComm(); CHKERRQ(ierr);
+  ierr = vH.update_ghosts(); CHKERRQ(ierr);
   
-  ierr = T3.beginGhostComm(); CHKERRQ(ierr);
-  ierr = T3.endGhostComm(); CHKERRQ(ierr);
+  ierr = T3.update_ghosts(); CHKERRQ(ierr);
 
   ierr = vH.copy_to(vh); CHKERRQ(ierr);
 
@@ -260,17 +258,14 @@ PetscErrorCode IceCompModel::fillSolnTestFG() {
   delete [] T;  delete [] u;  delete [] v;  delete [] w;
   delete [] Sigma;  delete [] SigmaC;
 
-  ierr = vH.beginGhostComm(); CHKERRQ(ierr);
-  ierr = vH.endGhostComm(); CHKERRQ(ierr);
+  ierr = vH.update_ghosts(); CHKERRQ(ierr);
   ierr = vH.copy_to(vh); CHKERRQ(ierr);
 
-  ierr = T3.beginGhostComm(); CHKERRQ(ierr);
-  ierr = u3->beginGhostComm(); CHKERRQ(ierr);
-  ierr = v3->beginGhostComm(); CHKERRQ(ierr);
+  ierr = T3.update_ghosts(); CHKERRQ(ierr);
 
-  ierr = T3.endGhostComm(); CHKERRQ(ierr);
-  ierr = u3->endGhostComm(); CHKERRQ(ierr);
-  ierr = v3->endGhostComm(); CHKERRQ(ierr);
+  ierr = u3->update_ghosts(); CHKERRQ(ierr);
+
+  ierr = v3->update_ghosts(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -689,8 +684,7 @@ PetscErrorCode IceCompModel::fillTemperatureSolnTestsKO() {
   delete [] Tcol;
 
   // communicate T
-  ierr = T3.beginGhostComm(); CHKERRQ(ierr);
-  ierr = T3.endGhostComm(); CHKERRQ(ierr);
+  ierr = T3.update_ghosts(); CHKERRQ(ierr);
   return 0;
 }
 
@@ -728,7 +722,6 @@ PetscErrorCode IceCompModel::initTestsKO() {
   ierr = vbed.set(0.0); CHKERRQ(ierr);
   ierr = vGhf.set(0.042); CHKERRQ(ierr);
   ierr = vH.set(3000.0); CHKERRQ(ierr);
-  ierr = vbwat.set(0.0); CHKERRQ(ierr);
   ierr = vH.copy_to(vh); CHKERRQ(ierr);
 
   ierr = fillTemperatureSolnTestsKO(); CHKERRQ(ierr);

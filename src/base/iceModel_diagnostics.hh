@@ -190,27 +190,11 @@ public:
   virtual PetscErrorCode update(PetscReal a, PetscReal b);
 };
 
-//! \brief Computes the temperate ice volume fraction.
-class IceModel_ivoltempf : public PISMTSDiag<IceModel>
-{
-public:
-  IceModel_ivoltempf(IceModel *m, IceGrid &g, PISMVars &my_vars);
-  virtual PetscErrorCode update(PetscReal a, PetscReal b);
-};
-
 //! \brief Computes the total volume of the cold ice.
 class IceModel_ivolcold : public PISMTSDiag<IceModel>
 {
 public:
   IceModel_ivolcold(IceModel *m, IceGrid &g, PISMVars &my_vars);
-  virtual PetscErrorCode update(PetscReal a, PetscReal b);
-};
-
-//! \brief Computes the cold ice volume fraction.
-class IceModel_ivolcoldf : public PISMTSDiag<IceModel>
-{
-public:
-  IceModel_ivolcoldf(IceModel *m, IceGrid &g, PISMVars &my_vars);
   virtual PetscErrorCode update(PetscReal a, PetscReal b);
 };
 
@@ -222,27 +206,11 @@ public:
   virtual PetscErrorCode update(PetscReal a, PetscReal b);
 };
 
-//! \brief Computes the temperate ice area fraction.
-class IceModel_iareatempf : public PISMTSDiag<IceModel>
-{
-public:
-  IceModel_iareatempf(IceModel *m, IceGrid &g, PISMVars &my_vars);
-  virtual PetscErrorCode update(PetscReal a, PetscReal b);
-};
-
 //! \brief Computes the total area of the cold ice.
 class IceModel_iareacold : public PISMTSDiag<IceModel>
 {
 public:
   IceModel_iareacold(IceModel *m, IceGrid &g, PISMVars &my_vars);
-  virtual PetscErrorCode update(PetscReal a, PetscReal b);
-};
-
-//! \brief Computes the cold ice area fraction.
-class IceModel_iareacoldf : public PISMTSDiag<IceModel>
-{
-public:
-  IceModel_iareacoldf(IceModel *m, IceGrid &g, PISMVars &my_vars);
   virtual PetscErrorCode update(PetscReal a, PetscReal b);
 };
 
@@ -490,6 +458,32 @@ class IceModel_sum_divQ_flux : public PISMTSDiag<IceModel>
 public:
   IceModel_sum_divQ_flux(IceModel *m, IceGrid &g, PISMVars &my_vars);
   virtual PetscErrorCode update(PetscReal a, PetscReal b);
+};
+
+//! \brief Reports the 2D cumulative (numerical) flux due to enforcing
+//! non-negativity of ice thickness.
+class IceModel_nonneg_flux_2D_cumulative : public PISMDiag<IceModel>
+{
+public:
+  IceModel_nonneg_flux_2D_cumulative(IceModel *m, IceGrid &g, PISMVars &my_vars);
+  virtual PetscErrorCode compute(IceModelVec* &result);
+};
+
+
+//! \brief Reports the 2D cumulative grounded basal flux.
+class IceModel_grounded_basal_flux_2D_cumulative : public PISMDiag<IceModel>
+{
+public:
+  IceModel_grounded_basal_flux_2D_cumulative(IceModel *m, IceGrid &g, PISMVars &my_vars);
+  virtual PetscErrorCode compute(IceModelVec* &result);
+};
+
+//! \brief Reports the 2D cumulative floating basal flux.
+class IceModel_floating_basal_flux_2D_cumulative : public PISMDiag<IceModel>
+{
+public:
+  IceModel_floating_basal_flux_2D_cumulative(IceModel *m, IceGrid &g, PISMVars &my_vars);
+  virtual PetscErrorCode compute(IceModelVec* &result);
 };
 
 

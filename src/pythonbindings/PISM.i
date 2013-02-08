@@ -36,9 +36,10 @@
 #include "inverse/Functional.hh"
 #include "inverse/L2NormFunctional.hh"
 #include "inverse/H1NormFunctional.hh"
+#include "inverse/TotalVariationFunctional.hh"
 #include "inverse/MeanSquareFunctional.hh"
 #include "inverse/InvSSATikhonovGN.hh"
-#if(PISM_HAS_TAO)
+#if (PISM_USE_TAO==1)
 #include "inverse/TaoUtil.hh"
 #include "inverse/InvSSATikhonov.hh"
 #include "inverse/InvSSATikhonovLCL.hh"
@@ -447,6 +448,9 @@ namespace std {
     }
 }
 
+/* This is needed to wrap IceGrid::get_dm() */
+%apply DM &OUTPUT {DM &result};
+
 // FIXME: the the following code blocks there are explicit calls to Py????_Check.  There seems to 
 // be a more elegant solution using SWIG_From(int) and so forth that I'm not familiar with.  The
 // following works for now.
@@ -526,6 +530,7 @@ namespace std {
 %include "LocalInterpCtx.hh"
 %include "rheology/flowlaws.hh"
 %include "enthalpyConverter.hh"
+%template(PISMDiag_ShallowStressBalance) PISMDiag<ShallowStressBalance>;
 %include "stressbalance/ShallowStressBalance.hh"
 %include "SSB_Modifier.hh"
 %template(PISMDiag_SIAFD) PISMDiag<SIAFD>;
@@ -570,13 +575,14 @@ namespace std {
 %template(IPFunctional2V) IPFunctional< IceModelVec2V >;
 %include "inverse/L2NormFunctional.hh"
 %include "inverse/H1NormFunctional.hh"
+%include "inverse/TotalVariationFunctional.hh"
 %include "inverse/MeanSquareFunctional.hh"
 %include "inverse/InvTaucParameterization.hh"
 %include "inverse/InvSSAForwardProblem.hh"
 %include "inverse/InvSSAForwardProblem_dep.hh"
 %include "inverse/InvSSATikhonovGN.hh"
 
-#if(PISM_HAS_TAO)
+#if (PISM_USE_TAO==1)
 %ignore TaoConvergedReasons;
 %shared_ptr(TAOTerminationReason)
 %include "inverse/TaoUtil.hh"

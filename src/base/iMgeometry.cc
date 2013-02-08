@@ -1,4 +1,4 @@
-// Copyright (C) 2004-2012 Jed Brown, Ed Bueler and Constantine Khroulev
+// Copyright (C) 2004-2013 Jed Brown, Ed Bueler and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -507,7 +507,10 @@ PetscErrorCode IceModel::massContExplicitStep() {
     floating_ice_killed = config.get_flag("floating_ice_killed"),
     include_bmr_in_continuity = config.get_flag("include_bmr_in_continuity"),
     compute_cumulative_climatic_mass_balance = climatic_mass_balance_cumulative.was_created(),
-    compute_cumulative_ocean_kill_flux = ocean_kill_flux_2D_cumulative.was_created();
+    compute_cumulative_ocean_kill_flux = ocean_kill_flux_2D_cumulative.was_created(),
+    compute_cumulative_nonneg_flux = nonneg_flux_2D_cumulative.was_created(),
+    compute_cumulative_grounded_basal_flux = grounded_basal_flux_2D_cumulative.was_created(),
+    compute_cumulative_floating_basal_flux = floating_basal_flux_2D_cumulative.was_created();
 
   // FIXME: use corrected cell areas (when available)
   PetscScalar factor = config.get("ice_density") * (dx * dy);
@@ -527,7 +530,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = stress_balance->get_diffusive_flux(Qdiff); CHKERRQ(ierr);
 
   IceModelVec2V *vel_advective;
-  ierr = stress_balance->get_advective_2d_velocity(vel_advective); CHKERRQ(ierr);
+  ierr = stress_balance->get_2D_advective_velocity(vel_advective); CHKERRQ(ierr);
 
   ierr = vH.begin_access(); CHKERRQ(ierr);
   ierr = vbmr.begin_access(); CHKERRQ(ierr);
@@ -566,6 +569,18 @@ PetscErrorCode IceModel::massContExplicitStep() {
 
   if (compute_cumulative_ocean_kill_flux) {
     ierr = ocean_kill_flux_2D_cumulative.begin_access(); CHKERRQ(ierr);
+  }
+
+  if (compute_cumulative_nonneg_flux) {
+    ierr = nonneg_flux_2D_cumulative.begin_access(); CHKERRQ(ierr);
+  }
+
+  if (compute_cumulative_grounded_basal_flux) {
+    ierr = grounded_basal_flux_2D_cumulative.begin_access(); CHKERRQ(ierr);
+  }
+
+  if (compute_cumulative_floating_basal_flux) {
+    ierr = floating_basal_flux_2D_cumulative.begin_access(); CHKERRQ(ierr);
   }
 
   MaskQuery mask(vMask);
@@ -691,6 +706,9 @@ PetscErrorCode IceModel::massContExplicitStep() {
       if (vHnew(i, j) < 0.0) {
         nonneg_rule_flux += -vHnew(i, j);
 
+        if (compute_cumulative_nonneg_flux)
+          nonneg_flux_2D_cumulative(i, j) += nonneg_rule_flux * factor; // factor=dx*dy*rho
+
         // this has to go *after* accounting above!
         vHnew(i, j) = 0.0;
       }
@@ -709,7 +727,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
           ocean_kill_flux = -vHnew(i, j);
 
           if (compute_cumulative_ocean_kill_flux)
-            ocean_kill_flux_2D_cumulative(i,j) += -vHnew(i,j) * factor; // factor=dx*dy*rho
+            ocean_kill_flux_2D_cumulative(i,j) += ocean_kill_flux * factor; // factor=dx*dy*rho
 
           // this has to go *after* accounting above!
           vHnew(i, j) = 0.0;
@@ -731,7 +749,15 @@ PetscErrorCode IceModel::massContExplicitStep() {
         climatic_mass_balance_cumulative(i, j) += acab(i, j) * dt;
       }
 
-      // accounting:
+      if (compute_cumulative_grounded_basal_flux) {
+        grounded_basal_flux_2D_cumulative(i, j) += -meltrate_grounded * dt;
+      }
+
+      if (compute_cumulative_floating_basal_flux) {
+        floating_basal_flux_2D_cumulative(i, j) += -meltrate_floating * dt;
+      }
+
+      // time-series accounting:
       {
         proc_grounded_basal_ice_flux -= meltrate_grounded;
         proc_sub_shelf_ice_flux      -= meltrate_floating;
@@ -756,6 +782,18 @@ PetscErrorCode IceModel::massContExplicitStep() {
   ierr = shelfbmassflux.end_access(); CHKERRQ(ierr);
   ierr = vH.end_access(); CHKERRQ(ierr);
   ierr = vHnew.end_access(); CHKERRQ(ierr);
+
+  if (compute_cumulative_grounded_basal_flux) {
+    ierr = grounded_basal_flux_2D_cumulative.end_access(); CHKERRQ(ierr);
+  }
+
+  if (compute_cumulative_floating_basal_flux) {
+    ierr = floating_basal_flux_2D_cumulative.end_access(); CHKERRQ(ierr);
+  }
+
+  if (compute_cumulative_nonneg_flux) {
+    ierr = nonneg_flux_2D_cumulative.end_access(); CHKERRQ(ierr);
+  }
 
   if (compute_cumulative_ocean_kill_flux) {
     ierr = ocean_kill_flux_2D_cumulative.end_access(); CHKERRQ(ierr);
@@ -810,8 +848,7 @@ PetscErrorCode IceModel::massContExplicitStep() {
   }
 
   // finally copy vHnew into vH and communicate ghosted values
-  ierr = vHnew.beginGhostComm(vH); CHKERRQ(ierr);
-  ierr = vHnew.endGhostComm(vH); CHKERRQ(ierr);
+  ierr = vHnew.update_ghosts(vH); CHKERRQ(ierr);
 
   // the following calls are new routines adopted from PISM-PIK. The place and
   // order is not clear yet!
@@ -828,7 +865,9 @@ PetscErrorCode IceModel::massContExplicitStep() {
   if (config.get_flag("do_eigen_calving") && config.get_flag("use_ssa_velocity")) {
     bool dteigencalving = config.get_flag("cfl_eigencalving");
     if (!dteigencalving){ // calculation of strain rates has been done in iMadaptive.cc already
-      ierr = stress_balance->get_principal_strain_rates(strain_rates); CHKERRQ(ierr);
+      IceModelVec2V *ssa_velocity;
+      ierr = stress_balance->get_2D_advective_velocity(ssa_velocity); CHKERRQ(ierr);
+      ierr = stress_balance->compute_2D_principal_strain_rates(*ssa_velocity, vMask, strain_rates); CHKERRQ(ierr);
     }
     ierr = eigenCalving(); CHKERRQ(ierr);
   }

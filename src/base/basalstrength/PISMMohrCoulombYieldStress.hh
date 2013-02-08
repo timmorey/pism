@@ -21,50 +21,30 @@
 
 #include "PISMDiagnostic.hh"
 #include "PISMYieldStress.hh"
+#include "PISMHydrology.hh"
 #include "iceModelVec.hh"
 
-//! Parameters used by the basal water pressure model.
-struct BWPparams {
-  bool usebmr,
-    usethkeff;
-  PetscReal bmr_scale,
-    thkeff_reduce,
-    thkeff_H_high,
-    thkeff_H_low;
-};
 
-//! \brief PISM's default basal yield stress model.
+//! \brief PISM's default basal yield stress model which applies the Mohr-Coulomb model of deformable, pressurized till.
 class PISMMohrCoulombYieldStress : public PISMYieldStress
 {
-  friend class PYS_bwp;
 public:
-  PISMMohrCoulombYieldStress(IceGrid &g, const NCConfigVariable &conf)
+  PISMMohrCoulombYieldStress(IceGrid &g, const NCConfigVariable &conf, PISMHydrology *hydro)
     : PISMYieldStress(g, conf)
   {
-    sliding_scale = -1.0;
-    basal_water_thickness = NULL;
-    basal_melt_rate = NULL;
-    ice_thickness = NULL;
     bed_topography = NULL;
     mask = NULL;
+
+    hydrology = hydro;
 
     if (allocate() != 0) {
       PetscPrintf(grid.com, "PISM ERROR: memory allocation failed in PISMYieldStress constructor.\n");
       PISMEnd();
     }
 
-    p.usebmr        = config.get_flag("bmr_enhance_basal_water_pressure");
-    p.usethkeff     = config.get_flag("thk_eff_basal_water_pressure");
-    p.bmr_scale     = config.get("bmr_enhance_scale");
-    p.thkeff_reduce = config.get("thk_eff_reduced");
-    p.thkeff_H_high = config.get("thk_eff_H_high");
-    p.thkeff_H_low  = config.get("thk_eff_H_low");
-
-    till_pw_fraction = config.get("till_pw_fraction");
     ice_density = config.get("ice_density");
     standard_gravity = config.get("standard_gravity");
     till_c_0 = config.get("till_c_0", "kPa", "Pa");
-    bwat_max = config.get("bwat_max");
   }
 
   virtual ~PISMMohrCoulombYieldStress() {}
@@ -72,8 +52,6 @@ public:
   virtual PetscErrorCode init(PISMVars &vars);
 
   virtual void add_vars_to_output(string keyword, map<string,NCSpatialVariable> &result);
-
-  virtual void get_diagnostics(map<string, PISMDiagnostic*> &dict);
 
   virtual PetscErrorCode define_variables(set<string> vars, const PIO &nc,
                                           PISM_IO_Type nctype);
@@ -83,32 +61,19 @@ public:
   virtual PetscErrorCode update(PetscReal my_t, PetscReal my_dt);
 
   virtual PetscErrorCode basal_material_yield_stress(IceModelVec2S &result);
+
 protected:
-  PetscReal standard_gravity, ice_density,
-    till_pw_fraction, bwat_max, sliding_scale, till_c_0;
-  IceModelVec2S till_phi, tauc;
-  IceModelVec2S *basal_water_thickness, *basal_melt_rate, *ice_thickness,
-    *bed_topography;
+  PetscReal standard_gravity, ice_density, till_c_0;
+  IceModelVec2S till_phi, tauc, bwp, Po;
+  IceModelVec2S *bed_topography;
   IceModelVec2Int *mask;
-  BWPparams p;
   PISMVars *variables;
+  PISMHydrology *hydrology;
 
   virtual PetscErrorCode allocate();
   virtual PetscErrorCode topg_to_phi();
   virtual PetscErrorCode tauc_to_phi();
   virtual PetscErrorCode regrid();
-  virtual PetscReal basal_water_pressure(PetscReal p_overburden, PetscReal bwat,
-                                         PetscReal bmr, PetscReal thk);
-  virtual PetscReal effective_pressure_on_till(PetscReal p_overburden,
-                                               PetscReal b_basal_water);
-};
-
-//! \brief Computes basal (pore) water pressure using a highly-simplified model.
-class PYS_bwp : public PISMDiag<PISMMohrCoulombYieldStress>
-{
-public:
-  PYS_bwp(PISMMohrCoulombYieldStress *m, IceGrid &g, PISMVars &my_vars);
-  virtual PetscErrorCode compute(IceModelVec* &result);
 };
 
 #endif /* _PISMMOHRCOULOMBYIELDSTRESS_H_ */

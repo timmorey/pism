@@ -1,4 +1,4 @@
-// Copyright (C) 2009--2012 Jed Brown and Ed Bueler and Constantine Khroulev and David Maxwell
+// Copyright (C) 2009--2013 Jed Brown and Ed Bueler and Constantine Khroulev and David Maxwell
 //
 // This file is part of PISM.
 //
@@ -43,9 +43,12 @@ PetscErrorCode InvSSAForwardProblem_dep::allocate_ksp()
   ierr = DMCreateGlobalVector(SSADA, &m_VecRHS2); CHKERRQ(ierr);
 
   // Storage for scalar unknowns.
-  ierr = DMCreateMatrix(grid.da2, "baij", &m_MatB); CHKERRQ(ierr);
-  ierr = DMCreateGlobalVector(grid.da2, &m_VecRHS); CHKERRQ(ierr);
-  ierr = DMCreateGlobalVector(grid.da2, &m_VecV); CHKERRQ(ierr);
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
+
+  ierr = DMCreateMatrix(da2, "baij", &m_MatB); CHKERRQ(ierr);
+  ierr = DMCreateGlobalVector(da2, &m_VecRHS); CHKERRQ(ierr);
+  ierr = DMCreateGlobalVector(da2, &m_VecV); CHKERRQ(ierr);
 
   ierr = KSPCreate(grid.com, &m_KSP); CHKERRQ(ierr);
   PetscReal ksp_rtol = 1e-12;
@@ -182,6 +185,7 @@ PetscErrorCode InvSSAForwardProblem_dep::set_zeta(IceModelVec2S &new_zeta )
       }
     }
   }
+  ierr = new_zeta.end_access(); CHKERRQ(ierr);
 
   m_tauc_param.convertToTauc(new_zeta,*tauc);
 
@@ -333,8 +337,7 @@ PetscErrorCode InvSSAForwardProblem_dep::solveF(IceModelVec2V &result)
   ierr = solveF_core(); CHKERRQ(ierr);
 
   ierr = result.copy_from(SSAX); CHKERRQ(ierr);
-  ierr = result.beginGhostComm(); CHKERRQ(ierr);
-  ierr = result.endGhostComm(); CHKERRQ(ierr);
+  ierr = result.update_ghosts(); CHKERRQ(ierr);
   return 0;
 }
 
@@ -425,8 +428,7 @@ PetscErrorCode InvSSAForwardProblem_dep::solveT( IceModelVec2S &dtauc, IceModelV
 
   // Extract the solution and communicate.
   ierr = result.copy_from(m_VecZ2); CHKERRQ(ierr);
-  ierr = result.beginGhostComm(); CHKERRQ(ierr);
-  ierr = result.endGhostComm(); CHKERRQ(ierr);
+  ierr = result.update_ghosts(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -478,9 +480,13 @@ PetscErrorCode InvSSAForwardProblem_dep::solveTStar( IceModelVec2V &residual, Ic
   // Assemble the right-hand side for the second step.
   ierr = DMDAVecGetArray(SSADA,m_VecZ,&Z); CHKERRQ(ierr);
   ierr = DMDAVecGetArray(SSADA,m_VecU,&U); CHKERRQ(ierr);
-  ierr = DMDAVecGetArray(grid.da2,m_VecRHS,&RHS); CHKERRQ(ierr);
+
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
+
+  ierr = DMDAVecGetArray(da2,m_VecRHS,&RHS); CHKERRQ(ierr);
   ierr = assemble_TStarB_rhs(Z,U,RHS); CHKERRQ(ierr);
-  ierr = DMDAVecRestoreArray(grid.da2,m_VecRHS,&RHS); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da2,m_VecRHS,&RHS); CHKERRQ(ierr);
   ierr = DMDAVecRestoreArray(SSADA,m_VecU,&U); CHKERRQ(ierr);
   ierr = DMDAVecRestoreArray(SSADA,m_VecZ,&Z); CHKERRQ(ierr);
 
@@ -498,8 +504,7 @@ PetscErrorCode InvSSAForwardProblem_dep::solveTStar( IceModelVec2V &residual, Ic
 
   // Extract the solution and communicate.
   ierr = result.copy_from(m_VecV); CHKERRQ(ierr);
-  ierr = result.beginGhostComm(); CHKERRQ(ierr);
-  ierr = result.endGhostComm(); CHKERRQ(ierr);
+  ierr = result.update_ghosts(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -619,11 +624,15 @@ PetscErrorCode InvSSAForwardProblem_dep::domainIP(Vec a, Vec b, PetscScalar *OUT
 {
   PetscErrorCode ierr;
   PetscScalar **A, **B;
-  ierr = DMDAVecGetArray(grid.da2,a,&A); CHKERRQ(ierr);
-  ierr = DMDAVecGetArray(grid.da2,b,&B); CHKERRQ(ierr);
+
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
+
+  ierr = DMDAVecGetArray(da2,a,&A); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(da2,b,&B); CHKERRQ(ierr);
   ierr = domainIP_core(A,B,OUTPUT);
-  ierr = DMDAVecRestoreArray(grid.da2,a,&A); CHKERRQ(ierr);
-  ierr = DMDAVecRestoreArray(grid.da2,b,&B); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da2,a,&A); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da2,b,&B); CHKERRQ(ierr);
   return 0;
 }
 PetscErrorCode InvSSAForwardProblem_dep::domainIP(IceModelVec2S &a, IceModelVec2S &b, PetscScalar *OUTPUT)
@@ -861,7 +870,7 @@ PetscErrorCode InvSSAForwardProblem_dep::assemble_T_rhs( PISMVector2 **gvel, Pet
   }
 
   // Start access of Dirichlet data, if present.
-  if (bc_locations && vel_bc) {
+  if (bc_locations && m_vel_bc) {
     ierr = bc_locations->get_array(bc_mask);CHKERRQ(ierr);
   }
 
@@ -897,7 +906,7 @@ PetscErrorCode InvSSAForwardProblem_dep::assemble_T_rhs( PISMVector2 **gvel, Pet
 
       // These values now need to be adjusted if some nodes in the element have
       // Dirichlet data.
-      if(bc_locations && vel_bc) {
+      if(bc_locations && m_vel_bc) {
         dofmap.extractLocalDOFs(i,j,bc_mask,local_bc_mask);
         for (k=0; k<4; k++) {
           if (PismIntMask(local_bc_mask[k]) == 1) { // Dirichlet node
@@ -945,7 +954,7 @@ PetscErrorCode InvSSAForwardProblem_dep::assemble_T_rhs( PISMVector2 **gvel, Pet
 
   // Until now we have not touched rows in the residual corresponding to Dirichlet data.
   // We fix this now.
-  if (bc_locations && vel_bc) {
+  if (bc_locations && m_vel_bc) {
     // Enforce Dirichlet conditions strongly
     for (i=grid.xs; i<grid.xs+grid.xm; i++) {
       for (j=grid.ys; j<grid.ys+grid.ym; j++) {
@@ -977,7 +986,7 @@ PetscErrorCode InvSSAForwardProblem_dep::assemble_TStarA_rhs( PISMVector2 **R, P
   }
 
   // Start access of Dirichlet data, if present.
-  if (bc_locations && vel_bc) {
+  if (bc_locations && m_vel_bc) {
     ierr = bc_locations->get_array(bc_mask);CHKERRQ(ierr);
   }
 
@@ -1006,7 +1015,7 @@ PetscErrorCode InvSSAForwardProblem_dep::assemble_TStarA_rhs( PISMVector2 **R, P
 
 
   // Set rows in the residual corresponding to Dirichlet data to zero.
-  if (bc_locations && vel_bc) {
+  if (bc_locations && m_vel_bc) {
     // Enforce Dirichlet conditions strongly
     for (i=grid.xs; i<grid.xs+grid.xm; i++) {
       for (j=grid.ys; j<grid.ys+grid.ym; j++) {

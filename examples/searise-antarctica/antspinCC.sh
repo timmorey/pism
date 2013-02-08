@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) 2009-2011 Maria Martin and Ed Bueler
+# Copyright (C) 2009-2012 Maria Martin and Ed Bueler
 ##################################################################################
 # Spinup of Antarctic ice sheet model using data from Anne Le Brocq (from SeaRISE wiki).
 # Uses PIK physics and enthalpy model (see Publications at www.pism-docs.org) 
@@ -71,7 +71,10 @@ SKIPTENKM=100
 SKIPSEVENKM=100
 SKIPFIVEKM=200
 
-SKIP=$SKIPFIFTEENKM
+# these coarse grid defaults are for development/regression runs, not
+# "production" or science
+GRID=$THIRTYKMGRID
+SKIP=$SKIPTHIRTYKM
 
 SIA_ENHANCEMENT="-sia_e 5.6"
 
@@ -86,7 +89,7 @@ PIKPHYS_COUPLING="-atmosphere given -atmosphere_given_file $PISM_INDATANAME -sur
 PARAMS="-pseudo_plastic -pseudo_plastic_q 0.25 -plastic_pwfrac 0.97"
 TILLPHI="-topg_to_phi 5.0,20.0,-300.0,700.0"
 #TILLPHI="-topg_to_phi 5.0,20.0,-1000.0,0.0,10.0" # as in Martin et al 2012
-FULLPHYS="-ssa_sliding -thk_eff -diffuse_bwat $PARAMS $TILLPHI"
+FULLPHYS="-ssa_sliding -hydrology diffuseonly $PARAMS $TILLPHI"
 
 # use these KSP "diverged" errors occur
 STRONGKSP="-ksp_type gmres -ksp_norm_type unpreconditioned -ksp_pc_side right -pc_type asm -sub_pc_type lu"
@@ -107,7 +110,7 @@ RESNAME=${RESDIR}$stage.nc
 RUNTIME=100 
 echo
 echo "$SCRIPTNAME  bootstrapping plus short SIA run for $RUNTIME a"
-cmd="$PISM_MPIDO $NN $PISM_EXEC -skip -skip_max $SKIP -boot_file ${INNAME} $FIFTEENKMGRID \
+cmd="$PISM_MPIDO $NN $PISM_EXEC -skip -skip_max $SKIP -boot_file ${INNAME} $GRID \
 	$SIA_ENHANCEMENT $PIKPHYS_COUPLING -ocean_kill \
 	-y $RUNTIME -o $RESNAME"
 $DO $cmd

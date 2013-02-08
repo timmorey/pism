@@ -7,14 +7,6 @@ PISM_BUILD_DIR=$1
 # make sure that Python imports the right modules
 export PYTHONPATH=$PISM_BUILD_DIR:$PYTHONPATH
 
-# check if siple is installed
-$PYTHONEXEC -c 'import siple'
-if [ $? != 0 ];
-then
-    echo "Please make sure that siple is installed!"
-    exit 1
-fi
-
 set -x
 set -e
 
@@ -29,9 +21,9 @@ $PYTHONEXEC make_synth_ssa.py -i tiny.nc -o inv_data.nc \
 # Run the inversion code
 $PYTHONEXEC vel2tauc.py \
               -i tiny.nc -pseudo_plastic -pseudo_plastic_q 0.25 -inv_data inv_data.nc \
-              -o tiny_inv.nc -regional -ssa_dirichlet_bc -inv_use_tauc_prior \
+              -o tiny_tikhonov_lmvm.nc -regional -ssa_dirichlet_bc -inv_use_tauc_prior \
               -inv_ssa_tauc_param trunc -inv_ssa_cL2 1 -inv_ssa_cH1 0 \
-              -inv_method nlcg -rms_error 100
+              -inv_method tikhonov_lmvm -tikhonov_penalty 3e-2
 
 # Check if we succeeded
-$PYTHONEXEC verify_ssa_inv.py -m 110 -e 2 -i 30
+$PYTHONEXEC verify_ssa_inv.py tiny_tikhonov_lmvm.nc --desired_misfit 14.12 --misfit_tolerance .5 --iter_max 66

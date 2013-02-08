@@ -40,7 +40,6 @@ this command fails: \dotfile stressbalance-out.dot
  */
 class PISMStressBalance : public PISMComponent_Diag
 {
-  friend class PSB_taud_mag;
 public:
   PISMStressBalance(IceGrid &g, ShallowStressBalance *sb, SSB_Modifier *ssb_mod,
                     PISMOceanModel *ocean, const NCConfigVariable &config);
@@ -78,7 +77,7 @@ public:
   virtual PetscErrorCode update(bool fast);
 
   //! \brief Get the thickness-advective (SSA) 2D velocity.
-  virtual PetscErrorCode get_advective_2d_velocity(IceModelVec2V* &result);
+  virtual PetscErrorCode get_2D_advective_velocity(IceModelVec2V* &result);
 
   //! \brief Get the diffusive (SIA) vertically-averaged flux on the staggered grid.
   virtual PetscErrorCode get_diffusive_flux(IceModelVec2Stag* &result);
@@ -105,10 +104,12 @@ public:
   // for the calving, etc.:
 
   //! \brief Get the largest and smallest eigenvalues of the strain rate tensor.
-  virtual PetscErrorCode get_principal_strain_rates(IceModelVec2 &result);
+  virtual PetscErrorCode compute_2D_principal_strain_rates(IceModelVec2V &velocity, IceModelVec2Int &mask,
+                                                           IceModelVec2 &result);
 
   //! \brief Get the components of the 2D deviatoric stress tensor.
-  virtual PetscErrorCode get_2D_stresses(IceModelVec2 &result);
+  virtual PetscErrorCode compute_2D_stresses(IceModelVec2V &velocity, IceModelVec2Int &mask,
+                                             IceModelVec2 &result);
 
   //! \brief Produce a report string for the standard output.
   virtual PetscErrorCode stdout_report(string &result);

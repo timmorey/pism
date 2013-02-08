@@ -1,4 +1,4 @@
-// Copyright (C) 2011, 2012 PISM Authors
+// Copyright (C) 2011, 2012, 2013 PISM Authors
 //
 // This file is part of PISM.
 //
@@ -32,7 +32,7 @@ static char help[] =
 static PetscErrorCode get_grid_from_file(string filename, IceGrid &grid) {
   PetscErrorCode ierr;
 
-  PIO nc(grid, "guess_format");
+  PIO nc(grid, "guess_mode");
 
   ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
   ierr = nc.inq_grid("bedrock_altitude", &grid, NOT_PERIODIC); CHKERRQ(ierr);
@@ -41,7 +41,7 @@ static PetscErrorCode get_grid_from_file(string filename, IceGrid &grid) {
   grid.compute_nprocs();
   grid.compute_ownership_ranges();
 
-  ierr = grid.createDA(); CHKERRQ(ierr);
+  ierr = grid.allocate(); CHKERRQ(ierr);
 
   ierr = grid.printInfo(1); CHKERRQ(ierr);
 
@@ -177,11 +177,7 @@ int main(int argc, char *argv[]) {
 
     // This is never used (but it is a required argument of the
     // PISMStressBalance constructor).
-    IceBasalResistancePlasticLaw basal(
-           config.get("plastic_regularization", "1/year", "1/second"),
-           config.get_flag("do_pseudo_plastic_till"),
-           config.get("pseudo_plastic_q"),
-           config.get("pseudo_plastic_uthreshold", "m/year", "m/second"));
+    IceBasalResistancePlasticLaw basal(config);
 
     // POConstant ocean(grid, config);
 

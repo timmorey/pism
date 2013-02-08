@@ -49,6 +49,7 @@ file containing a complete model state, versus bootstrapping).
 // forward declarations
 class IceGrid;
 class EnthalpyConverter;
+class PISMHydrology;
 class PISMYieldStress;
 class IceBasalResistancePlasticLaw;
 class PISMStressBalance;
@@ -96,15 +97,11 @@ class IceModel {
   friend class IceModel_imass;
   friend class IceModel_dimassdt;
   friend class IceModel_ivoltemp;
-  friend class IceModel_ivoltempf;
   friend class IceModel_ivolcold;
-  friend class IceModel_ivolcoldf;
   friend class IceModel_ivolg;
   friend class IceModel_ivolf;
   friend class IceModel_iareatemp;
-  friend class IceModel_iareatempf;
   friend class IceModel_iareacold;
-  friend class IceModel_iareacoldf;
   friend class IceModel_ienthalpy;
   friend class IceModel_iareag;
   friend class IceModel_iareaf;
@@ -124,6 +121,9 @@ class IceModel {
   friend class IceModel_float_kill_flux_cumulative;
   friend class IceModel_discharge_flux;
   friend class IceModel_discharge_flux_cumulative;
+  friend class IceModel_nonneg_flux_2D_cumulative;
+  friend class IceModel_grounded_basal_flux_2D_cumulative;
+  friend class IceModel_floating_basal_flux_2D_cumulative;
   friend class IceModel_max_hor_vel;
   friend class IceModel_sum_divQ_flux;
   friend class IceModel_H_to_Href_flux;
@@ -143,6 +143,7 @@ public:
   virtual PetscErrorCode allocate_stressbalance();
   virtual PetscErrorCode allocate_bed_deformation();
   virtual PetscErrorCode allocate_bedrock_thermal_unit();
+  virtual PetscErrorCode allocate_subglacial_hydrology();
   virtual PetscErrorCode allocate_basal_yield_stress();
 
   virtual PetscErrorCode init_couplers();
@@ -199,6 +200,7 @@ protected:
     &overrides;			 //!< flags and parameters overriding config, see -config_override
   NCGlobalAttributes    global_attributes;
 
+  PISMHydrology   *subglacial_hydrology;
   PISMYieldStress *basal_yield_stress;
   IceBasalResistancePlasticLaw *basal;
 
@@ -217,7 +219,6 @@ protected:
   IceModelVec2S vh,		//!< ice surface elevation; ghosted
     vH,		//!< ice thickness; ghosted
     vtauc,		//!< yield stress for basal till (plastic or pseudo-plastic model); ghosted
-    vbwat,		//!< thickness of the basal meltwater; ghosted
     vbmr,           //!< rate of production of basal meltwater (ice-equivalent); no ghosts
     vLongitude,	//!< Longitude; ghosted to compute cell areas
     vLatitude,	//!< Latitude; ghosted to compute cell areas
@@ -230,6 +231,9 @@ protected:
     acab,		//!< accumulation/ablation rate; no ghosts
     climatic_mass_balance_cumulative,    //!< cumulative acab
     ocean_kill_flux_2D_cumulative,       //!< cumulative ocean kill flux
+    grounded_basal_flux_2D_cumulative, //!< grounded basal (melt/freeze-on) cumulative flux
+    floating_basal_flux_2D_cumulative, //!< floating (sub-shelf) basal (melt/freeze-on) cumulative flux
+    nonneg_flux_2D_cumulative,         //!< cumulative nonnegative-rule flux
     artm,		//!< ice temperature at the ice surface but below firn; no ghosts
     liqfrac_surface,    //!< ice liquid water fraction at the top surface of the ice
     shelfbtemp,		//!< ice temperature at the shelf base; no ghosts
@@ -361,9 +365,6 @@ protected:
   virtual PetscErrorCode massContExplicitStep();
   virtual PetscErrorCode sub_gl_position();
 
-  // see iMhydrology.cc
-  virtual PetscErrorCode diffuse_bwat();
-
   // see iMicebergs.cc
   virtual PetscErrorCode killIceBergs();           // call this one to do proper sequence
   virtual PetscErrorCode findIceBergCandidates();
@@ -489,12 +490,21 @@ protected:
   PetscInt     id, jd;	     // sounding indices
   map<string,PetscViewer> viewers;
 
+  // time step decision helper; see step()
+  inline void revise_maxdt(PetscReal new_dt, PetscReal &my_maxdt) {
+    if (my_maxdt > 0)
+      my_maxdt = PetscMin(new_dt, my_maxdt);
+    else
+      my_maxdt = new_dt;
+  }
+
 private:
   PetscLogDouble start_time;    // this is used in the wall-clock-time backup code
 
   int event_step,		//!< total time spent doing time-stepping
     event_velocity,		//!< total velocity computation
     event_energy,		//!< energy balance computation
+    event_hydrology,		//!< subglacial hydrology computation
     event_mass,			//!< mass continuity computation
     event_age,			//!< age computation
     event_beddef,		//!< bed deformation step

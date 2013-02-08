@@ -1,4 +1,4 @@
-// Copyright (C) 2010--2012 Ed Bueler, Constantine Khroulev, and David Maxwell
+// Copyright (C) 2010--2013 Ed Bueler, Constantine Khroulev, and David Maxwell
 //
 // This file is part of PISM.
 //
@@ -82,12 +82,9 @@ PetscErrorCode SSATestCaseExp::initializeGrid(PetscInt Mx,PetscInt My)
 PetscErrorCode SSATestCaseExp::initializeSSAModel()
 {
   // Use a pseudo-plastic law with linear till
-  PetscScalar linear_q = 1.;
-  basal = new IceBasalResistancePlasticLaw(
-         config.get("plastic_regularization", "1/year", "1/second"),
-         true, // do not force a pure-plastic law
-         linear_q,
-         config.get("pseudo_plastic_uthreshold", "m/year", "m/second"));
+  config.set_flag("do_pseudo_plastic_till", true);
+  config.set("pseudo_plastic_q", 1.0);
+  basal = new IceBasalResistancePseudoPlasticLaw(config);
 
   // The following is irrelevant because we will force linear rheology later.
   enthalpyconverter = new EnthalpyConverter(config);
@@ -137,10 +134,10 @@ PetscErrorCode SSATestCaseExp::initializeSSACoefficients()
   ierr = vel_bc.end_access(); CHKERRQ(ierr);
   ierr = bc_mask.end_access(); CHKERRQ(ierr);
     
-  ierr = vel_bc.beginGhostComm(); CHKERRQ(ierr);
-  ierr = vel_bc.endGhostComm(); CHKERRQ(ierr);
-  ierr = bc_mask.beginGhostComm(); CHKERRQ(ierr);
-  ierr = bc_mask.endGhostComm(); CHKERRQ(ierr);
+  ierr = vel_bc.update_ghosts(); CHKERRQ(ierr);
+
+  ierr = bc_mask.update_ghosts(); CHKERRQ(ierr);
+
 
 
   ierr = ssa->set_boundary_conditions(bc_mask, vel_bc); CHKERRQ(ierr); 

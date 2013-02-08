@@ -1,4 +1,4 @@
-// Copyright (C) 2004-2011 Jed Brown, Ed Bueler, and Constantine Khroulev
+// Copyright (C) 2004-2012 Jed Brown, Ed Bueler, and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -20,6 +20,7 @@
 #define __basal_resistance_hh
 
 #include <petscsys.h>
+#include "NCVariable.hh"
 
 //! Class containing physical constants and the constitutive relation describing till for SSA.
 /*!
@@ -28,18 +29,30 @@ viscous till to purely plastic till.
  */
 class IceBasalResistancePlasticLaw {
 public:
-  IceBasalResistancePlasticLaw(PetscScalar regularizationConstant, bool pseudoPlastic,
-                   PetscScalar pseudoExponent, PetscScalar pseudoUThreshold);
+  IceBasalResistancePlasticLaw(const NCConfigVariable &config);
+  virtual ~IceBasalResistancePlasticLaw() {}
   virtual PetscErrorCode printInfo(int verbthresh, MPI_Comm com);
   virtual PetscScalar drag(PetscScalar tauc,
                            PetscScalar vx, PetscScalar vy);
   // Also get the derivative of drag with respect to \f$ alpha=\frac 1 2 \abs{u}^2 \f$.
   virtual void dragWithDerivative(PetscReal tauc, PetscScalar vx, PetscScalar vy,
                                   PetscScalar *drag, PetscScalar *ddrag) const;
-  virtual ~IceBasalResistancePlasticLaw() {}
+protected:
+  double plastic_regularize;
+};
 
-  PetscReal   plastic_regularize, pseudo_q, pseudo_u_threshold;
-  bool pseudo_plastic;
+class IceBasalResistancePseudoPlasticLaw : public IceBasalResistancePlasticLaw{
+public:
+  IceBasalResistancePseudoPlasticLaw(const NCConfigVariable &config);
+  virtual ~IceBasalResistancePseudoPlasticLaw() {}
+  virtual PetscErrorCode printInfo(int verbthresh, MPI_Comm com);
+  virtual PetscScalar drag(PetscScalar tauc,
+                           PetscScalar vx, PetscScalar vy);
+  // Also get the derivative of drag with respect to \f$ alpha=\frac 1 2 \abs{u}^2 \f$.
+  virtual void dragWithDerivative(PetscReal tauc, PetscScalar vx, PetscScalar vy,
+                                  PetscScalar *drag, PetscScalar *ddrag) const;
+protected:
+  PetscReal pseudo_q, pseudo_u_threshold, sliding_scale;
 };
 
 #endif /* __basal_resistance_hh */

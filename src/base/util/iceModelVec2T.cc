@@ -1,4 +1,4 @@
-// Copyright (C) 2009--2012 Constantine Khroulev
+// Copyright (C) 2009--2013 Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -80,8 +80,8 @@ PetscErrorCode IceModelVec2T::create(IceGrid &my_grid, string my_short_name,
 
   ierr = IceModelVec2S::create(my_grid, my_short_name, false, width); CHKERRQ(ierr);
 
-  // create the DA:
-  ierr = create_2d_da(da3, n_records, 1); CHKERRQ(ierr);
+  // initialize the da3 member:
+  ierr = grid->get_dm(this->n_records, this->da_stencil_width, da3); CHKERRQ(ierr);
 
   // allocate the 3D Vec:
   ierr = DMCreateGlobalVector(da3, &v3); CHKERRQ(ierr);
@@ -145,7 +145,7 @@ PetscErrorCode IceModelVec2T::init(string fname) {
   // We find the variable in the input file and
   // try to find the corresponding time dimension.
 
-  PIO nc(*grid, "guess_format");
+  PIO nc(*grid, "guess_mode");
   string name_found;
   bool exists, found_by_standard_name;
   ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
@@ -337,7 +337,7 @@ PetscErrorCode IceModelVec2T::update(int start) {
     report_range = true;
   }
 
-  PIO nc(*grid, "guess_format");
+  PIO nc(*grid, "guess_mode");
   ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
 
   for (int j = 0; j < missing; ++j) {
@@ -375,6 +375,7 @@ PetscErrorCode IceModelVec2T::discard(int number) {
       for (PetscInt k = 0; k < N; ++k)
 	a3[i][j][k] = a3[i][j][k + number];
   ierr = end_access(); CHKERRQ(ierr);
+  ierr = end_access(); CHKERRQ(ierr);
   
   return 0;
 }
@@ -390,6 +391,7 @@ PetscErrorCode IceModelVec2T::set_record(int n) {
     for (PetscInt j=grid->ys; j<grid->ys+grid->ym; ++j)
       a3[i][j][n] = a2[i][j];
   ierr = end_access(); CHKERRQ(ierr);
+  ierr = end_access(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -404,6 +406,7 @@ PetscErrorCode IceModelVec2T::get_record(int n) {
   for (PetscInt i=grid->xs; i<grid->xs+grid->xm; ++i)
     for (PetscInt j=grid->ys; j<grid->ys+grid->ym; ++j)
       a2[i][j] = a3[i][j][n];
+  ierr = end_access(); CHKERRQ(ierr);
   ierr = end_access(); CHKERRQ(ierr);
 
   return 0;
@@ -525,6 +528,7 @@ PetscErrorCode IceModelVec2T::interp(double my_t) {
     for (PetscInt j=grid->ys; j<grid->ys+grid->ym; ++j)
       a2[i][j] = a3[i][j][k] * (1 - lambda) + a3[i][j][k + 1] * lambda;
   ierr = end_access(); CHKERRQ(ierr);
+  ierr = end_access(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -603,15 +607,14 @@ PetscErrorCode IceModelVec2T::average(double my_t, double my_dt) {
   PetscErrorCode ierr;
   PetscScalar **a2;
 
-  ierr = begin_access(); CHKERRQ(ierr);
-  ierr = get_array(a2);
+  ierr = get_array(a2);         // calls begin_access()
   for (PetscInt   i = grid->xs; i < grid->xs+grid->xm; ++i) {
     for (PetscInt j = grid->ys; j < grid->ys+grid->ym; ++j) {
       ierr = average(i, j, my_t, my_dt, a2[i][j]); CHKERRQ(ierr);
     }
   }
-
   ierr = end_access(); CHKERRQ(ierr);
+
   return 0;
 }
 

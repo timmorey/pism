@@ -69,6 +69,8 @@ pism_test (verif_SSAFEM_regress_linear_flow ssa/ssafem_test_linear.sh)
 
 pism_test (verif_SSAFEM_regress_plug_flow ssa/ssafem_test_plug.sh)
 
+pism_test (verif_test_V_SSAFD_regress_CFBC ssa/ssa_test_cfbc.sh)
+
 pism_test (verif_test_K_regress_cold_ice_bedrock_thermal test_18.sh)
 
 pism_test (GPBLD_flow_law_regress test_20.sh)
@@ -91,6 +93,8 @@ pism_test (runtime_viewers test_27.sh)
 
 pism_test (bootstrapping_incomplete_input test_28.sh)
 
+pism_test (distributed_hydrology_regression test_29.py)
+
 
 if(Pism_BUILD_PYTHON_BINDINGS)
 
@@ -106,15 +110,18 @@ if(Pism_BUILD_PYTHON_BINDINGS)
 
         pism_python_test (verif_SSAFEM_regress_plug_flow_py ssa/ssafem_test_plug.sh)
 
+
+# Inversion regression tests.  We run the appropriate ones if we can find
+# the siple python library or if PISM was built with TAO support.
+
         execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import siple"
           RESULT_VARIABLE IMPORT_SIPLE_ERRCODE
           OUTPUT_QUIET ERROR_QUIET)
 
-        if (${IMPORT_SIPLE_ERRCODE} EQUAL 0) # siple is installed
+        set (Pism_HAS_SIPLE ${IMPORT_SIPLE_ERRCODE} EQUAL 0)
 
-          message (STATUS "Enabling regression tests that use siple")
-
-          # copy the scripts the next test needs:
+        if( Pism_HAS_SIPLE OR Pism_USE_TAO)
+          # Copy over commonly used files
           foreach (FILE
               ${PROJECT_SOURCE_DIR}/examples/inverse/make_synth_ssa.py
               ${PROJECT_SOURCE_DIR}/examples/inverse/vel2tauc.py
@@ -123,8 +130,22 @@ if(Pism_BUILD_PYTHON_BINDINGS)
             get_filename_component(OUTPUT ${FILE} NAME)
             configure_file (${FILE} ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT} COPYONLY)
           endforeach()
+        endif()
 
-          pism_python_test (simple_inversion_test inverse/test_tiny.sh)
+
+        if (Pism_HAS_SIPLE) # siple is installed
+
+          message (STATUS "Enabling regression tests that use siple")
+
+          pism_python_test (simple_inversion_test_nlcg inverse/tiny_nlcg.sh)
 
         endif()
+
+        if (Pism_USE_TAO)
+          message (STATUS "Enabling regression tests that use TAO")
+
+          pism_python_test (simple_inversion_test_tikhonov  inverse/tiny_tikhonov_lmvm.sh)
+
+        endif()
+
 endif()

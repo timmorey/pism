@@ -1,4 +1,4 @@
-// Copyright (C) 2012 PISM Authors
+// Copyright (C) 2012, 2013 PISM Authors
 //
 // This file is part of PISM.
 //
@@ -29,37 +29,49 @@
 #include "PISMNC4_Quilt.hh"
 #include <assert.h>
 
-#if (PISM_PARALLEL_NETCDF4==1)
+#if (PISM_USE_PARALLEL_NETCDF4==1)
 #include "PISMNC4_Par.hh"
 #endif
 
-#if (PISM_PNETCDF==1)
+#if (PISM_USE_PNETCDF==1)
 #include "PISMPNCFile.hh"
 #endif
 
-#if (PISM_HDF5==1)
+#if (PISM_USE_HDF5==1)
 #include "PISMNC4_HDF5.hh"
 #endif
 
 static PISMNCFile* create_backend(MPI_Comm com, int rank, string mode) {
   if (mode == "netcdf3") {
     return new PISMNC3File(com, rank);
-  } else if (mode == "quilt") {
-    return new PISMNC4_Quilt(com, rank, false);
-  } else if (mode == "quilt-with-compression") {
-    return new PISMNC4_Quilt(com, rank, true);
+  } else if (mode.find("quilt") == 0) {
+    size_t n = mode.find(":");
+    int compression_level = 0;
+
+    if (n != string::npos) {
+      mode.replace(0, 6, "");
+      char *endptr;
+      compression_level = strtol(mode.c_str(), &endptr, 10);
+      if ((*endptr != '\0') || (compression_level < 0) || (compression_level > 9)) {
+        PetscPrintf(com, "PISM WARNING: invalid compression level %s. Output compression is disabled.\n",
+                    mode.c_str());
+        compression_level = 0;
+      }
+    }
+
+    return new PISMNC4_Quilt(com, rank, compression_level);
   }
-#if (PISM_PARALLEL_NETCDF4==1)
+#if (PISM_USE_PARALLEL_NETCDF4==1)
   else if (mode == "netcdf4_parallel") {
     return new PISMNC4_Par(com, rank);
   }
 #endif
-#if (PISM_PNETCDF==1)
+#if (PISM_USE_PNETCDF==1)
   else if (mode == "pnetcdf") {
     return new PISMPNCFile(com, rank);
   }
 #endif
-#if (PISM_HDF5==1)
+#if (PISM_USE_HDF5==1)
   else if (mode == "hdf5") {
     return new PISMNC4_HDF5(com, rank);
   }
@@ -597,7 +609,7 @@ PetscErrorCode PIO::inq_grid(string var_name, IceGrid *grid, Periodicity periodi
   ierr = grid->compute_horizontal_spacing(); CHKERRQ(ierr);
   ierr = grid->set_vertical_levels(input.z); CHKERRQ(ierr);
 
-  // We're ready to call grid->createDA().
+  // We're ready to call grid->allocate().
 
   return 0;
 }

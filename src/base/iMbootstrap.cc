@@ -1,4 +1,4 @@
-// Copyright (C) 2004-2012 Jed Brown, Nathan Shemonski, Ed Bueler and
+// Copyright (C) 2004-2013 Jed Brown, Nathan Shemonski, Ed Bueler and
 // Constantine Khroulev
 //
 // This file is part of PISM.
@@ -89,7 +89,7 @@ PetscErrorCode IceModel::bootstrapFromFile(string filename) {
 PetscErrorCode IceModel::bootstrap_2d(string filename) {
   PetscErrorCode ierr;
 
-  PIO nc(grid, "guess_format");
+  PIO nc(grid, "guess_mode");
   ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
 
   ierr = verbPrintf(2, grid.com, 
@@ -127,6 +127,7 @@ PetscErrorCode IceModel::bootstrap_2d(string filename) {
     ierr = verbPrintf(2, grid.com, 
 		      "  WARNING: 'mask' found; IGNORING IT!\n"); CHKERRQ(ierr);
   }
+
   if (hExists) {
     ierr = verbPrintf(2, grid.com, 
 		      "  WARNING: surface elevation 'usurf' found; IGNORING IT!\n");
@@ -140,6 +141,7 @@ PetscErrorCode IceModel::bootstrap_2d(string filename) {
   if (!lonExists) {
     ierr = vLongitude.set_attr("missing_at_bootstrap","true"); CHKERRQ(ierr);
   }
+
   ierr =  vLatitude.regrid(filename, false); CHKERRQ(ierr);
   if (!latExists) {
     ierr = vLatitude.set_attr("missing_at_bootstrap","true"); CHKERRQ(ierr);
@@ -149,8 +151,6 @@ PetscErrorCode IceModel::bootstrap_2d(string filename) {
                            config.get("bootstrapping_H_value_no_var")); CHKERRQ(ierr);
   ierr =       vbed.regrid(filename,  
                            config.get("bootstrapping_bed_value_no_var")); CHKERRQ(ierr);
-  ierr =      vbwat.regrid(filename,  
-                           config.get("bootstrapping_bwat_value_no_var")); CHKERRQ(ierr);
   ierr =       vbmr.regrid(filename,  
                            config.get("bootstrapping_bmelt_value_no_var")); CHKERRQ(ierr);
   ierr =       vGhf.regrid(filename,  
@@ -188,22 +188,15 @@ PetscErrorCode IceModel::bootstrap_2d(string filename) {
     ierr = vBCvel.regrid(filename,  0.0); CHKERRQ(ierr);
   }
 
-  bool Lz_set;
-  ierr = PISMOptionsIsSet("-Lz", Lz_set); CHKERRQ(ierr);
-  if ( !Lz_set ) {
-    PetscReal thk_min, thk_max;
-    ierr = vH.range(thk_min, thk_max); CHKERRQ(ierr);
+  // check if Lz is valid
+  PetscReal thk_min, thk_max;
+  ierr = vH.range(thk_min, thk_max); CHKERRQ(ierr);
 
-    ierr = verbPrintf(2, grid.com,
-		      "  Setting Lz to 1.5 * max(ice thickness) = %3.3f meters...\n",
-		      1.5 * thk_max);
-
-
-    grid.Lz = 1.5 * thk_max;
-
-    ierr = grid.compute_vertical_levels();
-
-    CHKERRQ(ierr);
+  if (thk_max > grid.Lz) {
+    PetscPrintf(grid.com,
+                "PISM ERROR: Max. ice thickness (%3.3f m) exceeds the height of the computational domain (%3.3f m).\n"
+                "            Exiting...\n", thk_max, grid.Lz);
+    PISMEnd();
   }
 
   return 0;
@@ -343,8 +336,7 @@ PetscErrorCode IceModel::putTempAtDepth() {
 
   delete [] T;
 
-  ierr = result->beginGhostComm(); CHKERRQ(ierr);
-  ierr = result->endGhostComm(); CHKERRQ(ierr);
+  ierr = result->update_ghosts(); CHKERRQ(ierr);
 
   if (do_cold) {
     ierr = compute_enthalpy_cold(T3, Enth3); CHKERRQ(ierr);

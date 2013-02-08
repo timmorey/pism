@@ -1,4 +1,4 @@
-// Copyright (C) 2008--2012 Ed Bueler, Constantine Khroulev, and David Maxwell
+// Copyright (C) 2008--2013 Ed Bueler, Constantine Khroulev, and David Maxwell
 //
 // This file is part of PISM.
 //
@@ -86,8 +86,7 @@ class LocalInterpCtx;
  before the code using ghosts:
 
  \code
- ierr = var.beginGhostComm(); CHKERRQ(ierr);
- ierr = var.endGhostComm(); CHKERRQ(ierr);
+ ierr = var.update_ghosts(); CHKERRQ(ierr);
  \endcode
 
  \section imv_io Reading and writing variables
@@ -230,10 +229,8 @@ public:
 
   virtual PetscErrorCode  begin_access();
   virtual PetscErrorCode  end_access();
-  virtual PetscErrorCode  beginGhostComm();
-  virtual PetscErrorCode  endGhostComm();
-  virtual PetscErrorCode  beginGhostComm(IceModelVec &destination);
-  virtual PetscErrorCode  endGhostComm(IceModelVec &destination);
+  virtual PetscErrorCode  update_ghosts();
+  virtual PetscErrorCode  update_ghosts(IceModelVec &destination);
 
   virtual PetscErrorCode  set(PetscScalar c);
 
@@ -263,8 +260,8 @@ protected:
   IceGrid      *grid;
   int          dof,             //!< number of "degrees of freedom" per grid point
     da_stencil_width;           //!< stencil width supported by the DA
-  DM           da;
   bool         localp;          //!< localp == true means "has ghosts"
+  DM da;                        //!< DM; this IceModelVec does not own it!
   bool begin_end_access_use_dof;
 
   //! It is a map, because a temporary IceModelVec can be used to view
@@ -277,7 +274,6 @@ protected:
   int access_counter;		// used in begin_access() and end_access()
   int state_counter;            //!< Internal IceModelVec "revision number"
 
-  virtual PetscErrorCode create_2d_da(DM &result, PetscInt da_dof, PetscInt stencil_width);
   virtual PetscErrorCode destroy();
   virtual PetscErrorCode checkAllocated();
   virtual PetscErrorCode checkHaveArray();
@@ -338,7 +334,7 @@ public:
   virtual PetscErrorCode get_component(int n, IceModelVec2S &result);
   virtual PetscErrorCode set_component(int n, IceModelVec2S &source);
   inline PetscScalar& operator() (int i, int j, int k) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
     check_array_indices(i, j, k);
 #endif
     return static_cast<PetscScalar***>(array)[i][j][k];
@@ -376,6 +372,7 @@ public:
   virtual PetscErrorCode sum(PetscScalar &result);
   virtual PetscErrorCode min(PetscScalar &result);
   virtual PetscErrorCode max(PetscScalar &result);
+  virtual PetscErrorCode absmax(PetscScalar &result);
   virtual PetscScalar diff_x(int i, int j);
   virtual PetscScalar diff_y(int i, int j);
   virtual PetscScalar diff_x_stagE(int i, int j);
@@ -548,7 +545,7 @@ public:
   virtual PetscErrorCode get_array(PISMVector2 ** &a);
   virtual PetscErrorCode magnitude(IceModelVec2S &result);
   inline PISMVector2& operator()(int i, int j) {
-#if (PISM_DEBUG == 1)
+#if (PISM_DEBUG==1)
     check_array_indices(i, j);
 #endif
     return static_cast<PISMVector2**>(array)[i][j];
@@ -600,6 +597,7 @@ public:
   virtual PetscErrorCode staggered_to_regular(IceModelVec2S &result);
   virtual PetscErrorCode staggered_to_regular(IceModelVec2V &result);
   virtual PetscErrorCode get_array(PetscScalar*** &a);
+  virtual PetscErrorCode absmaxcomponents(PetscScalar* z);
 
   //! Returns the values at interfaces of the cell i,j using the staggered grid.
   /*! The ij member of the return value is set to 0, since it has no meaning in
@@ -642,9 +640,6 @@ public:
   PetscErrorCode  view_sounding(int i, int j, PetscInt viewer_size);
   PetscErrorCode  view_sounding(int i, int j, PetscViewer v);
 
-  // note the IceModelVec3 with this method must be *local* while imv3_source must be *global*
-  virtual PetscErrorCode beginGhostCommTransfer(IceModelVec3D &imv3_source);
-  virtual PetscErrorCode endGhostCommTransfer(IceModelVec3D &imv3_source);
   virtual PetscScalar    getValZ(PetscInt i, PetscInt j, PetscScalar z);
   virtual PetscErrorCode isLegalLevel(PetscScalar z);
 protected:

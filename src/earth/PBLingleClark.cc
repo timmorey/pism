@@ -1,4 +1,4 @@
-// Copyright (C) 2010, 2011, 2012 Constantine Khroulev
+// Copyright (C) 2010, 2011, 2012, 2013 Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -66,8 +66,11 @@ PetscErrorCode PBLingleClark::transfer_to_proc0(IceModelVec2S *source, Vec resul
 
   ierr = source->copy_to(g2);
 
-  ierr = DMDAGlobalToNaturalBegin(grid.da2, g2, INSERT_VALUES, g2natural); CHKERRQ(ierr);
-  ierr =   DMDAGlobalToNaturalEnd(grid.da2, g2, INSERT_VALUES, g2natural); CHKERRQ(ierr);
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
+
+  ierr = DMDAGlobalToNaturalBegin(da2, g2, INSERT_VALUES, g2natural); CHKERRQ(ierr);
+  ierr =   DMDAGlobalToNaturalEnd(da2, g2, INSERT_VALUES, g2natural); CHKERRQ(ierr);
 
   ierr = VecScatterBegin(scatter, g2natural, result, INSERT_VALUES, SCATTER_FORWARD); CHKERRQ(ierr);
   ierr =   VecScatterEnd(scatter, g2natural, result, INSERT_VALUES, SCATTER_FORWARD); CHKERRQ(ierr);
@@ -81,8 +84,11 @@ PetscErrorCode PBLingleClark::transfer_from_proc0(Vec source, IceModelVec2S *res
   ierr = VecScatterBegin(scatter, source, g2natural, INSERT_VALUES, SCATTER_REVERSE); CHKERRQ(ierr);
   ierr =   VecScatterEnd(scatter, source, g2natural, INSERT_VALUES, SCATTER_REVERSE); CHKERRQ(ierr);
 
-  ierr = DMDANaturalToGlobalBegin(grid.da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
-  ierr =   DMDANaturalToGlobalEnd(grid.da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
+
+  ierr = DMDANaturalToGlobalBegin(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
+  ierr =   DMDANaturalToGlobalEnd(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
 
   ierr = result->copy_from(g2); CHKERRQ(ierr);
 
@@ -91,12 +97,14 @@ PetscErrorCode PBLingleClark::transfer_from_proc0(Vec source, IceModelVec2S *res
 
 PetscErrorCode PBLingleClark::allocate() {
   PetscErrorCode ierr;
+  DM da2;
+  ierr = grid.get_dm(1, grid.max_stencil_width, da2); CHKERRQ(ierr);
 
-  ierr = DMCreateGlobalVector(grid.da2, &g2); CHKERRQ(ierr);
+  ierr = DMCreateGlobalVector(da2, &g2); CHKERRQ(ierr);
 
   // note we want a global Vec but reordered in the natural ordering so when it is
   // scattered to proc zero it is not all messed up; see above
-  ierr = DMDACreateNaturalVector(grid.da2, &g2natural); CHKERRQ(ierr);
+  ierr = DMDACreateNaturalVector(da2, &g2natural); CHKERRQ(ierr);
   // next get context *and* allocate samplep0 (on proc zero only, naturally)
   ierr = VecScatterCreateToZero(g2natural, &scatter, &Hp0); CHKERRQ(ierr);
 
@@ -163,7 +171,7 @@ PetscErrorCode PBLingleClark::correct_topg() {
   bool use_special_regrid_semantics, regrid_file_set, boot_file_set,
     topg_exists, topg_initial_exists, regrid_vars_set;
   string boot_filename, regrid_filename;
-  PIO nc(grid, "guess_format");
+  PIO nc(grid, "guess_mode");
 
   ierr = PISMOptionsIsSet("-regrid_bed_special",
                           "Correct topg when switching to a different grid",
@@ -193,17 +201,15 @@ PetscErrorCode PBLingleClark::correct_topg() {
   }
 
   // Stop if the user asked to regrid topg (in this case no correction is necessary).
-  vector<string> regrid_vars;
-  ierr = PISMOptionsStringArray("-regrid_vars", "Specifies regridding variables", "",
-                                regrid_vars, regrid_vars_set); CHKERRQ(ierr);
+  set<string> regrid_vars;
+  ierr = PISMOptionsStringSet("-regrid_vars", "Specifies regridding variables", "",
+                              regrid_vars, regrid_vars_set); CHKERRQ(ierr);
 
   if (regrid_vars_set) {
-    for (unsigned int i = 0; i < regrid_vars.size(); ++i) {
-      if (regrid_vars[i] == "topg") {
-        ierr = verbPrintf(2, grid.com,
-                          "  Bed elevation correction requested, but -regrid_vars contains topg...\n"); CHKERRQ(ierr);
-        return 0;
-      }
+    if (set_contains(regrid_vars, "topg")) {
+      ierr = verbPrintf(2, grid.com,
+                        "  Bed elevation correction requested, but -regrid_vars contains topg...\n"); CHKERRQ(ierr);
+      return 0;
     }
   }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2010, 2011, 2012 Constantine Khroulev and Ed Bueler
+// Copyright (C) 2010, 2011, 2012, 2013 Constantine Khroulev and Ed Bueler
 //
 // This file is part of PISM.
 //
@@ -23,6 +23,8 @@
 #include "iceModelVec.hh"
 #include "IceGrid.hh"
 #include "flowlaws.hh"
+#include "flowlaw_factory.hh"
+#include <PISMDiagnostic.hh>
 
 class PISMVars;
 class IceFlowLaw;
@@ -37,7 +39,7 @@ public:
                        EnthalpyConverter &e, const NCConfigVariable &conf)
     : PISMComponent_Diag(g, conf), basal(b), flow_law(NULL), EC(e)
   {
-    vel_bc = NULL; bc_locations = NULL; variables = NULL;
+    m_vel_bc = NULL; bc_locations = NULL; variables = NULL;
     max_u = max_v = 0.0;
     sea_level = 0;
     allocate();
@@ -53,7 +55,7 @@ public:
   virtual PetscErrorCode set_boundary_conditions(IceModelVec2Int &locations,
                                                  IceModelVec2V &velocities)
   {
-    vel_bc = &velocities;
+    m_vel_bc = &velocities;
     bc_locations = &locations;
     return 0;
   }
@@ -66,8 +68,8 @@ public:
   // interface to the data provided by the stress balance object:
 
   //! \brief Get the thickness-advective (SSA) 2D velocity.
-  virtual PetscErrorCode get_advective_2d_velocity(IceModelVec2V* &result)
-  { result = &velocity; return 0; }
+  virtual PetscErrorCode get_2D_advective_velocity(IceModelVec2V* &result)
+  { result = &m_velocity; return 0; }
 
   //! \brief Get the max advective velocity (for the adaptive mass-continuity time-stepping).
   virtual PetscErrorCode get_max_2d_velocity(PetscReal &u_max, PetscReal &v_max)
@@ -80,12 +82,11 @@ public:
   virtual PetscErrorCode get_D2(IceModelVec2S* &result)
   { result = &D2; return 0; }
 
-  virtual PetscErrorCode compute_principal_strain_rates(IceModelVec2 &/*result*/)
-  { SETERRQ(grid.com, 1,"not implemented in base class"); }
+  virtual PetscErrorCode compute_2D_principal_strain_rates(IceModelVec2V &velocity, IceModelVec2Int &mask,
+                                                           IceModelVec2 &result);
 
-  virtual PetscErrorCode compute_2D_stresses(IceModelVec2 &/*result*/)
-  { SETERRQ(grid.com,1,"not implemented in base class"); }
-
+  virtual PetscErrorCode compute_2D_stresses(IceModelVec2V &velocity, IceModelVec2Int &mask,
+                                             IceModelVec2 &result);
 
   // helpers:
 
@@ -107,10 +108,27 @@ protected:
   IceFlowLaw *flow_law;
   EnthalpyConverter &EC;
 
-  IceModelVec2V velocity, *vel_bc;
+  IceModelVec2V m_velocity, *m_vel_bc;
   IceModelVec2Int *bc_locations;
   IceModelVec2S basal_frictional_heating, D2;
   PetscReal max_u, max_v;
+};
+
+//! \brief Computes the gravitational driving stress (diagnostically).
+class SSB_taud : public PISMDiag<ShallowStressBalance>
+{
+public:
+  SSB_taud(ShallowStressBalance *m, IceGrid &g, PISMVars &my_vars);
+  virtual PetscErrorCode compute(IceModelVec* &result);
+};
+
+//! \brief Computes the magnitude of the gravitational driving stress
+//! (diagnostically).
+class SSB_taud_mag : public PISMDiag<ShallowStressBalance>
+{
+public:
+  SSB_taud_mag(ShallowStressBalance *m, IceGrid &g, PISMVars &my_vars);
+  virtual PetscErrorCode compute(IceModelVec* &result);
 };
 
 
@@ -125,13 +143,28 @@ class SSB_Trivial : public ShallowStressBalance
 public:
   SSB_Trivial(IceGrid &g, IceBasalResistancePlasticLaw &b,
               EnthalpyConverter &e, const NCConfigVariable &conf)
-    : ShallowStressBalance(g, b, e, conf) {}
-  virtual ~SSB_Trivial() {}
+    : ShallowStressBalance(g, b, e, conf) {
+
+    // Use the SIA flow law.
+    IceFlowLawFactory ice_factory(grid.com, "sia_", config, &EC);
+    ice_factory.setType(config.get_string("sia_flow_law"));
+
+    ice_factory.setFromOptions();
+    ice_factory.create(&flow_law);
+  }
+  virtual ~SSB_Trivial() {
+    delete flow_law;
+  }
   virtual PetscErrorCode update(bool fast);
 
   virtual void add_vars_to_output(string /*keyword*/,
                                   map<string,NCSpatialVariable> &/*result*/)
   { }
+
+  virtual void get_diagnostics(map<string, PISMDiagnostic*> &dict) {
+    dict["taud"] = new SSB_taud(this, grid, *variables);
+    dict["taud_mag"] = new SSB_taud_mag(this, grid, *variables);
+  }
 
   //! Defines requested couplings fields to file and/or asks an attached
   //! model to do so.

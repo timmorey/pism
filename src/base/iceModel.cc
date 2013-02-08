@@ -28,6 +28,7 @@
 #include "PISMOcean.hh"
 #include "PISMBedDef.hh"
 #include "bedrockThermalUnit.hh"
+#include "PISMHydrology.hh"
 #include "PISMYieldStress.hh"
 #include "basal_resistance.hh"
 #include "enthalpyConverter.hh"
@@ -54,6 +55,7 @@ IceModel::IceModel(IceGrid &g, NCConfigVariable &conf, NCConfigVariable &conf_ov
   signal(SIGUSR1, pism_signal_handler);
   signal(SIGUSR2, pism_signal_handler);
 
+  subglacial_hydrology = NULL;
   basal_yield_stress = NULL;
   basal = NULL;
 
@@ -151,6 +153,8 @@ IceModel::~IceModel() {
   delete surface;
   delete beddef;
 
+  delete subglacial_hydrology;
+  delete basal_yield_stress;
   delete basal;
   delete EC;
   delete btu;
@@ -307,14 +311,6 @@ PetscErrorCode IceModel::createVecs() {
   ierr = bedtoptemp.set_glaciological_units("K");
   ierr = variables.add(bedtoptemp); CHKERRQ(ierr);
 
-  // effective thickness of subglacial melt water
-  ierr = vbwat.create(grid, "bwat", true, WIDE_STENCIL); CHKERRQ(ierr);
-  ierr = vbwat.set_attrs("model_state", "effective thickness of subglacial melt water",
-                         "m", ""); CHKERRQ(ierr);
-  ierr = vbwat.set_attr("valid_min", 0.0); CHKERRQ(ierr);
-  ierr = vbwat.set_attr("valid_max", config.get("bwat_max")); CHKERRQ(ierr);
-  ierr = variables.add(vbwat); CHKERRQ(ierr);
-
   if (config.get_flag("use_ssa_velocity") || config.get_flag("do_blatter")) {
     // yield stress for basal till (plastic or pseudo-plastic model)
     ierr = vtauc.create(grid, "tauc", true, WIDE_STENCIL); CHKERRQ(ierr);
@@ -337,8 +333,8 @@ PetscErrorCode IceModel::createVecs() {
   ierr = vbmr.create(grid, "bmelt", true, WIDE_STENCIL); CHKERRQ(ierr);
   // ghosted to allow the "redundant" computation of tauc
   ierr = vbmr.set_attrs("model_state",
-                        "ice basal melt rate in ice thickness per time",
-                        "m s-1", "land_ice_basal_melt_rate"); CHKERRQ(ierr);
+            "ice basal melt rate from energy conservation and subshelf melt, in ice thickness per time",
+            "m s-1", "land_ice_basal_melt_rate"); CHKERRQ(ierr);
   ierr = vbmr.set_glaciological_units("m year-1"); CHKERRQ(ierr);
   vbmr.write_in_glaciological_units = true;
   vbmr.set_attr("comment", "positive basal melt rate corresponds to ice loss");
@@ -525,6 +521,38 @@ PetscErrorCode IceModel::createVecs() {
       ierr = ocean_kill_flux_2D_cumulative.set_glaciological_units("Gt"); CHKERRQ(ierr);
       ocean_kill_flux_2D_cumulative.write_in_glaciological_units = true;
     }
+
+    if (set_contains(ex_vars, "grounded_basal_flux_cumulative")) {
+      ierr = grounded_basal_flux_2D_cumulative.create(grid, "grounded_basal_flux_cumulative", false); CHKERRQ(ierr);
+      ierr = grounded_basal_flux_2D_cumulative.set_attrs("diagnostic",
+                                                         "cumulative basal flux into the ice "
+                                                         "in grounded areas (positive means ice gain)",
+                                                         "kg", ""); CHKERRQ(ierr);
+      grounded_basal_flux_2D_cumulative.time_independent = false;
+      ierr = grounded_basal_flux_2D_cumulative.set_glaciological_units("Gt"); CHKERRQ(ierr);
+      grounded_basal_flux_2D_cumulative.write_in_glaciological_units = true;
+    }
+
+    if (set_contains(ex_vars, "floating_basal_flux_cumulative")) {
+      ierr = floating_basal_flux_2D_cumulative.create(grid, "floating_basal_flux_cumulative", false); CHKERRQ(ierr);
+      ierr = floating_basal_flux_2D_cumulative.set_attrs("diagnostic",
+                                                         "cumulative basal flux into the ice "
+                                                         "in floating areas (positive means ice gain)",
+                                                         "kg", ""); CHKERRQ(ierr);
+      floating_basal_flux_2D_cumulative.time_independent = false;
+      ierr = floating_basal_flux_2D_cumulative.set_glaciological_units("Gt"); CHKERRQ(ierr);
+      floating_basal_flux_2D_cumulative.write_in_glaciological_units = true;
+    }
+
+    if (set_contains(ex_vars, "nonneg_flux_cumulative")) {
+      ierr = nonneg_flux_2D_cumulative.create(grid, "nonneg_flux_cumulative", false); CHKERRQ(ierr);
+      ierr = nonneg_flux_2D_cumulative.set_attrs("diagnostic",
+                                                 "cumulative nonnegative rule flux (positive means ice gain)",
+                                                 "kg", ""); CHKERRQ(ierr);
+      nonneg_flux_2D_cumulative.time_independent = false;
+      ierr = nonneg_flux_2D_cumulative.set_glaciological_units("Gt"); CHKERRQ(ierr);
+      nonneg_flux_2D_cumulative.write_in_glaciological_units = true;
+    }
   }
 
   return 0;
@@ -563,41 +591,26 @@ PetscErrorCode IceModel::step(bool do_mass_continuity,
   double apcc_dt;
   bool restrict_dt;
   ierr = surface->max_timestep(grid.time->current(), apcc_dt, restrict_dt); CHKERRQ(ierr);
-  if (restrict_dt) {
-    if (maxdt_temporary > 0)
-      maxdt_temporary = PetscMin(apcc_dt, maxdt_temporary);
-    else
-      maxdt_temporary = apcc_dt;
-  }
+  if (restrict_dt) revise_maxdt(apcc_dt, maxdt_temporary);
 
   double opcc_dt;
   ierr = ocean->max_timestep(grid.time->current(), opcc_dt, restrict_dt); CHKERRQ(ierr);
-  if (restrict_dt) {
-    if (maxdt_temporary > 0)
-      maxdt_temporary = PetscMin(opcc_dt, maxdt_temporary);
-    else
-      maxdt_temporary = opcc_dt;
-  }
+  if (restrict_dt) revise_maxdt(opcc_dt, maxdt_temporary);
 
+  double hydro_dt;
+  ierr = subglacial_hydrology->max_timestep(grid.time->current(), hydro_dt, restrict_dt); CHKERRQ(ierr);
+  if (restrict_dt) revise_maxdt(hydro_dt, maxdt_temporary);
+
+  //! \li apply the time-step restriction from the -ts_{times,file,vars} mechanism
   double ts_dt;
   ierr = ts_max_timestep(grid.time->current(), ts_dt, restrict_dt); CHKERRQ(ierr);
-  if (restrict_dt) {
-    if (maxdt_temporary > 0)
-      maxdt_temporary = PetscMin(ts_dt, maxdt_temporary);
-    else
-      maxdt_temporary = ts_dt;
-  }
+  if (restrict_dt) revise_maxdt(ts_dt, maxdt_temporary);
 
   //! \li apply the time-step restriction from the -extra_{times,file,vars}
   //! mechanism
   double extras_dt;
   ierr = extras_max_timestep(grid.time->current(), extras_dt, restrict_dt); CHKERRQ(ierr);
-  if (restrict_dt) {
-    if (maxdt_temporary > 0)
-      maxdt_temporary = PetscMin(extras_dt, maxdt_temporary);
-    else
-      maxdt_temporary = extras_dt;
-  }
+  if (restrict_dt) revise_maxdt(extras_dt, maxdt_temporary);
 
   //! \li update the velocity field; in some cases the whole three-dimensional
   //! field is updated and in some cases just the vertically-averaged
@@ -679,10 +692,13 @@ PetscErrorCode IceModel::step(bool do_mass_continuity,
 
   grid.profiler->end(event_energy);
 
-  // finally, diffuse the stored basal water once per energy step, if it is requested
-  if (do_energy_step && config.get_flag("do_diffuse_bwat")) {
-    ierr = diffuse_bwat(); CHKERRQ(ierr);
-  }
+  grid.profiler->begin(event_hydrology);
+
+  //! \li update the state variables in the subglacial hydrology model (typically
+  //!  water thickness and sometimes pressure)
+  ierr = subglacial_hydrology->update(grid.time->current(), dt); CHKERRQ(ierr);
+
+  grid.profiler->end(event_hydrology);
 
   grid.profiler->begin(event_mass);
 

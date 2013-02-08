@@ -1,4 +1,4 @@
-// Copyright (C) 2009--2012 Ed Bueler and Constantine Khroulev
+// Copyright (C) 2009--2013 Ed Bueler and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -33,6 +33,7 @@
 #include "PISMBedDef.hh"
 #include "PISMSurface.hh"
 #include "PISMOcean.hh"
+#include "PISMHydrology.hh"
 #include "PISMMohrCoulombYieldStress.hh"
 #include "PISMConstantYieldStress.hh"
 #include "bedrockThermalUnit.hh"
@@ -141,18 +142,12 @@ PetscErrorCode IceModel::set_grid_defaults() {
   ierr = PISMOptionsIsSet("-Mx", Mx_set); CHKERRQ(ierr);
   ierr = PISMOptionsIsSet("-My", My_set); CHKERRQ(ierr);
   ierr = PISMOptionsIsSet("-Mz", Mz_set); CHKERRQ(ierr);
-  if ( !(Mx_set && My_set && Mz_set) ) {
+  ierr = PISMOptionsIsSet("-Lz", Lz_set); CHKERRQ(ierr);
+  if ( !(Mx_set && My_set && Mz_set && Lz_set) ) {
     ierr = PetscPrintf(grid.com,
-		       "PISM ERROR: All of -boot_file, -Mx, -My, -Mz are required for bootstrapping.\n");
+		       "PISM ERROR: All of -boot_file, -Mx, -My, -Mz, -Lz are required for bootstrapping.\n");
     CHKERRQ(ierr);
     PISMEnd();
-  }
-
-  ierr = PISMOptionsIsSet("-Lz", Lz_set); CHKERRQ(ierr);
-  if ( !Lz_set ) {
-    ierr = verbPrintf(2, grid.com,
-		      "PISM WARNING: -Lz is not set; trying to deduce it using the bootstrapping file...\n");
-    CHKERRQ(ierr);
   }
 
   return 0;
@@ -246,11 +241,12 @@ PetscErrorCode IceModel::set_grid_from_options() {
     grid.Ly = (y_range[1] - y_range[0]) / 2.0;
   }
 
+  grid.check_parameters();
   ierr = grid.compute_horizontal_spacing(); CHKERRQ(ierr);
   ierr = grid.compute_vertical_levels();    CHKERRQ(ierr);
 
   // At this point all the fields except for da2, xs, xm, ys, ym should be
-  // filled. We're ready to call grid.createDA().
+  // filled. We're ready to call grid.allocate().
   return 0;
 }
 
@@ -285,7 +281,7 @@ PetscErrorCode IceModel::grid_setup() {
 			   filename, i_set); CHKERRQ(ierr);
 
   if (i_set) {
-    PIO nc(grid, "guess_format");
+    PIO nc(grid, "guess_mode");
     string source;
 
     // Get the 'source' global attribute to check if we are given a PISM output
@@ -447,7 +443,7 @@ PetscErrorCode IceModel::grid_setup() {
 
   grid.check_parameters();
 
-  ierr = grid.createDA(); CHKERRQ(ierr);
+  ierr = grid.allocate(); CHKERRQ(ierr);
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
@@ -522,6 +518,11 @@ PetscErrorCode IceModel::model_state_setup() {
     ierr = btu->init(variables); CHKERRQ(ierr);
   }
 
+  if (subglacial_hydrology) {
+    ierr = subglacial_hydrology->init(variables); CHKERRQ(ierr);
+  }
+
+  // basal_yield_stress->init() needs bwat so this must happen after subglacial_hydrology->init()
   if (basal_yield_stress) {
     ierr = basal_yield_stress->init(variables); CHKERRQ(ierr);
   }
@@ -717,6 +718,25 @@ PetscErrorCode IceModel::allocate_bedrock_thermal_unit() {
   return 0;
 }
 
+//! \brief Decide which subglacial hydrology model to use.
+PetscErrorCode IceModel::allocate_subglacial_hydrology() {
+  string hydrology_model = config.get_string("hydrology_model");
+
+  if (subglacial_hydrology != NULL) // indicates it has already been allocated
+    return 0;
+  if      (hydrology_model == "tillcan")
+    subglacial_hydrology = new PISMTillCanHydrology(grid, config, false);
+  else if (hydrology_model == "diffuseonly")
+    subglacial_hydrology = new PISMDiffuseOnlyHydrology(grid, config);
+  else if (hydrology_model == "lakes")
+    subglacial_hydrology = new PISMLakesHydrology(grid, config);
+  else if (hydrology_model == "distributed")
+    subglacial_hydrology = new PISMDistributedHydrology(grid, config, stress_balance);
+  else { SETERRQ(grid.com,1,"unknown value for 'hydrology_model'"); }
+
+  return 0;
+}
+
 //! \brief Decide which basal yield stress model to use.
 PetscErrorCode IceModel::allocate_basal_yield_stress() {
   PetscErrorCode ierr;
@@ -734,7 +754,7 @@ PetscErrorCode IceModel::allocate_basal_yield_stress() {
     if (hold_tauc) {
       basal_yield_stress = new PISMConstantYieldStress(grid, config);
     } else {
-      basal_yield_stress = new PISMMohrCoulombYieldStress(grid, config);
+      basal_yield_stress = new PISMMohrCoulombYieldStress(grid, config, subglacial_hydrology);
     }
   }
 
@@ -747,15 +767,10 @@ PetscErrorCode IceModel::allocate_basal_resistance_law() {
   if (basal != NULL)
     return 0;
 
-  bool do_pseudo_plastic_till = config.get_flag("do_pseudo_plastic_till");
-  PetscScalar pseudo_plastic_q = config.get("pseudo_plastic_q"),
-    pseudo_plastic_uthreshold = config.get("pseudo_plastic_uthreshold", "m/year", "m/s"),
-    plastic_regularization = config.get("plastic_regularization", "1/year", "1/second");
-
-  basal = new IceBasalResistancePlasticLaw(plastic_regularization,
-                                           do_pseudo_plastic_till,
-                                           pseudo_plastic_q,
-                                           pseudo_plastic_uthreshold);
+  if (config.get_flag("do_pseudo_plastic_till") == true)
+    basal = new IceBasalResistancePseudoPlasticLaw(config);
+  else
+    basal = new IceBasalResistancePlasticLaw(config);
 
   return 0;
 }
@@ -779,6 +794,10 @@ PetscErrorCode IceModel::allocate_submodels() {
 
   ierr = allocate_stressbalance(); CHKERRQ(ierr);
 
+  // this has to happen *after* allocate_stressbalance()
+  ierr = allocate_subglacial_hydrology(); CHKERRQ(ierr);
+
+  // this has to happen *after* allocate_subglacial_hydrology()
   ierr = allocate_basal_yield_stress(); CHKERRQ(ierr);
 
   ierr = allocate_bedrock_thermal_unit(); CHKERRQ(ierr);
@@ -867,6 +886,7 @@ PetscErrorCode IceModel::misc_setup() {
   event_velocity  = grid.profiler->create("velocity", "time spent updating ice velocity");
 
   event_energy  = grid.profiler->create("energy",   "time spent inside energy time-stepping");
+  event_hydrology = grid.profiler->create("hydrology",   "time spent inside hydrology time-stepping");
   event_age     = grid.profiler->create("age",      "time spent inside age time-stepping");
   event_mass    = grid.profiler->create("masscont", "time spent inside mass continuity time-stepping");
 
@@ -950,7 +970,7 @@ PetscErrorCode IceModel::allocate_bed_deformation() {
 
   choices.insert("none");
   choices.insert("iso");
-#if (PISM_HAVE_FFTW==1)
+#if (PISM_USE_FFTW==1)
   choices.insert("lc");
 #endif
 
@@ -971,7 +991,7 @@ PetscErrorCode IceModel::allocate_bed_deformation() {
     return 0;
   }
 
-#if (PISM_HAVE_FFTW==1)
+#if (PISM_USE_FFTW==1)
   if ((model == "lc") && (beddef == NULL)) {
     beddef = new PBLingleClark(grid, config);
     return 0;
