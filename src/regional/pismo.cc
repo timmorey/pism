@@ -24,6 +24,7 @@ static char help[] =
 #include "IceGrid.hh"
 #include "iceModel.hh"
 
+#include "CoarseGrid.hh"
 #include "regional.hh"
 
 #include "PAFactory.hh"
@@ -61,6 +62,10 @@ class IceRegionalModel : public IceModel {
 public:
   IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o)
      : IceModel(g,c,o) {};
+
+public:
+  virtual PetscErrorCode step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip);
+
 protected:
   virtual PetscErrorCode set_vars_from_options();
   virtual PetscErrorCode bootstrap_2d(string filename);
@@ -79,12 +84,52 @@ protected:
   virtual PetscErrorCode enthalpyAndDrainageStep(PetscScalar* vertSacrCount, PetscScalar* liquifiedVol,
                                                  PetscScalar* bulgeCount);
   virtual PetscErrorCode setFromOptions();
+
 private:
   IceModelVec2Int no_model_mask;
   IceModelVec2S   usurfstore, thkstore;
   IceModelVec2S   bmr_stored;
   PetscErrorCode  set_no_model_strip(PetscReal stripwidth);
+
+protected:
+  vector<PetscReal> coarse_x, coarse_y, coarse_z, coarse_t;
 };
+
+PetscErrorCode IceRegionalModel::step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip)
+{
+  PetscErrorCode retval = 0;
+
+  if(this->grid.time->current() >= this->grid.time->end()) {
+    // TODO: Check to see if this will be the last time step.  If so, then we may
+    // need to write out the current (next to last) time step so that we can
+    // interpolate the model state into a coarse model.
+  }
+
+  this->no_model_mask.begin_access();
+  this->vH.begin_access();
+
+  // TODO: Update boundary conditions in the NMS by interpolating from a coarse
+  // model output.
+  PetscReal t = this->grid.time->current();
+  for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+    PetscReal x = this->grid.x[i];
+    for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+      if (no_model_mask(i, j) > 0.5) {
+        PetscReal y = this->grid.y[i];
+
+        // TODO
+      }
+    }
+  }
+
+  this->no_model_mask.end_access();
+  this->vH.end_access();
+
+  retval = IceModel::step(do_mass_continuity, do_energy, do_age, do_skip);
+  CHKERRQ(retval);
+
+  return retval;
+}
 
 //! \brief 
 PetscErrorCode IceRegionalModel::setFromOptions() {

@@ -1,6 +1,7 @@
 # Subclasses for regional problems.
 add_library (pismregional
   ./regional.cc
+  ./CoarseGrid.cc
   )
 target_link_libraries (pismregional pismbase)
 
