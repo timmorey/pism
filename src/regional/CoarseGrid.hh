@@ -8,6 +8,7 @@
 #ifndef COARSEGRID_HH_
 #define COARSEGRID_HH_
 
+#include <map>
 #include <petsc.h>
 #include <string>
 #include <vector>
@@ -24,10 +25,15 @@ public:
   PetscErrorCode SetAreaOfInterest(PetscReal xmin, PetscReal xmax,
                                    PetscReal ymin, PetscReal ymax);
 
+  PetscErrorCode Interpolate(const std::string& varname,
+                             double x, double y, double z, double t,
+                             double* value);
+
 protected:
-  std::vector<PetscReal> x, y, z, t;
-  int aoi_minxi, aoi_maxxi, aoi_minyi, aoi_maxyi;
-  PIO* pio;
+  std::vector<PetscReal> _X, _Y, _Z, _T;
+  std::map<std::string, double*> _VarCache;
+  int _AOIMinXi, _AOIMaxXi, _AOIMinYi, _AOIMaxYi;
+  PIO* _Pio;
 
 };
 

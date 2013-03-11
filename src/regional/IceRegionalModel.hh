@@ -26,14 +26,16 @@
 #include <string>
 
 
+class CoarseGrid;
+
 //! \brief A version of the PISM core class (IceModel) which knows about the
 //! no_model_mask and its semantics.
 class IceRegionalModel : public IceModel {
 public:
-  IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o)
-     : IceModel(g,c,o) {};
+  IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o);
 
 public:
+  virtual PetscErrorCode attach_coarse_grid(const std::string& filename);
   virtual PetscErrorCode step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip);
 
 protected:
@@ -60,6 +62,8 @@ private:
   IceModelVec2S   usurfstore, thkstore;
   IceModelVec2S   bmr_stored;
   PetscErrorCode  set_no_model_strip(PetscReal stripwidth);
+
+  CoarseGrid* coarse_grid;
 };
 
 

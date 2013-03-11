@@ -17,15 +17,40 @@
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
+#include "CoarseGrid.hh"
 #include "IceGrid.hh"
 #include "IceRegionalModel.hh"
 #include "pism_options.hh"
 #include "PISMConstantYieldStress.hh"
 #include "regional.hh"
 
-PetscErrorCode IceRegionalModel::step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip)
-{
+
+IceRegionalModel::IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o)
+  : IceModel(g,c,o),
+    coarse_grid(0) {
+
+}
+
+PetscErrorCode IceRegionalModel::attach_coarse_grid(const std::string& filename) {
+
   PetscErrorCode retval = 0;
+
+  if(coarse_grid) {
+    delete coarse_grid;
+    coarse_grid = 0;
+  }
+
+  coarse_grid = new CoarseGrid(filename);
+  retval = coarse_grid->SetAreaOfInterest(grid.x[grid.xs], grid.x[grid.xs + grid.xm],
+                                          grid.y[grid.ys], grid.y[grid.ys + grid.ym]);
+  CHKERRQ(retval);
+
+  return retval;
+}
+
+PetscErrorCode IceRegionalModel::step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip) {
+  PetscErrorCode retval = 0;
+  double value;
 
   if(this->grid.time->current() >= this->grid.time->end()) {
     // TODO: Check to see if this will be the last time step.  If so, then we may
@@ -33,25 +58,26 @@ PetscErrorCode IceRegionalModel::step(bool do_mass_continuity, bool do_energy, b
     // interpolate the model state into a coarse model.
   }
 
-  this->no_model_mask.begin_access();
-  this->vH.begin_access();
+  if(coarse_grid) {
+    this->no_model_mask.begin_access();
+    this->vH.begin_access();
 
-  // TODO: Update boundary conditions in the NMS by interpolating from a coarse
-  // model output.
-  PetscReal t = this->grid.time->current();
-  for (PetscInt i = grid.xs; i < grid.xs+grid.xm; ++i) {
-    PetscReal x = this->grid.x[i];
-    for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-      if (no_model_mask(i, j) > 0.5) {
-        PetscReal y = this->grid.y[i];
+    PetscReal t = this->grid.time->current();
+    for (PetscInt i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      PetscReal x = this->grid.x[i];
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if (no_model_mask(i, j) > 0.5) {
+          PetscReal y = this->grid.y[i];
 
-        // TODO
+          this->coarse_grid->Interpolate(this->vH.string_attr("name", 0), x, y, 0.0, t, &value);
+          this->vH(i, j) = value;
+        }
       }
     }
-  }
 
-  this->no_model_mask.end_access();
-  this->vH.end_access();
+    this->no_model_mask.end_access();
+    this->vH.end_access();
+  }
 
   retval = IceModel::step(do_mass_continuity, do_energy, do_age, do_skip);
   CHKERRQ(retval);

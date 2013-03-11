@@ -50,6 +50,8 @@ Instead see the PSForceThickness surface model modifier class.
  */
 
 int main(int argc, char *argv[]) {
+  char temp[256];
+  PetscBool coarseGridFileSet;
   PetscErrorCode  ierr;
   ierr = PetscInitialize(&argc, &argv, PETSC_NULL, help); CHKERRQ(ierr);
 
@@ -93,6 +95,14 @@ int main(int argc, char *argv[]) {
     NCConfigVariable config, overrides;
     ierr = init_config(com, rank, config, overrides, true); CHKERRQ(ierr);
 
+    ierr = PetscOptionsBegin(com, "", "Embedded Modeling Options", ""); CHKERRQ(ierr);
+    ierr = PetscOptionsString("-coarse_grid_file",
+                              "A file that contains a coarse grid suitable for "
+                              "interpolating boundary conditions in the "
+                              "regional model.",
+                              "", "", temp, 256, &coarseGridFileSet);
+    ierr = PetscOptionsEnd(); CHKERRQ(ierr);
+
     // initialize the ice dynamics model
     IceGrid g(com, rank, size, config);
     IceRegionalModel m(g, config, overrides);
@@ -117,6 +127,11 @@ int main(int argc, char *argv[]) {
     m.attach_surface_model(surface);
 
     ierr = m.init(); CHKERRQ(ierr);
+
+    if(coarseGridFileSet) {
+      printf("Loading coarse grid file '%s'...\n", temp);
+      m.attach_coarse_grid(temp);
+    }
 
     ierr = m.run(); CHKERRQ(ierr);
 
