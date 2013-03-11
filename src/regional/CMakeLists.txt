@@ -2,6 +2,7 @@
 add_library (pismregional
   ./regional.cc
   ./CoarseGrid.cc
+  ./IceRegionalModel.cc
   )
 target_link_libraries (pismregional pismbase)
 
