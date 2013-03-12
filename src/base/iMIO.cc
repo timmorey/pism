@@ -736,7 +736,7 @@ PetscErrorCode IceModel::write_snapshot() {
     ierr = nc.open(filename, PISM_WRITE, true); CHKERRQ(ierr); // append==true
   }
 
-  ierr = nc.append_time(config.get_string("time_dimension_name"), grid.time->current()); CHKERRQ(ierr);
+  //ierr = nc.append_time(config.get_string("time_dimension_name"), grid.time->current()); CHKERRQ(ierr);
   ierr = nc.append_history(tmp); CHKERRQ(ierr); // append the history
 
   ierr = write_variables(nc, snapshot_vars, PISM_DOUBLE);
