@@ -11,11 +11,11 @@ cp g5km_0_ftt.nc coarse-input.nc
 
 # Step 1: run pismr for 1 time step, writing out the state at both the beginning
 # and end of the time step
-mpiexc -n 8 pismr \
+mpiexec -n 8 pismr \
 	-i coarse-input.nc \
-	-y 10 -step_count 0 \
+	-y 100 -step_count 1 \
 	-o_size none \
-	-save_file coarse-output.nc -save_times 0:0.1:10 -save_size medium
+	-save_file coarse-output.nc -save_times 0:0.01:100 -save_size medium
 
 # Step 2: run pismo until it catches up to pismr
 # TODO: figure out the time that pismr ran to, so that we can stop pismo at the same place
