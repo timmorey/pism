@@ -18,7 +18,11 @@ mpiexec -n 8 pismr \
 	-save_file coarse-output.nc -save_times 0:0.01:100 -save_size medium
 
 # Step 2: run pismo until it catches up to pismr
-# TODO: figure out the time that pismr ran to, so that we can stop pismo at the same place
+
+# Step 2.1: Figure out the stop time of the coarse model in model years, and 
+# store it in the variable STOP_TIME
+STOP_TIME=`python extract_time.py coarse-output.nc`
+
 # TODO: run pismo until it catches up where pismr stopped
 # TODO: use "-coarse_grid_file coarse-output.nc" to use coarse model state for boundary conditions
 
