@@ -783,6 +783,21 @@ PetscErrorCode IceModel::run() {
     do_skip = config.get_flag("do_skip");
   int stepcount = (config.get_flag("count_time_steps")) ? 0 : -1;
 
+  int maxsteps = -1;
+  PetscBool maxStepsSet;
+  char temp[32];
+
+  ierr = PetscOptionsBegin(grid.com, "", "Embedded Modeling Options", ""); CHKERRQ(ierr);
+  ierr = PetscOptionsString("-step_count",
+                            "Maximum number of time steps to execute",
+                            "", "", temp, 32, &maxStepsSet);
+  ierr = PetscOptionsEnd(); CHKERRQ(ierr);
+
+  if(maxStepsSet) {
+    maxsteps = atoi(temp);
+    stepcount = 0;
+  }
+  
   // do a one-step diagnostic run:
   ierr = verbPrintf(2,grid.com,
       "doing preliminary step of 1 s (one model second) to fill diagnostic quantities ...\n");
@@ -843,6 +858,13 @@ PetscErrorCode IceModel::run() {
   reset_counters();
   ierr = summary(do_energy); CHKERRQ(ierr);  // report starting state
 
+  // For the trivial case where we have requested 0 time steps, don't go into 
+  // the stepping loop.
+  if (stepcount >= 0) {
+    if(0 <= maxsteps && maxsteps <= stepcount)
+      grid.time->set_end(grid.time->current());
+  }
+
   // main loop for time evolution
   // IceModel::step calls grid.time->step(dt), ensuring that this while loop
   // will terminate
@@ -870,7 +892,12 @@ PetscErrorCode IceModel::run() {
 
     ierr = update_viewers(); CHKERRQ(ierr);
 
-    if (stepcount >= 0) stepcount++;
+    if (stepcount >= 0) {
+      stepcount++;
+      if(0 <= maxsteps && maxsteps <= stepcount)
+        grid.time->set_end(grid.time->current());
+    }
+
     if (endOfTimeStepHook() != 0) break;
   } // end of the time-stepping loop
 

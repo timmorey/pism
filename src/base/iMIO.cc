@@ -215,12 +215,18 @@ PetscErrorCode IceModel::write_variables(const PIO &nc, set<string> vars,
   // We are done defining variables, so now is a good time to finally write the
   // the dimension variable data
   string time_name = config.get_string("time_dimension_name");
+  bool dim_exists = false;
   ierr = nc.append_time(time_name, grid.time->current()); CHKERRQ(ierr);
   ierr = nc.put_dim("x", grid.x);  CHKERRQ(ierr);
   ierr = nc.put_dim("y", grid.y);  CHKERRQ(ierr);
-  ierr = nc.put_dim("z", grid.zlevels);  CHKERRQ(ierr);
+
+  ierr = nc.inq_dim("z", dim_exists);
+  if(dim_exists) {
+    ierr = nc.put_dim("z", grid.zlevels);  CHKERRQ(ierr);
+  }
   
-  if(! grid.zblevels.empty()) {
+  ierr = nc.inq_dim("zb", dim_exists);
+  if(dim_exists && ! grid.zblevels.empty()) {
     // pisms runs don't use the zb dimension, so we'll get an error if we try to
     // write it.  Check if we have data to write before we write it.
     ierr = nc.put_dim("zb", grid.zblevels);  CHKERRQ(ierr);
@@ -736,7 +742,7 @@ PetscErrorCode IceModel::write_snapshot() {
     ierr = nc.open(filename, PISM_WRITE, true); CHKERRQ(ierr); // append==true
   }
 
-  ierr = nc.append_time(config.get_string("time_dimension_name"), grid.time->current()); CHKERRQ(ierr);
+  //ierr = nc.append_time(config.get_string("time_dimension_name"), grid.time->current()); CHKERRQ(ierr);
   ierr = nc.append_history(tmp); CHKERRQ(ierr); // append the history
 
   ierr = write_variables(nc, snapshot_vars, PISM_DOUBLE);

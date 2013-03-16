@@ -148,7 +148,7 @@ PetscErrorCode PIO::detect_mode(string filename) {
       modes.push_back("netcdf4_parallel");
       modes.push_back("netcdf3");
     } else {
-      modes.push_back("pnetcdf");
+      //modes.push_back("pnetcdf");
       modes.push_back("netcdf3");
     }
   } else {
