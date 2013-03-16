@@ -12,10 +12,10 @@ cp g5km_0_ftt.nc coarse-input.nc
 # Step 1: run pismr for 1 time step, writing out the state at both the beginning
 # and end of the time step
 mpiexec -n 8 pismr \
-	-i coarse-input.nc \
 	-y 100 -step_count 1 \
-	-o_size none \
-	-save_file coarse-output.nc -save_times 0:0.01:100 -save_size medium
+	-i coarse-input.nc \
+	-o coarse-output.nc \
+	-step_record_file coarse-bc.nc -step_record_vars thk
 
 # Step 2: run pismo until it catches up to pismr
 
