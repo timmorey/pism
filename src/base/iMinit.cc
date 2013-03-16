@@ -869,6 +869,7 @@ PetscErrorCode IceModel::misc_setup() {
   ierr = init_backups(); CHKERRQ(ierr);
   ierr = init_timeseries(); CHKERRQ(ierr);
   ierr = init_extras(); CHKERRQ(ierr);
+  ierr = init_step_record(); CHKERRQ(ierr);
   ierr = init_viewers(); CHKERRQ(ierr);
 
   // Make sure that we use the output_variable_order that works with NetCDF-4,

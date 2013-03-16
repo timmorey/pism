@@ -483,6 +483,14 @@ protected:
   PetscErrorCode init_backups();
   PetscErrorCode write_backup();
 
+  // Variables to help us write step data to file
+  bool record_steps;
+  bool step_record_file_is_ready;
+  string step_record_filename;
+  set<string> step_record_vars;
+  PetscErrorCode init_step_record();
+  PetscErrorCode write_step_record();
+
   // diagnostic viewers; see iMviewers.cc
   virtual PetscErrorCode init_viewers();
   virtual PetscErrorCode update_viewers();

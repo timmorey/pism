@@ -833,6 +833,7 @@ PetscErrorCode IceModel::run() {
   ierr = write_snapshot(); CHKERRQ(ierr);
   ierr = write_timeseries(); CHKERRQ(ierr);
   ierr = write_extras(); CHKERRQ(ierr);
+  ierr = write_step_record(); CHKERRQ(ierr);
 
   ierr = verbPrintf(2,grid.com, "running forward ...\n"); CHKERRQ(ierr);
 
@@ -865,6 +866,7 @@ PetscErrorCode IceModel::run() {
     ierr = write_timeseries(); CHKERRQ(ierr);
     ierr = write_extras(); CHKERRQ(ierr);
     ierr = write_backup(); CHKERRQ(ierr);
+    ierr = write_step_record(); CHKERRQ(ierr);
 
     ierr = update_viewers(); CHKERRQ(ierr);
 

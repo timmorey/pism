@@ -832,3 +832,67 @@ PetscErrorCode IceModel::write_backup() {
   return 0;
 }
 
+PetscErrorCode IceModel::init_step_record() {
+  PetscErrorCode retval = 0;
+  string filename, vars;
+  bool filename_set, vars_set;
+
+  retval = PetscOptionsBegin(grid.com, "", "Options controlling the output of "
+      "variable data at the end of time steps", ""); CHKERRQ(retval);
+  {
+    retval = PISMOptionsString("-step_record_file", "Step record file path",
+                 filename, filename_set); CHKERRQ(retval);
+
+    retval = PISMOptionsString("-step_record_vars", "Specifies a comma-"
+        "separated list of variables to save", vars, vars_set); CHKERRQ(retval);
+  }
+  retval = PetscOptionsEnd(); CHKERRQ(retval);
+
+  if(filename_set && vars_set) {
+    record_steps = true;
+  } else if(filename_set || vars_set) {
+    record_steps = false;
+    PetscPrintf(grid.com, "PISM WARNING: Only one of '-step_record_file' and "
+        "'-step_record_vars' was set, but both are required for step "
+        "recording.  Not writing time step data to file.\n");
+  }
+
+  if(record_steps) {
+    step_record_filename = filename;
+    step_record_file_is_ready = false;
+
+    istringstream arg(vars);
+    string var_name;
+
+    while (getline(arg, var_name, ','))
+      step_record_vars.insert(var_name);
+  }
+
+  return retval;
+}
+
+PetscErrorCode IceModel::write_step_record() {
+  PetscErrorCode retval = 0;
+
+  if(record_steps) {
+    PIO nc(grid, grid.config.get_string("output_format"));
+
+    if(! step_record_file_is_ready) {
+      retval = nc.open(step_record_filename, PISM_WRITE, false); CHKERRQ(retval);
+      retval = nc.def_time(config.get_string("time_dimension_name"),
+                           config.get_string("calendar"),
+                           grid.time->CF_units()); CHKERRQ(retval);
+      retval = write_metadata(nc);
+
+      step_record_file_is_ready = true;
+    } else {
+      retval = nc.open(step_record_filename, PISM_WRITE, true); CHKERRQ(retval);
+    }
+
+    retval = write_variables(nc, step_record_vars, PISM_DOUBLE);  CHKERRQ(retval);
+    retval = nc.close(); CHKERRQ(retval);
+  }
+
+  return retval;
+}
+
