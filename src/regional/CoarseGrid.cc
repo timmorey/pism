@@ -29,7 +29,6 @@ CoarseGrid::CoarseGrid(const std::string& filename)
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
 
-  printf("Opening '%s'...\n", filename.c_str());
   _Pio = new PIO(comm, rank, "netcdf3");
   if(0 != _Pio->open(filename, PISM_NOWRITE)) {
     fprintf(stderr, "CoarseGrid::CoarseGrid: Failed to open '%s'.\n", filename.c_str());
@@ -37,7 +36,6 @@ CoarseGrid::CoarseGrid(const std::string& filename)
     _Pio = 0;
   }
 
-  printf("Reading dimension sizes from coarse grid file...\n");
   if(_Pio) {
     if(0 != _Pio->inq_dimlen("x", xlen) ||
        0 != _Pio->inq_dimlen("y", ylen) ||
@@ -50,7 +48,6 @@ CoarseGrid::CoarseGrid(const std::string& filename)
     }
   }
 
-  printf("Reading coordinate values from coarse grid file...\n");
   if(_Pio) {
     _X.reserve(xlen);
     _Y.reserve(ylen);
@@ -60,18 +57,16 @@ CoarseGrid::CoarseGrid(const std::string& filename)
     _AOIMaxXi = xlen - 1;
     _AOIMaxYi = ylen - 1;
 
-    if(0 != _Pio->get_1d_var("x", 0, xlen, _X) ||
-       0 != _Pio->get_1d_var("y", 0, ylen, _Y) ||
-       0 != _Pio->get_1d_var("z", 0, zlen, _Z) ||
-       0 != _Pio->get_1d_var("time", 0, tlen, _T)) {
+    if((xlen > 0 && 0 != _Pio->get_1d_var("x", 0, xlen, _X)) ||
+       (ylen > 0 && 0 != _Pio->get_1d_var("y", 0, ylen, _Y)) ||
+       (zlen > 0 && 0 != _Pio->get_1d_var("z", 0, zlen, _Z)) ||
+       (tlen > 0 && 0 != _Pio->get_1d_var("time", 0, tlen, _T))) {
       fprintf(stderr, "CoarseGrid::CoarseGrid: Failed to read dimension scales.\n");
       _Pio->close();
       delete _Pio;
       _Pio = 0;
     }
   }
-
-  printf("Finished initializing CoarseGrid.\n");
 }
 
 CoarseGrid::~CoarseGrid() {
@@ -125,55 +120,71 @@ PetscErrorCode CoarseGrid::SetAreaOfInterest(PetscReal xmin, PetscReal xmax,
   return retval;
 }
 
-PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
-                                       double x, double y, double z, double t,
-                                       double* value) {
+PetscErrorCode CoarseGrid::CacheVars(const std::vector<std::string>& varnames) {
   PetscErrorCode retval = 0;
 
+  std::vector<std::string>::const_iterator nameiter;
   std::map<std::string, double*>::const_iterator mapiter;
   std::vector<std::string> dims;
   std::vector<unsigned int> start, count;
   double* buf = 0;
   size_t buflen = 0;
 
+  for(nameiter = varnames.begin(); nameiter != varnames.end(); nameiter++) {
+    mapiter = _VarCache.find(*nameiter);
+    if(mapiter == _VarCache.end()) {
+      // Then the variable has not yet been loaded and cached
 
-  retval = _Pio->inq_vardims(varname, dims);  CHKERRQ(retval);
+      retval = _Pio->inq_vardims(*nameiter, dims);  CHKERRQ(retval);
+      buflen = 1;
+      for(size_t i = 0; i < dims.size(); i++) {
+        if(dims[i] == "x") {
+          start.push_back(_AOIMinXi);
+          count.push_back(_AOIMaxXi - _AOIMinXi + 1);
+        } else if(dims[i] == "y") {
+          start.push_back(_AOIMinYi);
+          count.push_back(_AOIMaxYi - _AOIMinYi + 1);
+        } else if(dims[i] == "z") {
+          start.push_back(0);
+          count.push_back(_Z.size());
+        } else if(dims[i] == "time") {
+          start.push_back(0);
+          count.push_back(_T.size());
+        }
+        
+        buflen *= count[i];
+      }
+
+      buf = new double[buflen];
+      _Pio->get_vara_double(*nameiter, start, count, buf);
+      _VarCache[*nameiter] = buf;
+      _VarDims[*nameiter] = dims;
+    }
+  }
+
+  return retval;
+}
+
+PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
+                                       double x, double y, double z, double t,
+                                       double* value) {
+  PetscErrorCode retval = 0;
+
+  // NOTE: We don't want to do any _Pio-> calls in here, since those are
+  // generally collective, and this function is not called equally at all 
+  // processes.
+
+  std::map<std::string, double*>::const_iterator mapiter;
+  std::vector<std::string> dims;
+  double* buf = 0;
 
   mapiter = _VarCache.find(varname);
   if(mapiter == _VarCache.end()) {
-    // Then the variable has not yet been loaded and cached
-
-    // TODO: this lazy-load approach might cause problems since I/O calls may
-    // be collective...  For example, a process that doesn't have any values
-    // in the NMS might never try to do an interpolation.
-
-    buflen = 1;
-    start.reserve(dims.size());
-    count.reserve(dims.size());
-    for(size_t i = 0; i < dims.size(); i++) {
-      if(dims[i] == "x") {
-        start[i] = _AOIMinXi;
-        count[i] = _AOIMaxXi - _AOIMinXi + 1;
-      } else if(dims[i] == "y") {
-        start[i] = _AOIMinYi;
-        count[i] = _AOIMaxYi - _AOIMinYi + 1;
-      } else if(dims[i] == "z") {
-        start[i] = 0;
-        count[i] = _Z.size();
-      } else if(dims[i] == "t") {
-        start[i] = 0;
-        count[i] = _T.size();;
-      }
-
-      buflen *= count[i];
-    }
-
-    buf = new double[buflen];
-    _Pio->get_vara_double(varname, start, count, buf);
-    _VarCache[varname] = buf;
-
+    fprintf(stderr, "Cannot interpolate '%s' - variable has not been loaded.\n", varname.c_str());
+    retval = -1;
   } else {
     buf = mapiter->second;
+    dims = _VarDims[varname];
   }
 
   if(buf && dims.size() == 3) {
@@ -187,25 +198,25 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
 
     for(int i = _AOIMinXi + 1; i <= _AOIMaxXi; i++) {
       if(_X[i - 1] <= x && x <= _X[i]) {
-        xi1 = i - 1;
-        xi2 = i;
-        x1 = _X[xi1];
-        x2 = _X[xi2];
+        x1 = _X[i-1];
+        x2 = _X[i];
+        xi1 = i - 1 - _AOIMinXi;
+        xi2 = i - _AOIMinXi;
         break;
       }
     }
 
     for(int i = _AOIMinYi + 1; i <= _AOIMaxYi; i++) {
       if(_Y[i - 1] <= y && y <= _Y[i]) {
-        yi1 = i - 1;
-        yi2 = i;
-        y1 = _Y[yi1];
-        y2 = _Y[yi2];
+        y1 = _Y[i-1];
+        y2 = _Y[i];
+        yi1 = i - 1 - _AOIMinYi;
+        yi2 = i - _AOIMinYi;
         break;
       }
     }
 
-    for(size_t i = 0; i <= _T.size(); i++) {
+    for(size_t i = 1; i < _T.size(); i++) {
       if(_T[i - 1] <= t && t <= _T[i]) {
         ti1 = i - 1;
         ti2 = i;

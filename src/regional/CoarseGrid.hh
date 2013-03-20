@@ -25,6 +25,8 @@ public:
   PetscErrorCode SetAreaOfInterest(PetscReal xmin, PetscReal xmax,
                                    PetscReal ymin, PetscReal ymax);
 
+  PetscErrorCode CacheVars(const std::vector<std::string>& varnames);
+
   PetscErrorCode Interpolate(const std::string& varname,
                              double x, double y, double z, double t,
                              double* value);
@@ -32,6 +34,7 @@ public:
 protected:
   std::vector<PetscReal> _X, _Y, _Z, _T;
   std::map<std::string, double*> _VarCache;
+  std::map<std::string, std::vector<std::string> > _VarDims;
   int _AOIMinXi, _AOIMaxXi, _AOIMinYi, _AOIMaxYi;
   PIO* _Pio;
 

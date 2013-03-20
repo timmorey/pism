@@ -34,6 +34,7 @@ IceRegionalModel::IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVari
 PetscErrorCode IceRegionalModel::attach_coarse_grid(const std::string& filename) {
 
   PetscErrorCode retval = 0;
+  std::vector<std::string> vars;
 
   if(coarse_grid) {
     delete coarse_grid;
@@ -41,8 +42,14 @@ PetscErrorCode IceRegionalModel::attach_coarse_grid(const std::string& filename)
   }
 
   coarse_grid = new CoarseGrid(filename);
-  retval = coarse_grid->SetAreaOfInterest(grid.x[grid.xs], grid.x[grid.xs + grid.xm],
-                                          grid.y[grid.ys], grid.y[grid.ys + grid.ym]);
+  retval = coarse_grid->SetAreaOfInterest(grid.x[grid.xs], grid.x[grid.xs + grid.xm - 1],
+                                          grid.y[grid.ys], grid.y[grid.ys + grid.ym - 1]);
+  CHKERRQ(retval);
+  
+  // We need to cache the variables we'll be using for interpollation, since we
+  // don't want to do disk accesses for every point we interpolate.
+  vars.push_back("thk");
+  retval = coarse_grid->CacheVars(vars);
   CHKERRQ(retval);
 
   return retval;
@@ -67,7 +74,7 @@ PetscErrorCode IceRegionalModel::step(bool do_mass_continuity, bool do_energy, b
       PetscReal x = this->grid.x[i];
       for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
         if (no_model_mask(i, j) > 0.5) {
-          PetscReal y = this->grid.y[i];
+          PetscReal y = this->grid.y[j];
 
           this->coarse_grid->Interpolate(this->vH.string_attr("name", 0), x, y, 0.0, t, &value);
           this->vH(i, j) = value;
