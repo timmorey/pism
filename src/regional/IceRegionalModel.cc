@@ -49,6 +49,11 @@ PetscErrorCode IceRegionalModel::attach_coarse_grid(const std::string& filename)
   // We need to cache the variables we'll be using for interpollation, since we
   // don't want to do disk accesses for every point we interpolate.
   vars.push_back("thk");
+  vars.push_back("usurf");
+  vars.push_back("bmelt");
+  vars.push_back("u_ssa");
+  vars.push_back("v_ssa");
+  vars.push_back("enthalpy");
   retval = coarse_grid->CacheVars(vars);
   CHKERRQ(retval);
 

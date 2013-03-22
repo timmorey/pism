@@ -78,7 +78,7 @@ CoarseGrid::~CoarseGrid() {
 
   map<std::string, double*>::iterator mapiter;
   for(mapiter = _VarCache.begin(); mapiter != _VarCache.end(); mapiter++) {
-    delete mapiter->second;
+    delete [] mapiter->second;
   }
 }
 
@@ -125,15 +125,16 @@ PetscErrorCode CoarseGrid::CacheVars(const std::vector<std::string>& varnames) {
 
   std::vector<std::string>::const_iterator nameiter;
   std::map<std::string, double*>::const_iterator mapiter;
-  std::vector<std::string> dims;
-  std::vector<unsigned int> start, count;
-  double* buf = 0;
-  size_t buflen = 0;
 
   for(nameiter = varnames.begin(); nameiter != varnames.end(); nameiter++) {
     mapiter = _VarCache.find(*nameiter);
     if(mapiter == _VarCache.end()) {
       // Then the variable has not yet been loaded and cached
+      
+      std::vector<std::string> dims;
+      std::vector<unsigned int> start, count;
+      double* buf = 0;
+      size_t buflen = 0;
 
       retval = _Pio->inq_vardims(*nameiter, dims);  CHKERRQ(retval);
       buflen = 1;
@@ -160,6 +161,7 @@ PetscErrorCode CoarseGrid::CacheVars(const std::vector<std::string>& varnames) {
       _VarCache[*nameiter] = buf;
       _VarDims[*nameiter] = dims;
     }
+
   }
 
   return retval;
