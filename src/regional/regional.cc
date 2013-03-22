@@ -16,7 +16,15 @@
 // along with PISM; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+#include "CoarseGrid.hh"
 #include "regional.hh"
+
+SIAFD_Regional::SIAFD_Regional(IceGrid &g, EnthalpyConverter &e, const NCConfigVariable &c,
+                               CoarseGrid* cg)
+  : SIAFD(g, e, c),
+    coarse_grid(cg) {
+
+}
 
 PetscErrorCode SIAFD_Regional::init(PISMVars &vars) {
   PetscErrorCode ierr;
@@ -50,50 +58,91 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
   ierr = nmm.begin_access(); CHKERRQ(ierr);
   ierr = hst.begin_access(); CHKERRQ(ierr);
 
+  // TODO: we are ignoring the zero_grad_where_no_model flag here, if we have a
+  // CoarseGrid to interpolate NMS values.
+
+  double t = grid.time->current();
   PetscInt GHOSTS = 1;
   for (PetscInt   i = grid.xs - GHOSTS; i < grid.xs+grid.xm + GHOSTS; ++i) {
     for (PetscInt j = grid.ys - GHOSTS; j < grid.ys+grid.ym + GHOSTS; ++j) {
 
       // x-component, i-offset
       if (nmm(i, j) > 0.5 || nmm(i + 1, j) > 0.5) {
-
-        if (i < 0 || i + 1 > Mx - 1)
+        if (i < 0 || i + 1 > Mx - 1) {
           h_x(i, j, 0) = 0.0;
-        else
-          h_x(i, j, 0) = (hst(i + 1, j) - hst(i, j)) / dx;
+        } else {
+          if(coarse_grid) {
+            double hst_ip1_j, hst_i_j;
+            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &hst_ip1_j);
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j], 0.0, t, &hst_i_j);
+            //printf("Interpolated usurf: %f, %f\n", hst_ip1_j, hst_i_j);
+            h_x(i, j, 0) = (hst_ip1_j - hst_i_j) / dx;            
+          } else {
+            h_x(i, j, 0) = (hst(i + 1, j) - hst(i, j)) / dx;
+          }
+        }
       }
 
       // x-component, j-offset
       if (nmm(i - 1, j + 1) > 0.5 || nmm(i + 1, j + 1) > 0.5 ||
           nmm(i - 1, j)     > 0.5 || nmm(i + 1, j)     > 0.5) {
-
-        if (i - 1 < 0 || j + 1 > My - 1 || i + 1 > Mx - 1)
+        if (i - 1 < 0 || j + 1 > My - 1 || i + 1 > Mx - 1) {
           h_x(i, j, 1) = 0.0;
-        else
-          h_x(i, j, 1) = ( + hst(i + 1, j + 1) + hst(i + 1, j)
-                           - hst(i - 1, j + 1) - hst(i - 1, j) ) / (4.0 * dx);
-
+        } else {
+          if(coarse_grid) {
+            double hst_ip1_jp1, hst_ip1_j, hst_im1_jp1, hst_im1_j;
+            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j+1], 0.0, t, &hst_ip1_jp1);
+            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &hst_ip1_j);
+            coarse_grid->Interpolate("usurf", grid.x[i-1], grid.y[j+1], 0.0, t, &hst_im1_jp1);
+            coarse_grid->Interpolate("usurf", grid.x[i-1], grid.y[j], 0.0, t, &hst_im1_j);
+            //printf("Interpolated usurf: %f, %f, %f, %f\n", hst_ip1_jp1, hst_ip1_j, hst_im1_jp1, hst_im1_j);
+            h_x(i, j, 1) = ( + hst_ip1_jp1 + hst_ip1_j
+                             - hst_im1_jp1 - hst_im1_j ) / (4.0 * dx);
+          } else {
+            h_x(i, j, 1) = ( + hst(i + 1, j + 1) + hst(i + 1, j)
+                             - hst(i - 1, j + 1) - hst(i - 1, j) ) / (4.0 * dx);
+          }
+        }
       }
 
       // y-component, i-offset
       if (nmm(i, j + 1) > 0.5 || nmm(i + 1, j + 1) > 0.5 ||
           nmm(i, j - 1) > 0.5 || nmm(i + 1, j - 1) > 0.5) {
-        if (i < 0 || j + 1 > My - 1 || i + 1 > Mx - 1 || j - 1 < 0)
+        if (i < 0 || j + 1 > My - 1 || i + 1 > Mx - 1 || j - 1 < 0) {
           h_y(i, j, 0) = 0.0;
-        else
-          h_y(i, j, 0) = ( + hst(i + 1, j + 1) + hst(i, j + 1)
-                           - hst(i + 1, j - 1) - hst(i, j - 1) ) / (4.0 * dy);
+        } else {
+          if(coarse_grid) {
+            double hst_ip1_jp1, hst_i_jp1, hst_ip1_jm1, hst_i_jm1;
+            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j+1], 0.0, t, &hst_ip1_jp1);
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j+1], 0.0, t, &hst_i_jp1);
+            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j-1], 0.0, t, &hst_ip1_jm1);
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j-1], 0.0, t, &hst_i_jm1);
+            //printf("Interpolated usurf: %f, %f, %f, %f\n", hst_ip1_jp1, hst_i_jp1, hst_ip1_jm1, hst_i_jm1);
+            h_y(i, j, 0) = ( + hst_ip1_jp1 + hst_i_jp1
+                             - hst_ip1_jm1 - hst_i_jm1 ) / (4.0 * dy);
+          } else {
+            h_y(i, j, 0) = ( + hst(i + 1, j + 1) + hst(i, j + 1)
+                             - hst(i + 1, j - 1) - hst(i, j - 1) ) / (4.0 * dy);
+          }
+        }
       }
 
       // y-component, j-offset
       if (nmm(i, j) > 0.5 || nmm(i, j + 1) > 0.5) {
-        
-        if (j < 0 || j + 1 > My - 1)
+        if (j < 0 || j + 1 > My - 1) {
           h_y(i, j, 1) = 0.0;
-        else
-          h_y(i, j, 1) = (hst(i, j + 1) - hst(i, j)) / dy;
+        } else {
+          if(coarse_grid) {
+            double hst_i_jp1, hst_i_j;
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j+1], 0.0, t, &hst_i_jp1);
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j], 0.0, t, &hst_i_j);
+            //printf("Interpolated usurf: %f, %f\n", hst_i_jp1, hst_i_j);
+            h_y(i, j, 1) = (hst_i_jp1 - hst_i_j) / dy;
+          } else {
+            h_y(i, j, 1) = (hst(i, j + 1) - hst(i, j)) / dy;
+          }
+        }
       }
-
     }
   }
   ierr = nmm.end_access(); CHKERRQ(ierr);
@@ -102,6 +151,13 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
   ierr = h_x.end_access(); CHKERRQ(ierr);
 
   return 0;
+}
+
+SSAFD_Regional::SSAFD_Regional(IceGrid &g, IceBasalResistancePlasticLaw &b, EnthalpyConverter &e,
+                               const NCConfigVariable &c, CoarseGrid* cg)
+  : SSAFD(g, b, e, c),
+    coarse_grid(cg) {
+
 }
 
 PetscErrorCode SSAFD_Regional::init(PISMVars &vars) {
@@ -137,27 +193,53 @@ PetscErrorCode SSAFD_Regional::compute_driving_stress(IceModelVec2V &result) {
     ice_rho = config.get("ice_density");
   IceModelVec2Int nmm = *no_model_mask;
 
+  // TODO: we are ignoring the zero_grad_where_no_model flag here if we have a
+  // CoarseGrid to interpolate NMS values.
+
   ierr = result.begin_access(); CHKERRQ(ierr);
   ierr = nmm.begin_access(); CHKERRQ(ierr);
   ierr = usurfstore->begin_access(); CHKERRQ(ierr);
   ierr = thkstore->begin_access(); CHKERRQ(ierr);
+  double t = grid.time->current();
   for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
     for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
       PetscScalar pressure = ice_rho * standard_gravity * (*thkstore)(i,j);
       if (pressure <= 0) pressure = 0;
 
       if (nmm(i, j) > 0.5 || nmm(i - 1, j) > 0.5 || nmm(i + 1, j) > 0.5) {
-        if (i - 1 < 0 || i + 1 > grid.Mx - 1)
+        if (i - 1 < 0 || i + 1 > grid.Mx - 1) {
           result(i, j).u = 0;
-        else
-          result(i, j).u = - pressure * usurfstore->diff_x(i,j);
+        } else {
+          if(coarse_grid) {
+            double x1, x2, dx;
+            coarse_grid->Interpolate("usurf", grid.x[i-1], grid.y[j], 0.0, t, &x1);
+            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &x2);
+            dx = grid.dx;
+            //printf("Interpolated usurf: %f, %f\n", x1, x2);
+            //printf("Interpolated diff_x: %f\n", (x2 - x1) / (2.0 * dx));
+            result(i, j).u = - pressure * ((x2 - x1) / (2.0 * dx));
+          } else {
+            result(i, j).u = - pressure * usurfstore->diff_x(i,j);
+          }
+        }
       }
 
       if (nmm(i, j) > 0.5 || nmm(i, j - 1) > 0.5 || nmm(i, j + 1) > 0.5) {
-        if (j - 1 < 0 || j + 1 > grid.My - 1)
+        if (j - 1 < 0 || j + 1 > grid.My - 1) {
           result(i, j).v = 0;
-        else
-          result(i, j).v = - pressure * usurfstore->diff_y(i,j);
+        } else {
+          if(coarse_grid) {
+            double y1, y2, dy;
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j-1], 0.0, t, &y1);
+            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j+1], 0.0, t, &y2);
+            dy = grid.dy;
+            //printf("Interpolated usurf: %f, %f\n", y1, y2);
+            //printf("Interpolated diff_y: %f\n", (y2 - y1) / (2.0 * dy));
+            result(i, j).v = - pressure * ((y2 - y1) / (2.0 * dy));
+          } else {
+            result(i, j).v = - pressure * usurfstore->diff_y(i,j);
+          }
+        }
       }
 
     }

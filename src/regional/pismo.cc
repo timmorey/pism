@@ -22,6 +22,7 @@ static char help[] =
 
 #include <petsc.h>
 
+#include "CoarseGrid.hh"
 #include "IceGrid.hh"
 #include "IceRegionalModel.hh"
 #include "PAFactory.hh"
@@ -50,8 +51,6 @@ Instead see the PSForceThickness surface model modifier class.
  */
 
 int main(int argc, char *argv[]) {
-  char temp[256];
-  PetscBool coarseGridFileSet;
   PetscErrorCode  ierr;
   ierr = PetscInitialize(&argc, &argv, PETSC_NULL, help); CHKERRQ(ierr);
 
@@ -59,6 +58,10 @@ int main(int argc, char *argv[]) {
   PetscMPIInt rank, size;
   ierr = MPI_Comm_rank(com, &rank); CHKERRQ(ierr);
   ierr = MPI_Comm_size(com, &size); CHKERRQ(ierr);
+
+  char temp[256];
+  PetscBool coarseGridFileSet;
+  CoarseGrid* coarseGrid = 0;
 
   /* This explicit scoping forces destructors to be called before PetscFinalize() */
   {
@@ -103,9 +106,13 @@ int main(int argc, char *argv[]) {
                               "", "", temp, 256, &coarseGridFileSet);
     ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
+    if(coarseGridFileSet) {
+      coarseGrid = new CoarseGrid(temp);
+    }
+
     // initialize the ice dynamics model
     IceGrid g(com, rank, size, config);
-    IceRegionalModel m(g, config, overrides);
+    IceRegionalModel m(g, config, overrides, coarseGrid);
     ierr = m.setExecName("pismo"); CHKERRQ(ierr);
 
     // initialize boundary models
@@ -127,11 +134,6 @@ int main(int argc, char *argv[]) {
     m.attach_surface_model(surface);
 
     ierr = m.init(); CHKERRQ(ierr);
-
-    if(coarseGridFileSet) {
-      printf("Loading coarse grid file '%s'...\n", temp);
-      m.attach_coarse_grid(temp);
-    }
 
     ierr = m.run(); CHKERRQ(ierr);
 

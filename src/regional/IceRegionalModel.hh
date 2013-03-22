@@ -32,11 +32,7 @@ class CoarseGrid;
 //! no_model_mask and its semantics.
 class IceRegionalModel : public IceModel {
 public:
-  IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o);
-
-public:
-  virtual PetscErrorCode attach_coarse_grid(const std::string& filename);
-  virtual PetscErrorCode step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip);
+  IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o, CoarseGrid* cg);
 
 protected:
   virtual PetscErrorCode set_vars_from_options();

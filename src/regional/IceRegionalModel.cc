@@ -25,77 +25,9 @@
 #include "regional.hh"
 
 
-IceRegionalModel::IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o)
+IceRegionalModel::IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o, CoarseGrid* cg)
   : IceModel(g,c,o),
-    coarse_grid(0) {
-
-}
-
-PetscErrorCode IceRegionalModel::attach_coarse_grid(const std::string& filename) {
-
-  PetscErrorCode retval = 0;
-  std::vector<std::string> vars;
-
-  if(coarse_grid) {
-    delete coarse_grid;
-    coarse_grid = 0;
-  }
-
-  coarse_grid = new CoarseGrid(filename);
-  retval = coarse_grid->SetAreaOfInterest(grid.x[grid.xs], grid.x[grid.xs + grid.xm - 1],
-                                          grid.y[grid.ys], grid.y[grid.ys + grid.ym - 1]);
-  CHKERRQ(retval);
-  
-  // We need to cache the variables we'll be using for interpollation, since we
-  // don't want to do disk accesses for every point we interpolate.
-  vars.push_back("thk");
-  vars.push_back("usurf");
-  vars.push_back("bmelt");
-  vars.push_back("u_ssa");
-  vars.push_back("v_ssa");
-  vars.push_back("enthalpy");
-  retval = coarse_grid->CacheVars(vars);
-  CHKERRQ(retval);
-
-  return retval;
-}
-
-PetscErrorCode IceRegionalModel::step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip) {
-  PetscErrorCode retval = 0;
-  double value;
-
-  if(this->grid.time->current() >= this->grid.time->end()) {
-    // TODO: Check to see if this will be the last time step.  If so, then we may
-    // need to write out the current (next to last) time step so that we can
-    // interpolate the model state into a coarse model.
-  }
-
-  if(coarse_grid) {
-    this->no_model_mask.begin_access();
-    this->vH.begin_access();
-
-    PetscReal t = this->grid.time->current();
-    for (PetscInt i = grid.xs; i < grid.xs+grid.xm; ++i) {
-      PetscReal x = this->grid.x[i];
-      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-        if (no_model_mask(i, j) > 0.5) {
-          PetscReal y = this->grid.y[j];
-
-          this->coarse_grid->Interpolate(this->vH.string_attr("name", 0), x, y, 0.0, t, &value);
-          this->vH(i, j) = value;
-        }
-      }
-    }
-
-    this->no_model_mask.end_access();
-    this->vH.end_access();
-  }
-
-  retval = IceModel::step(do_mass_continuity, do_energy, do_age, do_skip);
-  CHKERRQ(retval);
-
-  return retval;
-}
+    coarse_grid(cg) { }
 
 //! \brief
 PetscErrorCode IceRegionalModel::setFromOptions() {
@@ -191,6 +123,26 @@ PetscErrorCode IceRegionalModel::createVecs() {
     ierr = variables.add(no_model_mask, "bcflag"); CHKERRQ(ierr);
   }
 
+  // TODO: this isn't the perfect place to do this, but it should work...
+  if(coarse_grid) {
+    std::vector<std::string> vars;
+
+    ierr = coarse_grid->SetAreaOfInterest(grid.x[grid.xs], grid.x[grid.xs + grid.xm - 1],
+                                          grid.y[grid.ys], grid.y[grid.ys + grid.ym - 1]);
+    CHKERRQ(ierr);
+    
+    // We need to cache the variables we'll be using for interpollation, since we
+    // don't want to do disk accesses for every point we interpolate.
+    vars.push_back("thk");
+    vars.push_back("usurf");
+    vars.push_back("bmelt");
+    vars.push_back("u_ssa");
+    vars.push_back("v_ssa");
+    vars.push_back("enthalpy");
+    ierr = coarse_grid->CacheVars(vars);
+    CHKERRQ(ierr);
+  }
+
   return 0;
 }
 
@@ -234,13 +186,15 @@ PetscErrorCode IceRegionalModel::allocate_stressbalance() {
   ShallowStressBalance *my_stress_balance;
   SSB_Modifier *modifier;
   if (do_sia) {
-    modifier = new SIAFD_Regional(grid, *EC, config);
+    printf("Creating SIAFD_Regional\n");
+    modifier = new SIAFD_Regional(grid, *EC, config, coarse_grid);
   } else {
     modifier = new SSBM_Trivial(grid, *EC, config);
   }
 
   if (use_ssa_velocity) {
-    my_stress_balance = new SSAFD_Regional(grid, *basal, *EC, config);
+    printf("Creating SSAFD_Regional\n");
+    my_stress_balance = new SSAFD_Regional(grid, *basal, *EC, config, coarse_grid);
   } else {
     my_stress_balance = new SSB_Trivial(grid, *basal, *EC, config);
   }
@@ -416,13 +370,12 @@ void IceRegionalModel::cell_interface_fluxes(bool dirichlet_bc,
   for (int n = 0; n < 4; ++n) {
     PISM_Direction direction = dirs[n];
 
-      if ((nmm.ij == 1) ||
-          (nmm.ij == 0 && nmm[direction] == 1)) {
+    if ((nmm.ij == 1) ||
+        (nmm.ij == 0 && nmm[direction] == 1)) {
       output_velocity[direction] = 0.0;
       output_flux[direction] = 0.0;
     }
   }
-  //
 }
 
 PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCount, PetscScalar* liquifiedVol,
@@ -445,7 +398,8 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
 
       ierr = vWork3d.getInternalColumn(i, j, &new_enthalpy); CHKERRQ(ierr);
       ierr = Enth3.getInternalColumn(i, j, &old_enthalpy); CHKERRQ(ierr);
-
+      
+      // TODO: interpolate enthalpy, once we hook up 4d interpolation.
       for (int k = 0; k < grid.Mz; ++k)
         new_enthalpy[k] = old_enthalpy[k];
     }
@@ -456,12 +410,20 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
   // set vbmr; ghosts are comminucated later (in IceModel::energyStep()).
   ierr = vbmr.begin_access(); CHKERRQ(ierr);
   ierr = bmr_stored.begin_access(); CHKERRQ(ierr);
+  double t = grid.time->current();
+  double value;
   for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
     for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
       if (no_model_mask(i, j) < 0.5)
         continue;
 
-      vbmr(i, j) = bmr_stored(i, j);
+      if(coarse_grid) {
+        coarse_grid->Interpolate(vbmr.string_attr("name", 0), grid.x[i], grid.y[j], 0.0, t, &value);
+        //printf("Interpolated bmelt: %f\n", value);
+        vbmr(i, j) = value;
+      } else {
+        vbmr(i, j) = bmr_stored(i, j);
+      }
     }
   }
   ierr = bmr_stored.end_access(); CHKERRQ(ierr);
