@@ -186,14 +186,14 @@ PetscErrorCode IceRegionalModel::allocate_stressbalance() {
   ShallowStressBalance *my_stress_balance;
   SSB_Modifier *modifier;
   if (do_sia) {
-    printf("Creating SIAFD_Regional\n");
+    //printf("Creating SIAFD_Regional\n");
     modifier = new SIAFD_Regional(grid, *EC, config, coarse_grid);
   } else {
     modifier = new SSBM_Trivial(grid, *EC, config);
   }
 
   if (use_ssa_velocity) {
-    printf("Creating SSAFD_Regional\n");
+    //printf("Creating SSAFD_Regional\n");
     my_stress_balance = new SSAFD_Regional(grid, *basal, *EC, config, coarse_grid);
   } else {
     my_stress_balance = new SSB_Trivial(grid, *basal, *EC, config);
