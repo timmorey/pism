@@ -29,6 +29,64 @@ IceRegionalModel::IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVari
   : IceModel(g,c,o),
     coarse_grid(cg) { }
 
+PetscErrorCode IceRegionalModel::step(bool do_mass_continuity,
+                                      bool do_energy,
+                                      bool do_age,
+                                      bool do_skip) {
+  PetscErrorCode retval = 0;
+
+  if(coarse_grid) {
+    retval = no_model_mask.begin_access();  CHKERRQ(retval);
+    retval = vH.begin_access();  CHKERRQ(retval);
+    retval = vh.begin_access();  CHKERRQ(retval);
+    retval = vbed.begin_access();  CHKERRQ(retval);
+    retval = thkstore.begin_access();  CHKERRQ(retval);
+    retval = usurfstore.begin_access();  CHKERRQ(retval);
+
+    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if(no_model_mask(i, j) > 0.5) {
+          double topg = vbed(i, j);
+          double thk;
+          coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, grid.time->current(), &thk);
+
+          vH(i, j) = thk;
+          vh(i, j) = topg + thk;
+          thkstore(i, j) = thk;
+          usurfstore(i, j) = topg + thk;
+        }
+      }
+    }
+
+    retval = no_model_mask.end_access();  CHKERRQ(retval);
+
+  }
+
+  if(coarse_grid && config.get_flag("ssa_dirichlet_bc")) {
+    retval = no_model_mask.begin_access();  CHKERRQ(retval);
+    retval = vBCvel.begin_access();  CHKERRQ(retval);
+
+    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if(no_model_mask(i, j) > 0.5) {
+          double u, v;
+          coarse_grid->Interpolate("u_ssa", grid.x[i], grid.y[j], 0.0, grid.time->current(), &u);
+          coarse_grid->Interpolate("v_ssa", grid.x[i], grid.y[j], 0.0, grid.time->current(), &v);
+          vBCvel(i, j).u = u;
+          vBCvel(i, j).v = v;
+        }
+      }
+    }
+
+    retval = no_model_mask.end_access();  CHKERRQ(retval);
+    retval = vBCvel.end_access();  CHKERRQ(retval);
+  }
+
+  retval = IceModel::step(do_mass_continuity, do_energy, do_age, do_skip);
+
+  return retval;
+}
+
 //! \brief
 PetscErrorCode IceRegionalModel::setFromOptions() {
   PetscErrorCode ierr;
@@ -45,29 +103,34 @@ PetscErrorCode IceRegionalModel::setFromOptions() {
 PetscErrorCode IceRegionalModel::set_no_model_strip(PetscReal strip) {
   PetscErrorCode ierr;
 
-    ierr = no_model_mask.begin_access(); CHKERRQ(ierr);
-    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
-      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-        if (grid.x[i] <= grid.x[0]+strip || grid.x[i] >= grid.x[grid.Mx-1]-strip) {
-          no_model_mask(i, j) = 1;
-        } else if (grid.y[j] <= grid.y[0]+strip || grid.y[j] >= grid.y[grid.My-1]-strip) {
-          no_model_mask(i, j) = 1;
-        } else {
-          no_model_mask(i, j) = 0;
-        }
+  if(0 == grid.rank) printf("IceRegionalModel::set_no_model_strip(%f)\n", strip);
+
+  ierr = no_model_mask.begin_access(); CHKERRQ(ierr);
+  for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+    for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+      if (grid.x[i] <= grid.x[0]+strip || grid.x[i] >= grid.x[grid.Mx-1]-strip) {
+        no_model_mask(i, j) = 1;
+      } else if (grid.y[j] <= grid.y[0]+strip || grid.y[j] >= grid.y[grid.My-1]-strip) {
+        no_model_mask(i, j) = 1;
+      } else {
+        no_model_mask(i, j) = 0;
       }
     }
-    ierr = no_model_mask.end_access(); CHKERRQ(ierr);
-
-    ierr = no_model_mask.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
-
-    ierr = no_model_mask.update_ghosts(); CHKERRQ(ierr);
-  return 0;
+  }
+  ierr = no_model_mask.end_access(); CHKERRQ(ierr);
+  
+  ierr = no_model_mask.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+  
+  ierr = no_model_mask.update_ghosts(); CHKERRQ(ierr);
+  
+return 0;
 }
 
 
 PetscErrorCode IceRegionalModel::createVecs() {
   PetscErrorCode ierr;
+
+  if(0 == grid.rank) printf("IceRegionalModel::createVecs()\n");
 
   ierr = IceModel::createVecs(); CHKERRQ(ierr);
 
@@ -127,8 +190,14 @@ PetscErrorCode IceRegionalModel::createVecs() {
   if(coarse_grid) {
     std::vector<std::string> vars;
 
-    ierr = coarse_grid->SetAreaOfInterest(grid.x[grid.xs], grid.x[grid.xs + grid.xm - 1],
-                                          grid.y[grid.ys], grid.y[grid.ys + grid.ym - 1]);
+    // Expand the region of interest a bit to accomodate the interpolation of
+    // ghost points.  I suspect we could be smarter about this expansion...
+    int minxi = PetscMax(0, grid.xs - 1);
+    int maxxi = PetscMin(grid.x.size() - 1, grid.xs + grid.xm);
+    int minyi = PetscMax(0, grid.ys - 1);
+    int maxyi = PetscMin(grid.y.size() - 1, grid.ys + grid.ym);
+
+    ierr = coarse_grid->SetAreaOfInterest(grid.x[minxi], grid.x[maxxi], grid.y[minyi], grid.y[maxyi]);
     CHKERRQ(ierr);
     
     // We need to cache the variables we'll be using for interpollation, since we
@@ -148,6 +217,8 @@ PetscErrorCode IceRegionalModel::createVecs() {
 
 PetscErrorCode IceRegionalModel::model_state_setup() {
   PetscErrorCode ierr;
+
+  if(0 == grid.rank) printf("IceRegionalModel::model_state_setup()\n");
 
   ierr = IceModel::model_state_setup(); CHKERRQ(ierr);
 
@@ -179,6 +250,8 @@ PetscErrorCode IceRegionalModel::model_state_setup() {
 
 PetscErrorCode IceRegionalModel::allocate_stressbalance() {
   PetscErrorCode ierr;
+
+  if(0 == grid.rank) printf("IceRegionalModel::allocate_stressbalance()\n");
 
   bool use_ssa_velocity = config.get_flag("use_ssa_velocity"),
     do_sia = config.get_flag("do_sia");
@@ -220,6 +293,8 @@ PetscErrorCode IceRegionalModel::allocate_stressbalance() {
 PetscErrorCode IceRegionalModel::allocate_basal_yield_stress() {
   PetscErrorCode ierr;
 
+  if(0 == grid.rank) printf("IceRegionalModel::allocate_basal_yield_stress()\n");
+
   if (basal_yield_stress != NULL)
     return 0;
 
@@ -244,6 +319,8 @@ PetscErrorCode IceRegionalModel::allocate_basal_yield_stress() {
 PetscErrorCode IceRegionalModel::bootstrap_2d(string filename) {
   PetscErrorCode ierr;
 
+  if(0 == grid.rank) printf("IceRegionalModel::bootstrap_2d('%s')\n", filename.c_str());
+
   ierr = IceModel::bootstrap_2d(filename); CHKERRQ(ierr);
 
   ierr = usurfstore.regrid(filename, 0.0); CHKERRQ(ierr);
@@ -255,6 +332,9 @@ PetscErrorCode IceRegionalModel::bootstrap_2d(string filename) {
 
 PetscErrorCode IceRegionalModel::initFromFile(string filename) {
   PetscErrorCode  ierr;
+
+  if(0 == grid.rank) printf("IceRegionalModel::initFromFile('%s')\n", filename.c_str());
+
   PIO nc(grid, "guess_mode");
 
   bool no_model_strip_set;
@@ -298,9 +378,10 @@ PetscErrorCode IceRegionalModel::initFromFile(string filename) {
   }
 
   ierr = IceModel::initFromFile(filename); CHKERRQ(ierr);
-
+  
   if (config.get_flag("ssa_dirichlet_bc")) {
-      ierr = vBCvel.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vBCvel.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+    ierr = vBCvel.set(0.0); CHKERRQ(ierr);
   }
 
   if (zgwnm) {
@@ -315,6 +396,8 @@ PetscErrorCode IceRegionalModel::initFromFile(string filename) {
 PetscErrorCode IceRegionalModel::set_vars_from_options() {
   PetscErrorCode ierr;
   bool nmstripSet;
+
+  if(0 == grid.rank) printf("IceRegionalModel::set_vars_from_options()\n");
 
   // base class reads the -boot_file option and does the bootstrapping:
   ierr = IceModel::set_vars_from_options(); CHKERRQ(ierr);
@@ -340,6 +423,8 @@ PetscErrorCode IceRegionalModel::set_vars_from_options() {
 PetscErrorCode IceRegionalModel::massContExplicitStep() {
   PetscErrorCode ierr;
 
+//  if(0 == grid.rank) printf("IceRegionalModel::massContExplicitStep()\n");
+
   // This ensures that no_model_mask is available in
   // IceRegionalModel::cell_interface_fluxes() below.
   ierr = no_model_mask.begin_access(); CHKERRQ(ierr);
@@ -357,6 +442,8 @@ void IceRegionalModel::cell_interface_fluxes(bool dirichlet_bc,
                                              planeStar<PetscScalar> input_flux,
                                              planeStar<PetscScalar> &output_velocity,
                                              planeStar<PetscScalar> &output_flux) {
+
+  //if(0 == grid.rank) printf("IceRegionalModel::cell_interface_fluxes(...)\n");
 
   IceModel::cell_interface_fluxes(dirichlet_bc, i, j,
                                   input_velocity,
@@ -382,6 +469,8 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
                                                          PetscScalar* bulgeCount) {
   PetscErrorCode ierr;
   PetscScalar *new_enthalpy, *old_enthalpy;
+
+  if(0 == grid.rank) printf("IceRegionalModel::enthalpyAndDrainageStep(...)\n");
 
   ierr = IceModel::enthalpyAndDrainageStep(vertSacrCount, liquifiedVol, bulgeCount); CHKERRQ(ierr);
 
@@ -418,8 +507,10 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
         continue;
 
       if(coarse_grid) {
+        //if(false) {
         coarse_grid->Interpolate(vbmr.string_attr("name", 0), grid.x[i], grid.y[j], 0.0, t, &value);
         //printf("Interpolated bmelt: %f\n", value);
+        //printf("bmr_stored: %f\n", bmr_stored(i, j));
         vbmr(i, j) = value;
       } else {
         vbmr(i, j) = bmr_stored(i, j);

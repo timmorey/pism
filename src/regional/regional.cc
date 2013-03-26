@@ -29,6 +29,8 @@ SIAFD_Regional::SIAFD_Regional(IceGrid &g, EnthalpyConverter &e, const NCConfigV
 PetscErrorCode SIAFD_Regional::init(PISMVars &vars) {
   PetscErrorCode ierr;
 
+  if(0 == grid.rank) printf("SIAFD_Regional::init(...)\n");
+
   ierr = SIAFD::init(vars); CHKERRQ(ierr);
 
   ierr = verbPrintf(2,grid.com,"  using the regional version of the SIA solver...\n"); CHKERRQ(ierr);
@@ -39,11 +41,16 @@ PetscErrorCode SIAFD_Regional::init(PISMVars &vars) {
   usurfstore = dynamic_cast<IceModelVec2S*>(vars.get("usurfstore"));
   if (usurfstore == NULL) SETERRQ(grid.com, 1, "usurfstore is not available");
 
+  topg = dynamic_cast<IceModelVec2S*>(vars.get("topg"));
+  if(topg == NULL) SETERRQ(grid.com, 1, "topg is not available");
+
   return 0;
 }
 
 PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) {
   PetscErrorCode ierr;
+
+//  if(0 == grid.rank) printf("SIAFD_Regional::compute_surface_gradient(...)\n");
 
   ierr = SIAFD::compute_surface_gradient(h_x, h_y); CHKERRQ(ierr);
 
@@ -57,6 +64,7 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
   ierr = h_y.begin_access(); CHKERRQ(ierr);
   ierr = nmm.begin_access(); CHKERRQ(ierr);
   ierr = hst.begin_access(); CHKERRQ(ierr);
+  ierr = topg->begin_access(); CHKERRQ(ierr);
 
   // TODO: we are ignoring the zero_grad_where_no_model flag here, if we have a
   // CoarseGrid to interpolate NMS values.
@@ -71,13 +79,24 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
         if (i < 0 || i + 1 > Mx - 1) {
           h_x(i, j, 0) = 0.0;
         } else {
-          if(coarse_grid) {
-            double hst_ip1_j, hst_i_j;
-            coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &hst_ip1_j);
-            coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j], 0.0, t, &hst_i_j);
-            //printf("Interpolated usurf: %f, %f\n", hst_ip1_j, hst_i_j);
-            h_x(i, j, 0) = (hst_ip1_j - hst_i_j) / dx;            
-          } else {
+          //if(coarse_grid) {
+          if(false) {
+            double usurf_ip1_j, usurf_i_j;
+            coarse_grid->Interpolate("thk", grid.x[i+1], grid.y[j], 0.0, t, &usurf_ip1_j);
+            coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, t, &usurf_i_j);
+            usurf_ip1_j = MAX(0.0, usurf_ip1_j + (*topg)(i+1, j));
+            usurf_i_j = MAX(0.0, usurf_i_j + (*topg)(i, j));
+            //printf("Interpolated usurf: %f, %f\n", usurf_ip1_j, usurf_i_j);
+            //printf("usurfstore: %f, %f\n", hst(i+1, j), hst(i, j));
+            h_x(i, j, 0) = (usurf_ip1_j - usurf_i_j) / dx;
+/*          } else if(true) {
+              double hst_ip1_j, hst_i_j;
+              coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &hst_ip1_j);
+              coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j], 0.0, t, &hst_i_j);
+              //printf("Interpolated usurf: %f, %f\n", usurf_ip1_j, usurf_i_j);
+              //printf("usurfstore: %f, %f\n", hst(i+1, j), hst(i, j));
+              h_x(i, j, 0) = (hst_ip1_j - hst_i_j) / dx;
+*/          } else {
             h_x(i, j, 0) = (hst(i + 1, j) - hst(i, j)) / dx;
           }
         }
@@ -89,7 +108,22 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
         if (i - 1 < 0 || j + 1 > My - 1 || i + 1 > Mx - 1) {
           h_x(i, j, 1) = 0.0;
         } else {
-          if(coarse_grid) {
+          //if(coarse_grid) {
+          if(false) {
+            double usurf_ip1_jp1, usurf_ip1_j, usurf_im1_jp1, usurf_im1_j;
+            coarse_grid->Interpolate("thk", grid.x[i+1], grid.y[j+1], 0.0, t, &usurf_ip1_jp1);
+            coarse_grid->Interpolate("thk", grid.x[i+1], grid.y[j], 0.0, t, &usurf_ip1_j);
+            coarse_grid->Interpolate("thk", grid.x[i-1], grid.y[j+1], 0.0, t, &usurf_im1_jp1);
+            coarse_grid->Interpolate("thk", grid.x[i-1], grid.y[j], 0.0, t, &usurf_im1_j);
+            usurf_ip1_jp1 = PetscMax(0.0, usurf_ip1_jp1 + (*topg)(i+1, j+1));
+            usurf_ip1_j = PetscMax(0.0, usurf_ip1_j + (*topg)(i+1, j));
+            usurf_im1_jp1 = PetscMax(0.0, usurf_im1_jp1 + (*topg)(i-1, j+1));
+            usurf_im1_j = PetscMax(0.0, usurf_im1_j + (*topg)(i-1, j));
+            //printf("Interpolated usurf: %f, %f, %f, %f\n", usurf_ip1_jp1, usurf_ip1_j, usurf_im1_jp1, usurf_im1_j);
+            h_x(i, j, 1) = ( + usurf_ip1_jp1 + usurf_ip1_j
+                             - usurf_im1_jp1 - usurf_im1_j ) / (4.0 * dx);
+
+/*          } else if(true) {
             double hst_ip1_jp1, hst_ip1_j, hst_im1_jp1, hst_im1_j;
             coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j+1], 0.0, t, &hst_ip1_jp1);
             coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &hst_ip1_j);
@@ -98,7 +132,7 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
             //printf("Interpolated usurf: %f, %f, %f, %f\n", hst_ip1_jp1, hst_ip1_j, hst_im1_jp1, hst_im1_j);
             h_x(i, j, 1) = ( + hst_ip1_jp1 + hst_ip1_j
                              - hst_im1_jp1 - hst_im1_j ) / (4.0 * dx);
-          } else {
+*/          } else {
             h_x(i, j, 1) = ( + hst(i + 1, j + 1) + hst(i + 1, j)
                              - hst(i - 1, j + 1) - hst(i - 1, j) ) / (4.0 * dx);
           }
@@ -111,7 +145,22 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
         if (i < 0 || j + 1 > My - 1 || i + 1 > Mx - 1 || j - 1 < 0) {
           h_y(i, j, 0) = 0.0;
         } else {
-          if(coarse_grid) {
+          //if(coarse_grid) {
+          if(false) {
+            double usurf_ip1_jp1, usurf_i_jp1, usurf_ip1_jm1, usurf_i_jm1;
+            coarse_grid->Interpolate("thk", grid.x[i+1], grid.y[j+1], 0.0, t, &usurf_ip1_jp1);
+            coarse_grid->Interpolate("thk", grid.x[i], grid.y[j+1], 0.0, t, &usurf_i_jp1);
+            coarse_grid->Interpolate("thk", grid.x[i+1], grid.y[j-1], 0.0, t, &usurf_ip1_jm1);
+            coarse_grid->Interpolate("thk", grid.x[i], grid.y[j-1], 0.0, t, &usurf_i_jm1);
+            usurf_ip1_jp1 = PetscMax(0.0, usurf_ip1_jp1 + (*topg)(i+1, j+1));
+            usurf_i_jp1 = PetscMax(0.0, usurf_i_jp1 + (*topg)(i, j+1));
+            usurf_ip1_jm1 = PetscMax(0.0, usurf_ip1_jm1 + (*topg)(i+1, j-1));
+            usurf_i_jm1 = PetscMax(0.0, usurf_i_jm1 + (*topg)(i, j-1));
+            //printf("Interpolated usurf: %f, %f, %f, %f\n", usurf_ip1_jp1, usurf_i_jp1, usurf_ip1_jm1, usurf_i_jm1);
+            h_y(i, j, 0) = ( + usurf_ip1_jp1 + usurf_i_jp1
+                             - usurf_ip1_jm1 - usurf_i_jm1 ) / (4.0 * dy);
+
+/*          } else if (true) {
             double hst_ip1_jp1, hst_i_jp1, hst_ip1_jm1, hst_i_jm1;
             coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j+1], 0.0, t, &hst_ip1_jp1);
             coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j+1], 0.0, t, &hst_i_jp1);
@@ -120,7 +169,7 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
             //printf("Interpolated usurf: %f, %f, %f, %f\n", hst_ip1_jp1, hst_i_jp1, hst_ip1_jm1, hst_i_jm1);
             h_y(i, j, 0) = ( + hst_ip1_jp1 + hst_i_jp1
                              - hst_ip1_jm1 - hst_i_jm1 ) / (4.0 * dy);
-          } else {
+*/          } else {
             h_y(i, j, 0) = ( + hst(i + 1, j + 1) + hst(i, j + 1)
                              - hst(i + 1, j - 1) - hst(i, j - 1) ) / (4.0 * dy);
           }
@@ -132,13 +181,23 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
         if (j < 0 || j + 1 > My - 1) {
           h_y(i, j, 1) = 0.0;
         } else {
-          if(coarse_grid) {
+          //if(coarse_grid) {
+          if(false) {
+            double usurf_i_jp1, usurf_i_j;
+            coarse_grid->Interpolate("thk", grid.x[i], grid.y[j+1], 0.0, t, &usurf_i_jp1);
+            coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, t, &usurf_i_j);
+            usurf_i_jp1 = PetscMax(0.0, usurf_i_jp1 + (*topg)(i, j+1));
+            usurf_i_j = PetscMax(0.0, usurf_i_j + (*topg)(i, j));
+            //printf("Interpolated usurf: %f, %f\n", usurf_i_jp1, usurf_i_j);
+            h_y(i, j, 1) = (usurf_i_jp1 - usurf_i_j) / dy;
+
+/*         } else if (true) {
             double hst_i_jp1, hst_i_j;
             coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j+1], 0.0, t, &hst_i_jp1);
             coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j], 0.0, t, &hst_i_j);
             //printf("Interpolated usurf: %f, %f\n", hst_i_jp1, hst_i_j);
             h_y(i, j, 1) = (hst_i_jp1 - hst_i_j) / dy;
-          } else {
+*/          } else {
             h_y(i, j, 1) = (hst(i, j + 1) - hst(i, j)) / dy;
           }
         }
@@ -149,6 +208,7 @@ PetscErrorCode SIAFD_Regional::compute_surface_gradient(IceModelVec2Stag &h_x, I
   ierr = hst.end_access(); CHKERRQ(ierr);
   ierr = h_y.end_access(); CHKERRQ(ierr);
   ierr = h_x.end_access(); CHKERRQ(ierr);
+  ierr = topg->end_access(); CHKERRQ(ierr);
 
   return 0;
 }
@@ -162,6 +222,8 @@ SSAFD_Regional::SSAFD_Regional(IceGrid &g, IceBasalResistancePlasticLaw &b, Enth
 
 PetscErrorCode SSAFD_Regional::init(PISMVars &vars) {
   PetscErrorCode ierr;
+
+  if(0 == grid.rank) printf("SSAFD_Regional::init(...)\n");
 
   ierr = SSAFD::init(vars); CHKERRQ(ierr);
 
@@ -187,6 +249,8 @@ PetscErrorCode SSAFD_Regional::init(PISMVars &vars) {
 PetscErrorCode SSAFD_Regional::compute_driving_stress(IceModelVec2V &result) {
   PetscErrorCode ierr;
 
+//  if(0 == grid.rank) printf("SSAFD_Regional::compute_driving_stress(...)\n");
+
   ierr = SSAFD::compute_driving_stress(result); CHKERRQ(ierr);
 
   const PetscReal standard_gravity = config.get("standard_gravity"),
@@ -210,7 +274,8 @@ PetscErrorCode SSAFD_Regional::compute_driving_stress(IceModelVec2V &result) {
         if (i - 1 < 0 || i + 1 > grid.Mx - 1) {
           result(i, j).u = 0;
         } else {
-          if(coarse_grid) {
+          //if(coarse_grid) {
+          if(false) {
             double x1, x2, dx;
             coarse_grid->Interpolate("usurf", grid.x[i-1], grid.y[j], 0.0, t, &x1);
             coarse_grid->Interpolate("usurf", grid.x[i+1], grid.y[j], 0.0, t, &x2);
@@ -228,7 +293,8 @@ PetscErrorCode SSAFD_Regional::compute_driving_stress(IceModelVec2V &result) {
         if (j - 1 < 0 || j + 1 > grid.My - 1) {
           result(i, j).v = 0;
         } else {
-          if(coarse_grid) {
+          //if(coarse_grid) {
+          if(false) {
             double y1, y2, dy;
             coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j-1], 0.0, t, &y1);
             coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j+1], 0.0, t, &y2);
@@ -254,6 +320,9 @@ PetscErrorCode SSAFD_Regional::compute_driving_stress(IceModelVec2V &result) {
 PetscErrorCode PISMRegionalDefaultYieldStress::init(PISMVars &vars) {
   PetscErrorCode ierr;
   PetscInt v = getVerbosityLevel(); // turn off second, redundant init message
+
+  if(0 == grid.rank) printf("PISMRegionalDefaultYieldStress::init()\n");
+
   ierr = setVerbosityLevel(1); CHKERRQ(ierr);
   ierr = PISMMohrCoulombYieldStress::init(vars); CHKERRQ(ierr);
   ierr = setVerbosityLevel(v); CHKERRQ(ierr);
@@ -268,6 +337,8 @@ PetscErrorCode PISMRegionalDefaultYieldStress::init(PISMVars &vars) {
 
 PetscErrorCode PISMRegionalDefaultYieldStress::basal_material_yield_stress(IceModelVec2S &result) {
   PetscErrorCode ierr;
+
+  if(0 == grid.rank) printf("PISMRegionalDefaultYieldStress::basal_material_yield_stress()\n");
   
   // do whatever you normally do
   ierr = PISMMohrCoulombYieldStress::basal_material_yield_stress(result); CHKERRQ(ierr);

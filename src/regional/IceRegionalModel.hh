@@ -34,6 +34,9 @@ class IceRegionalModel : public IceModel {
 public:
   IceRegionalModel(IceGrid &g, NCConfigVariable &c, NCConfigVariable &o, CoarseGrid* cg);
 
+public:
+  virtual PetscErrorCode step(bool do_mass_continuity, bool do_energy, bool do_age, bool do_skip);
+
 protected:
   virtual PetscErrorCode set_vars_from_options();
   virtual PetscErrorCode bootstrap_2d(string filename);

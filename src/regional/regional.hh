@@ -42,7 +42,9 @@ public:
 protected:
   IceModelVec2Int *no_model_mask;
   IceModelVec2S   *usurfstore;
-  CoarseGrid* coarse_grid;   
+
+  CoarseGrid* coarse_grid;
+  IceModelVec2S* topg;
 };
 
 //! \brief A version of the SSA stress balance with tweaks for outlet glacier
