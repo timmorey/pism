@@ -85,6 +85,12 @@ CoarseGrid::~CoarseGrid() {
 PetscErrorCode CoarseGrid::SetAreaOfInterest(PetscReal xmin, PetscReal xmax,
                                              PetscReal ymin, PetscReal ymax) {
   PetscErrorCode retval = 0;
+  int rank;
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  //printf("Rank %03d: CoarseGrid::SetAreaOfInterest(%f, %f, %f, %f)\n",
+  //       rank, xmin, xmax, ymin, ymax);
 
   // TODO: We assume that the region of interest is fully contained in the
   // bounds of this coarse grid.
@@ -116,6 +122,9 @@ PetscErrorCode CoarseGrid::SetAreaOfInterest(PetscReal xmin, PetscReal xmax,
       break;
     }
   }
+
+  //printf("Rank %03d: CoarseGrid AOI: %d, %d, %d, %d\n",
+  //      rank, _AOIMinXi, _AOIMaxXi, _AOIMinYi, _AOIMaxYi);
 
   return retval;
 }
@@ -171,6 +180,12 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
                                        double x, double y, double z, double t,
                                        double* value) {
   PetscErrorCode retval = 0;
+//  int rank;
+
+//  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+//  printf("Rank %03d: CoarseGrid::Interpolate('%s', %f, %f, %f, %f)\n",
+//         rank, varname.c_str(), x, y, z, t);
 
   // NOTE: We don't want to do any _Pio-> calls in here, since those are
   // generally collective, and this function is not called equally at all 
@@ -228,32 +243,36 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
       }
     }
 
+//    printf("Rank %03d: x(%d)=%f, x(%d)=%f\n", rank, xi1, x1, xi2, x2);
+//    printf("Rank %03d: y(%d)=%f, y(%d)=%f\n", rank, yi1, y1, yi2, y2);
+//    printf("Rank %03d: t(%d)=%f, t(%d)=%f\n", rank, ti1, t1, ti2, t2);
+
     denom = (t2 - t1)*(x2 - x1)*(y2 - y1);
     localw = _AOIMaxXi - _AOIMinXi + 1;
     localh = _AOIMaxYi - _AOIMinYi + 1;
 
-    values[0] = buf[ti1*localw*localh + yi1*localw + xi1];
+    values[0] = buf[ti1*localw*localh + xi1*localh + yi1];
     weights[0] = (t2 - t)*(x2 - x)*(y2 - y) / denom;
 
-    values[1] = buf[ti1*localw*localh + yi1*localw + xi2];
+    values[1] = buf[ti1*localw*localh + xi2*localh + yi1];
     weights[1] = (t2 - t)*(x - x1)*(y2 - y) / denom;
 
-    values[2] = buf[ti1*localw*localh + yi2*localw + xi1];
+    values[2] = buf[ti1*localw*localh + xi1*localh + yi2];
     weights[2] = (t2 - t)*(x2 - x)*(y - y1) / denom;
 
-    values[3] = buf[ti1*localw*localh + yi2*localw + xi2];
+    values[3] = buf[ti1*localw*localh + xi2*localh + yi2];
     weights[3] = (t2 - t)*(x - x1)*(y - y1) / denom;
 
-    values[4] = buf[ti2*localw*localh + yi1*localw + xi1];
+    values[4] = buf[ti2*localw*localh + xi1*localh + yi1];
     weights[4] = (t - t1)*(x2 - x)*(y2 - y) / denom;
 
-    values[5] = buf[ti2*localw*localh + yi1*localw + xi2];
+    values[5] = buf[ti2*localw*localh + xi2*localh + yi1];
     weights[5] = (t - t1)*(x - x1)*(y2 - y) / denom;
 
-    values[6] = buf[ti2*localw*localh + yi2*localw + xi1];
+    values[6] = buf[ti2*localw*localh + xi1*localh + yi2];
     weights[6] = (t - t1)*(x2 - x)*(y - y1) / denom;
 
-    values[7] = buf[ti2*localw*localh + yi2*localw + xi2];
+    values[7] = buf[ti2*localw*localh + xi2*localh + yi2];
     weights[7] = (t - t1)*(x - x1)*(y - y1) / denom;
 
     *value = 0.0;
