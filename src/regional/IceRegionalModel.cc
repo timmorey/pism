@@ -59,7 +59,11 @@ PetscErrorCode IceRegionalModel::step(bool do_mass_continuity,
     }
 
     retval = no_model_mask.end_access();  CHKERRQ(retval);
-
+    retval = vH.end_access();  CHKERRQ(retval);
+    retval = vh.end_access();  CHKERRQ(retval);
+    retval = vbed.end_access();  CHKERRQ(retval);
+    retval = thkstore.end_access();  CHKERRQ(retval);
+    retval = usurfstore.end_access();  CHKERRQ(retval);
   }
 
   if(coarse_grid && config.get_flag("ssa_dirichlet_bc")) {
