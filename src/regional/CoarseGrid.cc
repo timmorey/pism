@@ -213,6 +213,11 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
   std::vector<std::string> dims;
   double* buf = 0;
 
+  int ti1, ti2, xi1, xi2, yi1, yi2, zi1, zi2;
+  int localw, localh, locald;
+  double t1, t2, x1, x2, y1, y2, z1, z2;
+  double denom;
+
   mapiter = _VarCache.find(varname);
   if(mapiter == _VarCache.end()) {
     fprintf(stderr, "Cannot interpolate '%s' - variable has not been loaded.\n", varname.c_str());
@@ -222,87 +227,170 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
     dims = _VarDims[varname];
   }
 
-  if(buf && dims.size() == 3) {
-    // Assume t,x,y
-
-    int xi1, xi2, yi1, yi2, ti1, ti2;
-    int localw, localh;
-    double x1, x2, y1, y2, t1, t2;
-    double denom;
-    double weights[8], values[8];
-
-    for(int i = _AOIMinXi + 1; i <= _AOIMaxXi; i++) {
-      if(_X[i - 1] <= x && x <= _X[i]) {
-        x1 = _X[i-1];
-        x2 = _X[i];
-        xi1 = i - 1 - _AOIMinXi;
-        xi2 = i - _AOIMinXi;
-        break;
+  if(buf) {
+    if(dims.size() >= 1) {
+      // Assume we have at least the t dim
+      
+      for(size_t i = 1; i < _T.size(); i++) {
+        if(_T[i - 1] <= t && t <= _T[i]) {
+          ti1 = i - 1;
+          ti2 = i;
+          t1 = _T[ti1];
+          t2 = _T[ti2];
+          break;
+        }
       }
     }
-
-    for(int i = _AOIMinYi + 1; i <= _AOIMaxYi; i++) {
-      if(_Y[i - 1] <= y && y <= _Y[i]) {
-        y1 = _Y[i-1];
-        y2 = _Y[i];
-        yi1 = i - 1 - _AOIMinYi;
-        yi2 = i - _AOIMinYi;
-        break;
+    
+    if(buf && dims.size() >= 2) {
+      // Assume we have at least the t,x dims
+      
+      localw = _AOIMaxXi - _AOIMinXi + 1;
+      for(int i = _AOIMinXi + 1; i <= _AOIMaxXi; i++) {
+        if(_X[i - 1] <= x && x <= _X[i]) {
+          x1 = _X[i-1];
+          x2 = _X[i];
+          xi1 = i - 1 - _AOIMinXi;
+          xi2 = i - _AOIMinXi;
+          break;
+        }
       }
     }
-
-    for(size_t i = 1; i < _T.size(); i++) {
-      if(_T[i - 1] <= t && t <= _T[i]) {
-        ti1 = i - 1;
-        ti2 = i;
-        t1 = _T[ti1];
-        t2 = _T[ti2];
-        break;
+    
+    if(buf && dims.size() >= 3) {
+      // Assume we have at least the t,x,y dims
+      
+      localh = _AOIMaxYi - _AOIMinYi + 1;
+      for(int i = _AOIMinYi + 1; i <= _AOIMaxYi; i++) {
+        if(_Y[i - 1] <= y && y <= _Y[i]) {
+          y1 = _Y[i-1];
+          y2 = _Y[i];
+          yi1 = i - 1 - _AOIMinYi;
+          yi2 = i - _AOIMinYi;
+          break;
+        }
       }
     }
-
-//    printf("Rank %03d: x(%d)=%f, x(%d)=%f\n", rank, xi1, x1, xi2, x2);
-//    printf("Rank %03d: y(%d)=%f, y(%d)=%f\n", rank, yi1, y1, yi2, y2);
-//    printf("Rank %03d: t(%d)=%f, t(%d)=%f\n", rank, ti1, t1, ti2, t2);
-
-    denom = (t2 - t1)*(x2 - x1)*(y2 - y1);
-    localw = _AOIMaxXi - _AOIMinXi + 1;
-    localh = _AOIMaxYi - _AOIMinYi + 1;
-
-    values[0] = buf[ti1*localw*localh + xi1*localh + yi1];
-    weights[0] = (t2 - t)*(x2 - x)*(y2 - y) / denom;
-
-    values[1] = buf[ti1*localw*localh + xi2*localh + yi1];
-    weights[1] = (t2 - t)*(x - x1)*(y2 - y) / denom;
-
-    values[2] = buf[ti1*localw*localh + xi1*localh + yi2];
-    weights[2] = (t2 - t)*(x2 - x)*(y - y1) / denom;
-
-    values[3] = buf[ti1*localw*localh + xi2*localh + yi2];
-    weights[3] = (t2 - t)*(x - x1)*(y - y1) / denom;
-
-    values[4] = buf[ti2*localw*localh + xi1*localh + yi1];
-    weights[4] = (t - t1)*(x2 - x)*(y2 - y) / denom;
-
-    values[5] = buf[ti2*localw*localh + xi2*localh + yi1];
-    weights[5] = (t - t1)*(x - x1)*(y2 - y) / denom;
-
-    values[6] = buf[ti2*localw*localh + xi1*localh + yi2];
-    weights[6] = (t - t1)*(x2 - x)*(y - y1) / denom;
-
-    values[7] = buf[ti2*localw*localh + xi2*localh + yi2];
-    weights[7] = (t - t1)*(x - x1)*(y - y1) / denom;
-
-    *value = 0.0;
-    for(int i = 0; i < 8; i++) {
-      *value += values[i] * weights[i];
+    
+    if(buf && dims.size() >= 4) {
+      // Assume we have at least the t,x,y,z dims
+      
+      locald = _Z.size();
+      for(size_t i = 1; i < _Z.size(); i++) {
+        if(_Z[i - 1] <= z && z <= _Z[i]) {
+          zi1 = i - 1;
+          zi2 = i;
+          z1 = _Z[zi1];
+          z2 = _Z[zi2];
+          break;
+        }
+      }
     }
+    
+    if(buf && dims.size() == 3) {
+      // Assume t,x,y
+      int npts = 8;
+      double weights[8], values[8];
+      
+      denom = (t2 - t1)*(x2 - x1)*(y2 - y1);
+      
+      values[0] = buf[ti1*localw*localh + xi1*localh + yi1];
+      weights[0] = (t2 - t)*(x2 - x)*(y2 - y) / denom;
+      
+      values[1] = buf[ti1*localw*localh + xi2*localh + yi1];
+      weights[1] = (t2 - t)*(x - x1)*(y2 - y) / denom;
 
-  } else if(buf && dims.size() == 4) {
-    // Assume t,x,y,z
-    fprintf(stderr, "4d interpolation not yet implemented.\n");
-    retval = -1;
+      values[2] = buf[ti1*localw*localh + xi1*localh + yi2];
+      weights[2] = (t2 - t)*(x2 - x)*(y - y1) / denom;
+      
+      values[3] = buf[ti1*localw*localh + xi2*localh + yi2];
+      weights[3] = (t2 - t)*(x - x1)*(y - y1) / denom;
+      
+      values[4] = buf[ti2*localw*localh + xi1*localh + yi1];
+      weights[4] = (t - t1)*(x2 - x)*(y2 - y) / denom;
+      
+      values[5] = buf[ti2*localw*localh + xi2*localh + yi1];
+      weights[5] = (t - t1)*(x - x1)*(y2 - y) / denom;
+
+      values[6] = buf[ti2*localw*localh + xi1*localh + yi2];
+      weights[6] = (t - t1)*(x2 - x)*(y - y1) / denom;
+      
+      values[7] = buf[ti2*localw*localh + xi2*localh + yi2];
+      weights[7] = (t - t1)*(x - x1)*(y - y1) / denom;
+
+      *value = 0.0;
+      for(int i = 0; i < npts; i++) {
+        *value += values[i] * weights[i];
+      }
+
+    } else if(buf && dims.size() == 4) {
+      // Assume t,x,y,z
+      int npts = 16;
+      double weights[16], values[16];
+      int tstride = localw*localh*locald;
+      int xstride = localh*locald;
+      int ystride = locald;
+      
+      denom = (t2 - t1)*(x2 - x1)*(y2 - y1)*(z2 - z1);
+
+      values[0] = buf[ti1*tstride + xi1*xstride + yi1*ystride + zi1];
+      weights[0] = (t2 - t)*(x2 - x)*(y2 - y)*(z2 - z) / denom;
+
+      values[1] = buf[ti1*tstride + xi1*xstride + yi1*ystride + zi2];
+      weights[1] = (t2 - t)*(x2 - x)*(y2 - y)*(z - z1) / denom;
+
+      values[2] = buf[ti1*tstride + xi1*xstride + yi2*ystride + zi1];
+      weights[2] = (t2 - t)*(x2 - x)*(y - y1)*(z2 - z) / denom;
+
+      values[3] = buf[ti1*tstride + xi1*xstride + yi2*ystride + zi2];
+      weights[3] = (t2 - t)*(x2 - x)*(y - y1)*(z - z1) / denom;
+
+      values[4] = buf[ti1*tstride + xi2*xstride + yi1*ystride + zi1];
+      weights[4] = (t2 - t)*(x - x1)*(y2 - y)*(z2 - z) / denom;
+
+      values[5] = buf[ti1*tstride + xi2*xstride + yi1*ystride + zi2];
+      weights[5] = (t2 - t)*(x - x1)*(y2 - y)*(z - z1) / denom;
+
+      values[6] = buf[ti1*tstride + xi2*xstride + yi2*ystride + zi1];
+      weights[6] = (t2 - t)*(x - x1)*(y - y1)*(z2 - z) / denom;
+
+      values[7] = buf[ti1*tstride + xi2*xstride + yi2*ystride + zi2];
+      weights[7] = (t2 - t)*(x - x1)*(y - y1)*(z - z1) / denom;
+
+      values[8] = buf[ti2*tstride + xi1*xstride + yi1*ystride + zi1];
+      weights[8] = (t - t1)*(x2 - x)*(y2 - y)*(z2 - z) / denom;
+
+      values[9] = buf[ti2*tstride + xi1*xstride + yi1*ystride + zi2];
+      weights[9] = (t - t1)*(x2 - x)*(y2 - y)*(z - z1) / denom;
+
+      values[10] = buf[ti2*tstride + xi1*xstride + yi2*ystride + zi1];
+      weights[10] = (t - t1)*(x2 - x)*(y - y1)*(z2 - z) / denom;
+
+      values[11] = buf[ti2*tstride + xi1*xstride + yi2*ystride + zi2];
+      weights[11] = (t - t1)*(x2 - x)*(y - y1)*(z - z1) / denom;
+
+      values[12] = buf[ti2*tstride + xi2*xstride + yi1*ystride + zi1];
+      weights[12] = (t - t1)*(x - x1)*(y2 - y)*(z2 - z) / denom;
+
+      values[13] = buf[ti2*tstride + xi2*xstride + yi1*ystride + zi2];
+      weights[13] = (t - t1)*(x - x1)*(y2 - y)*(z - z1) / denom;
+
+      values[14] = buf[ti2*tstride + xi2*xstride + yi2*ystride + zi1];
+      weights[14] = (t - t1)*(x - x1)*(y - y1)*(z2 - z) / denom;
+
+      values[15] = buf[ti2*tstride + xi2*xstride + yi2*ystride + zi2];
+      weights[15] = (t - t1)*(x - x1)*(y - y1)*(z - z1) / denom;
+
+      *value = 0.0;
+      for(int i = 0; i < npts; i++) {
+        *value += values[i] * weights[i];
+      }
+
+    } else {
+      fprintf(stderr, "%dd interpolation not yet implemented.\n", (int)dims.size());
+      retval = -1;
+    }
   }
-
+  
   return retval;
 }

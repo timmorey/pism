@@ -489,12 +489,19 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
       if (no_model_mask(i, j) < 0.5)
         continue;
 
-      ierr = vWork3d.getInternalColumn(i, j, &new_enthalpy); CHKERRQ(ierr);
-      ierr = Enth3.getInternalColumn(i, j, &old_enthalpy); CHKERRQ(ierr);
-      
-      // TODO: interpolate enthalpy, once we hook up 4d interpolation.
-      for (int k = 0; k < grid.Mz; ++k)
-        new_enthalpy[k] = old_enthalpy[k];
+      if(coarse_grid) {
+        vWork3d.getInternalColumn(i, j, &new_enthalpy);  CHKERRQ(ierr);
+        for(int k = 0; k < grid.Mz; ++k) {
+          coarse_grid->Interpolate("enthalpy", grid.x[i], grid.y[j], grid.zlevels[k], 
+                                   grid.time->current(), &new_enthalpy[k]);
+        }
+      } else {
+        ierr = vWork3d.getInternalColumn(i, j, &new_enthalpy); CHKERRQ(ierr);
+        ierr = Enth3.getInternalColumn(i, j, &old_enthalpy); CHKERRQ(ierr);
+        
+        for (int k = 0; k < grid.Mz; ++k)
+          new_enthalpy[k] = old_enthalpy[k];
+      }
     }
   }
   ierr = Enth3.end_access(); CHKERRQ(ierr);
