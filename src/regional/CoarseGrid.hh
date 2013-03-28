@@ -8,12 +8,12 @@
 #ifndef COARSEGRID_HH_
 #define COARSEGRID_HH_
 
+
 #include <map>
 #include <petsc.h>
 #include <string>
 #include <vector>
 
-class PIO;
 
 class CoarseGrid
 {
@@ -36,7 +36,7 @@ protected:
   std::map<std::string, double*> _VarCache;
   std::map<std::string, std::vector<std::string> > _VarDims;
   int _AOIMinXi, _AOIMaxXi, _AOIMinYi, _AOIMaxYi;
-  PIO* _Pio;
+  std::string _Filename;
 
 };
 

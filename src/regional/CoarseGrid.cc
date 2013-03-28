@@ -20,35 +20,36 @@ CoarseGrid::CoarseGrid(const std::string& filename)
     _AOIMaxXi(0),
     _AOIMinYi(0),
     _AOIMaxYi(0),
-    _Pio(0) {
+    _Filename(filename) {
 
   MPI_Comm comm = PETSC_COMM_WORLD;
   PetscMPIInt rank, size;
   unsigned int xlen, ylen, zlen, tlen;
+  PIO* pio = 0;
 
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
 
-  _Pio = new PIO(comm, rank, "netcdf3");
-  if(0 != _Pio->open(filename, PISM_NOWRITE)) {
-    fprintf(stderr, "CoarseGrid::CoarseGrid: Failed to open '%s'.\n", filename.c_str());
-    delete _Pio;
-    _Pio = 0;
+  pio = new PIO(comm, rank, "netcdf3");
+  if(0 != pio->open(_Filename, PISM_NOWRITE)) {
+    fprintf(stderr, "CoarseGrid::CoarseGrid: Failed to open '%s'.\n", _Filename.c_str());
+    delete pio;
+    pio = 0;
   }
 
-  if(_Pio) {
-    if(0 != _Pio->inq_dimlen("x", xlen) ||
-       0 != _Pio->inq_dimlen("y", ylen) ||
-       0 != _Pio->inq_dimlen("z", zlen) ||
-       0 != _Pio->inq_dimlen("time", tlen)) {
+  if(pio) {
+    if(0 != pio->inq_dimlen("x", xlen) ||
+       0 != pio->inq_dimlen("y", ylen) ||
+       0 != pio->inq_dimlen("z", zlen) ||
+       0 != pio->inq_dimlen("time", tlen)) {
       fprintf(stderr, "CoarseGrid::CoarseGrid: Failed to retrieve dimlen.\n");
-      _Pio->close();
-      delete _Pio;
-      _Pio = 0;
+      pio->close();
+      delete pio;
+      pio = 0;
     }
   }
 
-  if(_Pio) {
+  if(pio) {
     _X.reserve(xlen);
     _Y.reserve(ylen);
     _Z.reserve(zlen);
@@ -57,25 +58,25 @@ CoarseGrid::CoarseGrid(const std::string& filename)
     _AOIMaxXi = xlen - 1;
     _AOIMaxYi = ylen - 1;
 
-    if((xlen > 0 && 0 != _Pio->get_1d_var("x", 0, xlen, _X)) ||
-       (ylen > 0 && 0 != _Pio->get_1d_var("y", 0, ylen, _Y)) ||
-       (zlen > 0 && 0 != _Pio->get_1d_var("z", 0, zlen, _Z)) ||
-       (tlen > 0 && 0 != _Pio->get_1d_var("time", 0, tlen, _T))) {
+    if((xlen > 0 && 0 != pio->get_1d_var("x", 0, xlen, _X)) ||
+       (ylen > 0 && 0 != pio->get_1d_var("y", 0, ylen, _Y)) ||
+       (zlen > 0 && 0 != pio->get_1d_var("z", 0, zlen, _Z)) ||
+       (tlen > 0 && 0 != pio->get_1d_var("time", 0, tlen, _T))) {
       fprintf(stderr, "CoarseGrid::CoarseGrid: Failed to read dimension scales.\n");
-      _Pio->close();
-      delete _Pio;
-      _Pio = 0;
+      pio->close();
+      delete pio;
+      pio = 0;
     }
+  }
+
+  if(pio) {
+    pio->close();
+    delete pio;
+    pio = 0;
   }
 }
 
 CoarseGrid::~CoarseGrid() {
-  if(_Pio) {
-    _Pio->close();
-    delete _Pio;
-    _Pio = 0;
-  }
-
   map<std::string, double*>::iterator mapiter;
   for(mapiter = _VarCache.begin(); mapiter != _VarCache.end(); mapiter++) {
     delete [] mapiter->second;
@@ -131,46 +132,63 @@ PetscErrorCode CoarseGrid::SetAreaOfInterest(PetscReal xmin, PetscReal xmax,
 
 PetscErrorCode CoarseGrid::CacheVars(const std::vector<std::string>& varnames) {
   PetscErrorCode retval = 0;
-
+  PIO* pio = 0;
+  MPI_Comm comm = PETSC_COMM_WORLD;
+  int rank;
   std::vector<std::string>::const_iterator nameiter;
   std::map<std::string, double*>::const_iterator mapiter;
 
-  for(nameiter = varnames.begin(); nameiter != varnames.end(); nameiter++) {
-    mapiter = _VarCache.find(*nameiter);
-    if(mapiter == _VarCache.end()) {
-      // Then the variable has not yet been loaded and cached
-      
-      std::vector<std::string> dims;
-      std::vector<unsigned int> start, count;
-      double* buf = 0;
-      size_t buflen = 0;
+  MPI_Comm_rank(comm, &rank);
+  pio = new PIO(comm, rank, "netcdf3");
+  if(0 != pio->open(_Filename, PISM_NOWRITE)) {
+    fprintf(stderr, "CoarseGrid::CacheVars: Failed to open '%s'.\n", _Filename.c_str());
+    delete pio;
+    pio = 0;
+  }
 
-      retval = _Pio->inq_vardims(*nameiter, dims);  CHKERRQ(retval);
-      buflen = 1;
-      for(size_t i = 0; i < dims.size(); i++) {
-        if(dims[i] == "x") {
-          start.push_back(_AOIMinXi);
-          count.push_back(_AOIMaxXi - _AOIMinXi + 1);
-        } else if(dims[i] == "y") {
-          start.push_back(_AOIMinYi);
-          count.push_back(_AOIMaxYi - _AOIMinYi + 1);
-        } else if(dims[i] == "z") {
-          start.push_back(0);
-          count.push_back(_Z.size());
-        } else if(dims[i] == "time") {
-          start.push_back(0);
-          count.push_back(_T.size());
+  if(pio) {
+    for(nameiter = varnames.begin(); nameiter != varnames.end(); nameiter++) {
+      mapiter = _VarCache.find(*nameiter);
+      if(mapiter == _VarCache.end()) {
+      // Then the variable has not yet been loaded and cached
+        
+        std::vector<std::string> dims;
+        std::vector<unsigned int> start, count;
+        double* buf = 0;
+        size_t buflen = 0;
+        
+        retval = pio->inq_vardims(*nameiter, dims);  CHKERRQ(retval);
+        buflen = 1;
+        for(size_t i = 0; i < dims.size(); i++) {
+          if(dims[i] == "x") {
+            start.push_back(_AOIMinXi);
+            count.push_back(_AOIMaxXi - _AOIMinXi + 1);
+          } else if(dims[i] == "y") {
+            start.push_back(_AOIMinYi);
+            count.push_back(_AOIMaxYi - _AOIMinYi + 1);
+          } else if(dims[i] == "z") {
+            start.push_back(0);
+            count.push_back(_Z.size());
+          } else if(dims[i] == "time") {
+            start.push_back(0);
+            count.push_back(_T.size());
+          }
+          
+          buflen *= count[i];
         }
         
-        buflen *= count[i];
+        buf = new double[buflen];
+        pio->get_vara_double(*nameiter, start, count, buf);
+        _VarCache[*nameiter] = buf;
+        _VarDims[*nameiter] = dims;
       }
-
-      buf = new double[buflen];
-      _Pio->get_vara_double(*nameiter, start, count, buf);
-      _VarCache[*nameiter] = buf;
-      _VarDims[*nameiter] = dims;
     }
+  }
 
+  if(pio) {
+    pio->close();
+    delete pio;
+    pio = 0;
   }
 
   return retval;
