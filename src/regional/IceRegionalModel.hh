@@ -56,6 +56,12 @@ protected:
                                                  PetscScalar* bulgeCount);
   virtual PetscErrorCode setFromOptions();
 
+protected:
+  PetscErrorCode interpolateSSABC();
+  PetscErrorCode interpolateIceGeom();
+  PetscErrorCode interpolateEnthalpy(IceModelVec3& dest);
+  PetscErrorCode interpolateBMR();
+
 private:
   IceModelVec2Int no_model_mask;
   IceModelVec2S   usurfstore, thkstore;

@@ -35,58 +35,13 @@ PetscErrorCode IceRegionalModel::step(bool do_mass_continuity,
                                       bool do_skip) {
   PetscErrorCode retval = 0;
 
-  if(coarse_grid) {
-    retval = no_model_mask.begin_access();  CHKERRQ(retval);
-    retval = vH.begin_access();  CHKERRQ(retval);
-    retval = vh.begin_access();  CHKERRQ(retval);
-    retval = vbed.begin_access();  CHKERRQ(retval);
-    retval = thkstore.begin_access();  CHKERRQ(retval);
-    retval = usurfstore.begin_access();  CHKERRQ(retval);
-
-    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
-      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-        if(no_model_mask(i, j) > 0.5) {
-          double topg = vbed(i, j);
-          double thk;
-          coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, grid.time->current(), &thk);
-
-          vH(i, j) = thk;
-          vh(i, j) = topg + thk;
-          thkstore(i, j) = thk;
-          usurfstore(i, j) = topg + thk;
-        }
-      }
-    }
-
-    retval = no_model_mask.end_access();  CHKERRQ(retval);
-    retval = vH.end_access();  CHKERRQ(retval);
-    retval = vh.end_access();  CHKERRQ(retval);
-    retval = vbed.end_access();  CHKERRQ(retval);
-    retval = thkstore.end_access();  CHKERRQ(retval);
-    retval = usurfstore.end_access();  CHKERRQ(retval);
-  }
-
-  if(coarse_grid && config.get_flag("ssa_dirichlet_bc")) {
-    retval = no_model_mask.begin_access();  CHKERRQ(retval);
-    retval = vBCvel.begin_access();  CHKERRQ(retval);
-
-    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
-      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-        if(no_model_mask(i, j) > 0.5) {
-          double u, v;
-          coarse_grid->Interpolate("u_ssa", grid.x[i], grid.y[j], 0.0, grid.time->current(), &u);
-          coarse_grid->Interpolate("v_ssa", grid.x[i], grid.y[j], 0.0, grid.time->current(), &v);
-          vBCvel(i, j).u = u;
-          vBCvel(i, j).v = v;
-        }
-      }
-    }
-
-    retval = no_model_mask.end_access();  CHKERRQ(retval);
-    retval = vBCvel.end_access();  CHKERRQ(retval);
-  }
-
   retval = IceModel::step(do_mass_continuity, do_energy, do_age, do_skip);
+
+  if(coarse_grid)
+    this->interpolateIceGeom();
+
+  if(coarse_grid && config.get_flag("ssa_dirichlet_bc"))
+    this->interpolateSSABC();
 
   return retval;
 }
@@ -196,6 +151,8 @@ PetscErrorCode IceRegionalModel::createVecs() {
 
     // Expand the region of interest a bit to accomodate the interpolation of
     // ghost points.  I suspect we could be smarter about this expansion...
+    
+    // TODO: move as much of this initialization code into the CoarseGrid as possible.
     int minxi = PetscMax(0, grid.xs - 1);
     int maxxi = PetscMin(grid.x.size() - 1, grid.xs + grid.xm);
     int minyi = PetscMax(0, grid.ys - 1);
@@ -356,21 +313,23 @@ PetscErrorCode IceRegionalModel::initFromFile(string filename) {
   // Allow re-starting from a file that does not contain u_ssa_bc and v_ssa_bc.
   // The user is probably using -regrid_file to bring in SSA B.C. data.
   if (config.get_flag("ssa_dirichlet_bc")) {
-    bool u_ssa_exists, v_ssa_exists;
-
-    ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
-    ierr = nc.inq_var("u_ssa_bc", u_ssa_exists); CHKERRQ(ierr);
-    ierr = nc.inq_var("v_ssa_bc", v_ssa_exists); CHKERRQ(ierr);
-    ierr = nc.close(); CHKERRQ(ierr);
-
-    if (! (u_ssa_exists && v_ssa_exists)) {
-      ierr = vBCvel.set_attr("pism_intent", "internal"); CHKERRQ(ierr);
-      ierr = verbPrintf(2, grid.com,
-                        "PISM WARNING: u_ssa_bc and/or v_ssa_bc not found in %s. Setting them to zero.\n"
-                        "              This may be overridden by the -regrid_file option.\n",
-                        filename.c_str()); CHKERRQ(ierr);
-
-      ierr = vBCvel.set(0.0); CHKERRQ(ierr);
+    if(! coarse_grid) {
+      bool u_ssa_exists, v_ssa_exists;
+      
+      ierr = nc.open(filename, PISM_NOWRITE); CHKERRQ(ierr);
+      ierr = nc.inq_var("u_ssa_bc", u_ssa_exists); CHKERRQ(ierr);
+      ierr = nc.inq_var("v_ssa_bc", v_ssa_exists); CHKERRQ(ierr);
+      ierr = nc.close(); CHKERRQ(ierr);
+      
+      if (! (u_ssa_exists && v_ssa_exists)) {
+        ierr = vBCvel.set_attr("pism_intent", "internal"); CHKERRQ(ierr);
+        ierr = verbPrintf(2, grid.com,
+                          "PISM WARNING: u_ssa_bc and/or v_ssa_bc not found in %s. Setting them to zero.\n"
+                          "              This may be overridden by the -regrid_file option.\n",
+                          filename.c_str()); CHKERRQ(ierr);
+        
+        ierr = vBCvel.set(0.0); CHKERRQ(ierr);
+      }
     }
   }
 
@@ -385,12 +344,23 @@ PetscErrorCode IceRegionalModel::initFromFile(string filename) {
   
   if (config.get_flag("ssa_dirichlet_bc")) {
     ierr = vBCvel.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
-    ierr = vBCvel.set(0.0); CHKERRQ(ierr);
+
+    if(coarse_grid) {
+      ierr = this->interpolateSSABC(); CHKERRQ(ierr);
+    } else {
+      ierr = vBCvel.set(0.0); CHKERRQ(ierr);
+    }
   }
 
   if (zgwnm) {
     ierr = thkstore.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
     ierr = usurfstore.set_attr("pism_intent", "model_state"); CHKERRQ(ierr);
+  }
+
+  if(coarse_grid) {
+    ierr = this->interpolateIceGeom(); CHKERRQ(ierr);
+    ierr = this->interpolateEnthalpy(Enth3); CHKERRQ(ierr);
+    ierr = this->interpolateBMR(); CHKERRQ(ierr);
   }
 
   return 0;
@@ -478,24 +448,20 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
 
   ierr = IceModel::enthalpyAndDrainageStep(vertSacrCount, liquifiedVol, bulgeCount); CHKERRQ(ierr);
 
-  // note that the call above sets vWork3d; ghosts are comminucated later (in
-  // IceModel::energyStep()).
-  ierr = no_model_mask.begin_access(); CHKERRQ(ierr);
+  if(coarse_grid) {
+    ierr = this->interpolateEnthalpy(vWork3d);  CHKERRQ(ierr);
 
-  ierr = vWork3d.begin_access(); CHKERRQ(ierr);
-  ierr = Enth3.begin_access(); CHKERRQ(ierr);
-  for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
-    for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-      if (no_model_mask(i, j) < 0.5)
-        continue;
-
-      if(coarse_grid) {
-        vWork3d.getInternalColumn(i, j, &new_enthalpy);  CHKERRQ(ierr);
-        for(int k = 0; k < grid.Mz; ++k) {
-          coarse_grid->Interpolate("enthalpy", grid.x[i], grid.y[j], grid.zlevels[k], 
-                                   grid.time->current(), &new_enthalpy[k]);
-        }
-      } else {
+  } else {
+    // note that the call above sets vWork3d; ghosts are comminucated later (in
+    // IceModel::energyStep()).
+    ierr = no_model_mask.begin_access(); CHKERRQ(ierr);
+    ierr = vWork3d.begin_access(); CHKERRQ(ierr);
+    ierr = Enth3.begin_access(); CHKERRQ(ierr);
+    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if (no_model_mask(i, j) < 0.5)
+          continue;
+        
         ierr = vWork3d.getInternalColumn(i, j, &new_enthalpy); CHKERRQ(ierr);
         ierr = Enth3.getInternalColumn(i, j, &old_enthalpy); CHKERRQ(ierr);
         
@@ -503,37 +469,154 @@ PetscErrorCode IceRegionalModel::enthalpyAndDrainageStep(PetscScalar* vertSacrCo
           new_enthalpy[k] = old_enthalpy[k];
       }
     }
+    
+    ierr = Enth3.end_access(); CHKERRQ(ierr);
+    ierr = vWork3d.end_access(); CHKERRQ(ierr);
+    ierr = no_model_mask.end_access(); CHKERRQ(ierr);
   }
-  ierr = Enth3.end_access(); CHKERRQ(ierr);
-  ierr = vWork3d.end_access(); CHKERRQ(ierr);
 
-  // set vbmr; ghosts are comminucated later (in IceModel::energyStep()).
-  ierr = vbmr.begin_access(); CHKERRQ(ierr);
-  ierr = bmr_stored.begin_access(); CHKERRQ(ierr);
-  double t = grid.time->current();
-  double value;
-  for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
-    for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
-      if (no_model_mask(i, j) < 0.5)
-        continue;
+  if(coarse_grid) {
+    ierr = this->interpolateBMR(); CHKERRQ(ierr);
 
-      if(coarse_grid) {
-        //if(false) {
-        coarse_grid->Interpolate(vbmr.string_attr("name", 0), grid.x[i], grid.y[j], 0.0, t, &value);
-        //printf("Interpolated bmelt: %f\n", value);
-        //printf("bmr_stored: %f\n", bmr_stored(i, j));
-        vbmr(i, j) = value;
-      } else {
+  } else {
+    // set vbmr; ghosts are comminucated later (in IceModel::energyStep()).
+    ierr = no_model_mask.begin_access(); CHKERRQ(ierr);
+    ierr = vbmr.begin_access(); CHKERRQ(ierr);
+    ierr = bmr_stored.begin_access(); CHKERRQ(ierr);
+
+    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if (no_model_mask(i, j) < 0.5)
+          continue;
+        
         vbmr(i, j) = bmr_stored(i, j);
       }
     }
+    
+    ierr = bmr_stored.end_access(); CHKERRQ(ierr);
+    ierr = vbmr.end_access(); CHKERRQ(ierr);
+    ierr = no_model_mask.end_access(); CHKERRQ(ierr);
   }
-  ierr = bmr_stored.end_access(); CHKERRQ(ierr);
-  ierr = vbmr.end_access(); CHKERRQ(ierr);
-
-  ierr = no_model_mask.end_access(); CHKERRQ(ierr);
 
   return 0;
 }
 
+PetscErrorCode IceRegionalModel::interpolateSSABC() {
+  PetscErrorCode retval = 0;
 
+  if(coarse_grid) {
+    retval = no_model_mask.begin_access();  CHKERRQ(retval);
+    retval = vBCvel.begin_access();  CHKERRQ(retval);
+
+    for (PetscInt i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if(no_model_mask(i, j) > 0.5) {
+          double u, v;
+          coarse_grid->Interpolate("u_ssa", grid.x[i], grid.y[j], 0.0, grid.time->current(), &u);
+          coarse_grid->Interpolate("v_ssa", grid.x[i], grid.y[j], 0.0, grid.time->current(), &v);
+          vBCvel(i, j).u = u;
+          vBCvel(i, j).v = v;
+        }
+      }
+    }
+
+    retval = no_model_mask.end_access();  CHKERRQ(retval);
+    retval = vBCvel.end_access();  CHKERRQ(retval);
+  }
+
+  return retval;
+}
+
+PetscErrorCode IceRegionalModel::interpolateIceGeom() {
+  PetscErrorCode retval = 0;
+
+  if(coarse_grid) {
+    retval = no_model_mask.begin_access();  CHKERRQ(retval);
+    retval = vH.begin_access();  CHKERRQ(retval);
+    retval = vh.begin_access();  CHKERRQ(retval);
+    retval = vbed.begin_access();  CHKERRQ(retval);
+    retval = thkstore.begin_access();  CHKERRQ(retval);
+    retval = usurfstore.begin_access();  CHKERRQ(retval);
+
+    for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if(no_model_mask(i, j) > 0.5) {
+          double topg = vbed(i, j);
+          double thk;
+          coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, grid.time->current(), &thk);
+
+          vH(i, j) = thk;
+          vh(i, j) = topg + thk;
+          thkstore(i, j) = thk;
+          usurfstore(i, j) = topg + thk;
+        }
+      }
+    }
+
+    retval = no_model_mask.end_access();  CHKERRQ(retval);
+    retval = vH.end_access();  CHKERRQ(retval);
+    retval = vh.end_access();  CHKERRQ(retval);
+    retval = vbed.end_access();  CHKERRQ(retval);
+    retval = thkstore.end_access();  CHKERRQ(retval);
+    retval = usurfstore.end_access();  CHKERRQ(retval);
+  }
+
+  return retval;
+}
+
+PetscErrorCode IceRegionalModel::interpolateEnthalpy(IceModelVec3& dest) {
+  PetscErrorCode retval = 0;
+  PetscScalar* col = 0;
+
+  if(coarse_grid) {
+    retval = no_model_mask.begin_access(); CHKERRQ(retval);
+    retval = dest.begin_access();  CHKERRQ(retval);
+
+    for (PetscInt i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if (no_model_mask(i, j) < 0.5)
+          continue;
+
+        retval = dest.getInternalColumn(i, j, &col);  CHKERRQ(retval);
+        for(int k = 0; k < grid.Mz; ++k) {
+          retval = coarse_grid->Interpolate("enthalpy", grid.x[i], grid.y[j], grid.zlevels[k], 
+                                            grid.time->current(), &col[k]); CHKERRQ(retval);
+        }
+      }
+    }
+    
+    retval = no_model_mask.end_access();  CHKERRQ(retval);
+    retval = dest.end_access();  CHKERRQ(retval);
+  }
+
+  return retval;
+}
+
+PetscErrorCode IceRegionalModel::interpolateBMR() {
+  PetscErrorCode retval = 0;
+
+  if(coarse_grid) {
+    double t = grid.time->current();
+    double value;
+
+    retval = no_model_mask.begin_access(); CHKERRQ(retval);
+    retval = vbmr.begin_access(); CHKERRQ(retval);
+
+    for (PetscInt i = grid.xs; i < grid.xs+grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+        if (no_model_mask(i, j) < 0.5)
+          continue;
+
+        coarse_grid->Interpolate(vbmr.string_attr("name", 0), grid.x[i], grid.y[j], 0.0, t, &value);
+        //printf("Interpolated bmelt: %f\n", value);
+        //printf("bmr_stored: %f\n", bmr_stored(i, j));
+        vbmr(i, j) = value;
+      }
+    }
+
+    retval = vbmr.end_access(); CHKERRQ(retval);
+    retval = no_model_mask.end_access(); CHKERRQ(retval);
+  }
+
+  return retval;
+}
