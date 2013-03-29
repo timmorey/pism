@@ -16,8 +16,10 @@
 // along with PISM; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+#include "CoarseGrid.hh"
 #include "PSForceThickness.hh"
 #include "IceGrid.hh"
+#include "PISMTime.hh"
 #include "PISMVars.hh"
 #include "PIO.hh"
 
@@ -30,7 +32,9 @@ void PSForceThickness::attach_atmosphere_model(PISMAtmosphereModel *input) {
 PetscErrorCode PSForceThickness::init(PISMVars &vars) {
   PetscErrorCode ierr;
   char fttfile[PETSC_MAX_PATH_LEN] = "";
+  char maskfile[PETSC_MAX_PATH_LEN] = "";
   PetscBool opt_set;
+  PetscBool maskfile_set = PETSC_FALSE;
   PetscScalar fttalpha;
   PetscBool  fttalphaSet;
 
@@ -38,16 +42,42 @@ PetscErrorCode PSForceThickness::init(PISMVars &vars) {
 
   ierr = PetscOptionsBegin(grid.com, "", "Surface model forcing", ""); CHKERRQ(ierr);
 
-  ierr = PetscOptionsString("-force_to_thk",
-			    "Specifies the target thickness file for the force-to-thickness mechanism",
-			    "", "",
-			    fttfile, PETSC_MAX_PATH_LEN, &opt_set); CHKERRQ(ierr);
+  ierr = PetscOptionsString("-interp_ftt_thk",
+                            "Indicates that the ftt target thickness should be "
+                            "interpolated from the given file.", "", "",
+                            fttfile, PETSC_MAX_PATH_LEN, &opt_set);
 
-  if (!opt_set) {
-    ierr = PetscPrintf(grid.com,
-      "ERROR: surface model forcing requires the -force_to_thk option.\n"); CHKERRQ(ierr);
-    PISMEnd();
+  if(opt_set) {
+    std::vector<std::string> interpvars;
+    int minxi = PetscMax(0, grid.xs - 1);
+    int maxxi = PetscMin(grid.x.size() - 1, grid.xs + grid.xm);
+    int minyi = PetscMax(0, grid.ys - 1);
+    int maxyi = PetscMin(grid.y.size() - 1, grid.ys + grid.ym);
+    
+    coarse_grid = new CoarseGrid(fttfile);
+    ierr = coarse_grid->SetAreaOfInterest(grid.x[minxi], grid.x[maxxi], grid.y[minyi], grid.y[maxyi]);
+    CHKERRQ(ierr);
+    
+    interpvars.push_back("thk");
+    ierr = coarse_grid->CacheVars(interpvars); CHKERRQ(ierr);
+    
+  } else {
+    ierr = PetscOptionsString("-force_to_thk",
+                              "Specifies the target thickness file for the force-to-thickness mechanism",
+                              "", "",
+                              fttfile, PETSC_MAX_PATH_LEN, &opt_set); CHKERRQ(ierr);
+    
+    if (!opt_set) {
+      ierr = PetscPrintf(grid.com,
+                         "ERROR: surface model forcing requires the -force_to_thk option.\n"); CHKERRQ(ierr);
+      PISMEnd();
+    }
   }
+
+  ierr = PetscOptionsString("-ftt_mask_file",
+                            "The file that contains the FTT mask",
+                            "", "",
+                            maskfile, PETSC_MAX_PATH_LEN, &maskfile_set); CHKERRQ(ierr);
 
   ierr = PetscOptionsReal("-force_to_thk_alpha",
 			  "Specifies the force-to-thickness alpha value in per-year units",
@@ -92,24 +122,38 @@ PetscErrorCode PSForceThickness::init(PISMVars &vars) {
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
-  // fttfile now contains name of -force_to_thk file; now check
-  // it is really there; and regrid the target thickness
-  PIO nc(grid, "guess_mode");
-  bool mask_exists = false;
-  ierr = nc.open(fttfile, PISM_NOWRITE); CHKERRQ(ierr);
-  ierr = nc.inq_var("ftt_mask", mask_exists); CHKERRQ(ierr);
-  ierr = nc.close(); CHKERRQ(ierr);
-
-  ierr = verbPrintf(2, grid.com,
-		    "    reading target thickness 'thk' from %s ...\n"
-		    "    (this field will appear in output file as 'ftt_target_thk')\n",
-		    fttfile); CHKERRQ(ierr);
-  ierr = target_thickness.regrid(fttfile, true); CHKERRQ(ierr);
-
-  if (mask_exists) {
+  if(0 == coarse_grid) {
+    if(PETSC_FALSE == maskfile_set) {
+      // fttfile now contains name of -force_to_thk file; now check
+      // it is really there; and regrid the target thickness
+      PIO nc(grid, "guess_mode");
+      bool mask_exists = false;
+      ierr = nc.open(fttfile, PISM_NOWRITE); CHKERRQ(ierr);
+      ierr = nc.inq_var("ftt_mask", mask_exists); CHKERRQ(ierr);
+      ierr = nc.close(); CHKERRQ(ierr);
+      
+      if(mask_exists) {
+        maskfile_set = PETSC_TRUE;
+        strcpy(maskfile, fttfile);
+      }
+    }
+    
     ierr = verbPrintf(2, grid.com,
-                      "    reading force-to-thickness mask 'ftt_mask' from %s ...\n", fttfile); CHKERRQ(ierr);
-    ierr = ftt_mask.regrid(fttfile, true); CHKERRQ(ierr);
+                      "    reading target thickness 'thk' from %s ...\n"
+                      "    (this field will appear in output file as 'ftt_target_thk')\n",
+                      fttfile); CHKERRQ(ierr);
+    ierr = target_thickness.regrid(fttfile, true); CHKERRQ(ierr);
+  }
+
+  if(maskfile_set) {
+    ierr = verbPrintf(2, grid.com,
+                      "    reading force-to-thickness mask 'ftt_mask' from %s ...\n", maskfile); 
+    CHKERRQ(ierr);
+    ierr = ftt_mask.regrid(maskfile, true); CHKERRQ(ierr);
+  }
+
+  if(coarse_grid) {
+    this->interpolateTargetThk();
   }
 
   // reset name to avoid confusion; set attributes again to overwrite "read by" choices above
@@ -262,12 +306,21 @@ a system with negative feedback.
 PetscErrorCode PSForceThickness::ice_surface_mass_flux(IceModelVec2S &result) {
   PetscErrorCode ierr;
 
+  if(0 == grid.rank) printf("PSForceThickness::ice_surface_mass_flux(...)\n");
+
   // get the surface mass balance result from the next level up
   ierr = input_model->ice_surface_mass_flux(result); CHKERRQ(ierr);
 
   ierr = verbPrintf(5, grid.com,
      "    updating surface mass balance using -force_to_thk mechanism ...");
-     CHKERRQ(ierr);
+  CHKERRQ(ierr);
+  
+  // HACK: This doesn't seem like the right place to do this, but we may need to
+  // re-interpolate the target_thickness at each time step, and doing so here
+  // will ensure that we calculate the right flux below.
+  if(coarse_grid) {
+    ierr = this->interpolateTargetThk();  CHKERRQ(ierr);
+  }
 
   PetscScalar **H;
   ierr = ice_thickness->get_array(H);   CHKERRQ(ierr);
@@ -402,4 +455,29 @@ PetscErrorCode PSForceThickness::write_variables(set<string> vars, const PIO &nc
   ierr = input_model->write_variables(vars, nc); CHKERRQ(ierr);
 
   return 0;
+}
+
+PetscErrorCode PSForceThickness::interpolateTargetThk() {
+  PetscErrorCode retval = 0;
+
+  if(coarse_grid) {
+    double value;
+
+    retval = ftt_mask.begin_access(); CHKERRQ(retval);
+    retval = target_thickness.begin_access(); CHKERRQ(retval);
+
+    for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
+      for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
+        if (ftt_mask(i,j) > 0.5) {
+          coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, grid.time->current(), &value);
+          target_thickness(i, j) = value;
+        }
+      }
+    }
+
+    retval = ftt_mask.end_access(); CHKERRQ(retval);
+    retval = target_thickness.end_access(); CHKERRQ(retval);
+  }
+
+  return retval;
 }

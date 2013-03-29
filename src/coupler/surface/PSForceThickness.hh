@@ -23,12 +23,15 @@
 #include "iceModelVec.hh"
 #include "NCVariable.hh"
 
+class CoarseGrid;
+
 //! A class implementing a modified surface mass balance which forces
 //! ice thickness to a given target by the end of the run.
 class PSForceThickness : public PSModifier {
 public:
   PSForceThickness(IceGrid &g, const NCConfigVariable &conf, PISMSurfaceModel *input)
-    : PSModifier(g, conf, input)
+    : PSModifier(g, conf, input),
+      coarse_grid(0)
   {
     ice_thickness = NULL;
     alpha = convert(config.get("force_to_thickness_alpha"),"yr-1","s-1");
@@ -43,12 +46,17 @@ public:
   virtual void add_vars_to_output(string keyword, map<string,NCSpatialVariable> &result);
   virtual PetscErrorCode define_variables(set<string> vars, const PIO &nc, PISM_IO_Type nctype);
   virtual PetscErrorCode write_variables(set<string> vars, const PIO &nc);
+
+protected:
+  PetscErrorCode interpolateTargetThk();
+
 protected:
   string input_file;
   PetscReal alpha;
   IceModelVec2S *ice_thickness;	//!< current ice thickness produced by IceModel.
   IceModelVec2S target_thickness, ftt_mask;
   NCSpatialVariable climatic_mass_balance, ice_surface_temp;
+  CoarseGrid* coarse_grid;
 };
 
 #endif /* _PSFORCETHICKNESS_H_ */
