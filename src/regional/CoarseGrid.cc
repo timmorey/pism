@@ -230,7 +230,15 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
   if(buf) {
     if(dims.size() >= 1) {
       // Assume we have at least the t dim
-      
+
+      // Avoid seg fault in the case that we try to interpolate outside of the
+      // available time range.  If everything is working right, we should only
+      // ever get very slightly outside of the available time range.
+      if(t < _T[0])
+        t = _T[0];
+      else if(t > _T[_T.size() - 1])
+        t = _T[_T.size() - 1];
+
       for(size_t i = 1; i < _T.size(); i++) {
         if(_T[i - 1] <= t && t <= _T[i]) {
           ti1 = i - 1;
