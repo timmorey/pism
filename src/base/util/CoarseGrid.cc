@@ -252,7 +252,12 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
     
     if(buf && dims.size() >= 2) {
       // Assume we have at least the t,x dims
-      
+
+      if(x < _X[_AOIMinXi])
+        x = _X[_AOIMinXi];
+      else if(x > _X[_AOIMaxXi])
+        x = _X[_AOIMaxXi];
+
       localw = _AOIMaxXi - _AOIMinXi + 1;
       for(int i = _AOIMinXi + 1; i <= _AOIMaxXi; i++) {
         if(_X[i - 1] <= x && x <= _X[i]) {
@@ -268,6 +273,11 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
     if(buf && dims.size() >= 3) {
       // Assume we have at least the t,x,y dims
       
+      if(y < _Y[_AOIMinYi])
+        y = _Y[_AOIMinYi];
+      else if(y > _Y[_AOIMaxYi])
+        y = _Y[_AOIMaxYi];
+
       localh = _AOIMaxYi - _AOIMinYi + 1;
       for(int i = _AOIMinYi + 1; i <= _AOIMaxYi; i++) {
         if(_Y[i - 1] <= y && y <= _Y[i]) {
@@ -282,6 +292,11 @@ PetscErrorCode CoarseGrid::Interpolate(const std::string& varname,
     
     if(buf && dims.size() >= 4) {
       // Assume we have at least the t,x,y,z dims
+
+      if(z < _Z[0])
+        z = _Z[0];
+      else if(z > _Z[_Z.size() - 1])
+        z = _Z[_Z.size() - 1];
       
       locald = _Z.size();
       for(size_t i = 1; i < _Z.size(); i++) {

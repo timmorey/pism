@@ -154,9 +154,9 @@ PetscErrorCode IceRegionalModel::createVecs() {
     
     // TODO: move as much of this initialization code into the CoarseGrid as possible.
     int minxi = PetscMax(0, grid.xs - 1);
-    int maxxi = PetscMin(grid.x.size() - 1, grid.xs + grid.xm);
+    int maxxi = PetscMin(grid.x.size() - 1, grid.xs + grid.xm + 1);
     int minyi = PetscMax(0, grid.ys - 1);
-    int maxyi = PetscMin(grid.y.size() - 1, grid.ys + grid.ym);
+    int maxyi = PetscMin(grid.y.size() - 1, grid.ys + grid.ym + 1);
 
     ierr = coarse_grid->SetAreaOfInterest(grid.x[minxi], grid.x[maxxi], grid.y[minyi], grid.y[maxyi]);
     CHKERRQ(ierr);
