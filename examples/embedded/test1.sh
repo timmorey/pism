@@ -61,12 +61,14 @@ do
     -no_model_strip 10 \
     -ocean_kill jako.nc -cfbc -kill_icebergs -diffuse_bwat -thk_eff -sia_e 1.0 -ssa_sliding -topg_to_phi 5.0,30.0,-300.0,700.0 -plastic_pwfrac 0.98 -pseudo_plastic -pseudo_plastic_q 0.25 \
     -surface given,forcing -surface_given_file g5km_climate.nc -interp_ftt_thk coarse-bc.nc -ftt_mask_file jakofine-input.nc -force_to_thk_alpha 1.0 \
+    -ssa_dirichlet_bc \
     -ys $START_TIME -ye $STOP_TIME \
     -coarse_grid_file coarse-bc.nc \
     -o jakofine-output.nc \
     -step_record_file jakofine-steps.nc -step_record_vars thk,usurf,bmelt,vel_ssa
 
-# Step 3: combine pismr and pismo outputs to generate a new input for pismr
+  # Step 3: combine pismr and pismo outputs to generate a new input for pismr
+  python feedback.py jakofine-output.nc coarse-output.nc
 
   START_TIME=$STOP_TIME
   cp coarse-output.nc coarse-input.nc
