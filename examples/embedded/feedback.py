@@ -54,10 +54,10 @@ def feedback(finefile, coarsefile):
                           fthk[0, xi1, yi2],
                           fthk[0, xi2, yi1],
                           fthk[0, xi2, yi2]]
-                weights = [((x2-x)*(y2-y)/(x2-x1)*(y2-y1)),
-                           ((x2-x)*(y-y1)/(x2-x1)*(y2-y1)),
-                           ((x-x1)*(y2-y)/(x2-x1)*(y2-y1)),
-                           ((x-x1)*(y-y1)/(x2-x1)*(y2-y1))]
+                weights = [((x2-x)*(y2-y))/((x2-x1)*(y2-y1)),
+                           ((x2-x)*(y-y1))/((x2-x1)*(y2-y1)),
+                           ((x-x1)*(y2-y))/((x2-x1)*(y2-y1)),
+                           ((x-x1)*(y-y1))/((x2-x1)*(y2-y1))]
 
                 value = 0.0
                 for k in range(4):
