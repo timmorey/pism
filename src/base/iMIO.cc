@@ -841,7 +841,7 @@ PetscErrorCode IceModel::write_backup() {
 PetscErrorCode IceModel::init_step_record() {
   PetscErrorCode retval = 0;
   string filename, vars;
-  bool filename_set, vars_set;
+  bool filename_set, vars_set, append_set;
 
   retval = PetscOptionsBegin(grid.com, "", "Options controlling the output of "
       "variable data at the end of time steps", ""); CHKERRQ(retval);
@@ -851,6 +851,9 @@ PetscErrorCode IceModel::init_step_record() {
 
     retval = PISMOptionsString("-step_record_vars", "Specifies a comma-"
         "separated list of variables to save", vars, vars_set); CHKERRQ(retval);
+
+    retval = PISMOptionsIsSet("-append_steps", "Indicates if we should append "
+        "to an existing step file, or create a new one", append_set);
   }
   retval = PetscOptionsEnd(); CHKERRQ(retval);
 
@@ -866,6 +869,7 @@ PetscErrorCode IceModel::init_step_record() {
   if(record_steps) {
     step_record_filename = filename;
     step_record_file_is_ready = false;
+    append_steps = append_set;
 
     istringstream arg(vars);
     string var_name;
@@ -884,7 +888,7 @@ PetscErrorCode IceModel::write_step_record() {
     PIO nc(grid, grid.config.get_string("output_format"));
 
     if(! step_record_file_is_ready) {
-      retval = nc.open(step_record_filename, PISM_WRITE, false); CHKERRQ(retval);
+      retval = nc.open(step_record_filename, PISM_WRITE, append_steps); CHKERRQ(retval);
       retval = nc.def_time(config.get_string("time_dimension_name"),
                            config.get_string("calendar"),
                            grid.time->CF_units()); CHKERRQ(retval);
