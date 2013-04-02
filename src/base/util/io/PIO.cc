@@ -206,7 +206,13 @@ PetscErrorCode PIO::open(string filename, int mode, bool append) {
 
   // opening for writing
 
-  if (append == false) {
+  bool exists = false;
+  if (FILE *f = fopen(filename.c_str(), "r")) {
+    fclose(f);
+    exists = true;
+  }
+
+  if (append == false || exists == false) {
 
     // We are creating a new file, so use whatever mode the user requested
     nc = create_backend(com, rank, m_mode);
