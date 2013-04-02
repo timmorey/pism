@@ -51,7 +51,7 @@ do
 
   # Step 2.1: Figure out the stop time of the coarse model in model years, and 
   # store it in the variable STOP_TIME
-  STOP_TIME=`python extract_time.py coarse-output.nc`
+  STOP_TIME=`python ../extract_time.py coarse-output.nc`
 
   # Step 2.2: Run pismo until it catches up to pismr
   # The parameters for this run are copied out of examples/jako/century.sh, with
@@ -67,13 +67,10 @@ do
     -step_record_file jakofine-steps.nc -step_record_vars thk,usurf,bmelt,vel_ssa -append_steps
 
   # Step 3: combine pismr and pismo outputs to generate a new input for pismr
-  python feedback.py jakofine-output.nc coarse-output.nc
+  python ../feedback.py jakofine-output.nc coarse-output.nc
 
   START_TIME=$STOP_TIME
   cp coarse-output.nc coarse-input.nc
   cp jakofine-output.nc jakofine-input.nc
-
-  echo $START_TIME
-  echo $STOP_TIME
 
 done
