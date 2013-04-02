@@ -10,6 +10,19 @@
 cp g20km_0_ftt.nc coarse-input.nc
 cp jako.nc jako-input.nc
 
+# Don't append to an old step file.  If the step files exist, move them to
+# force new ones to be created.
+if [ -f coarse-steps.nc ];
+then
+  mv coarse-steps.nc coarse-steps.nc~
+fi
+
+if [ -f jako-steps.nc ];
+then
+  mv jako-steps.nc jako-steps.nc~
+fi
+
+
 SIM_START=0
 SIM_STOP=1
 
@@ -28,8 +41,7 @@ do
     -ys $START_TIME -ye $SIM_STOP -step_count 1 \
     -i coarse-input.nc \
     -o coarse-output.nc \
-    -step_record_file coarse-bc.nc -step_record_vars thk,usurf,bmelt,vel_ssa,enthalpy
-
+    -step_record_file coarse-bc.nc -step_record_vars thk,usurf,bmelt,vel_ssa,enthalpy 
 
   # Step 2: run pismo until it catches up to pismr
 
@@ -48,7 +60,7 @@ do
     -ys $START_TIME -ye $STOP_TIME \
     -coarse_grid_file coarse-bc.nc \
     -o jako-output.nc \
-    -step_record_file jako-steps.nc -step_record_vars thk,usurf,bmelt,vel_ssa 
+    -step_record_file jako-steps.nc -step_record_vars thk,usurf,bmelt,vel_ssa -append_steps
 
   # Step 3: combine pismr and pismo outputs to generate a new input for pismr
   python ../feedback.py jako-output.nc coarse-output.nc
