@@ -22,6 +22,8 @@ then
   mv jako-steps.nc jako-steps.nc~
 fi
 
+# Prepare the new step file for the coarse model, which we compile outside of pism.
+cp coarse-input.nc coarse-steps.nc
 
 SIM_START=0
 SIM_STOP=1
@@ -42,6 +44,9 @@ do
     -i coarse-input.nc \
     -o coarse-output.nc \
     -step_record_file coarse-bc.nc -step_record_vars thk,usurf,bmelt,vel_ssa,enthalpy 
+
+  ncrcat -v thk,topg,usurf,bmelt,u_ssa,v_ssa coarse-output.nc coarse-steps.nc coarse-steps-new.nc
+  mv coarse-steps-new.nc coarse-steps.nc
 
   # Step 2: run pismo until it catches up to pismr
 
