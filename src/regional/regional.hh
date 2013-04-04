@@ -28,23 +28,19 @@
 #include "PISMHydrology.hh"
 
 
-class CoarseGrid;
-
 //! \brief A version of the SIA stress balance with tweaks for outlet glacier
 //! simulations.
 class SIAFD_Regional : public SIAFD
 {
 public:
-  SIAFD_Regional(IceGrid &g, EnthalpyConverter &e, const NCConfigVariable &c, CoarseGrid* cg);
+  SIAFD_Regional(IceGrid &g, EnthalpyConverter &e, const NCConfigVariable &c)
+    : SIAFD(g, e, c) {}
   virtual ~SIAFD_Regional() {}
   virtual PetscErrorCode init(PISMVars &vars);
   virtual PetscErrorCode compute_surface_gradient(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y);
 protected:
   IceModelVec2Int *no_model_mask;
-  IceModelVec2S   *usurfstore;
-
-  CoarseGrid* coarse_grid;
-  IceModelVec2S* topg;
+  IceModelVec2S   *usurfstore;   
 };
 
 //! \brief A version of the SSA stress balance with tweaks for outlet glacier
@@ -53,14 +49,14 @@ class SSAFD_Regional : public SSAFD
 {
 public:
   SSAFD_Regional(IceGrid &g, IceBasalResistancePlasticLaw &b, EnthalpyConverter &e,
-                 const NCConfigVariable &c, CoarseGrid* cg);
+                 const NCConfigVariable &c)
+    : SSAFD(g, b, e, c) {}
   virtual ~SSAFD_Regional() {}
   virtual PetscErrorCode init(PISMVars &vars);
   virtual PetscErrorCode compute_driving_stress(IceModelVec2V &taud);
 protected:
   IceModelVec2Int *no_model_mask;    
   IceModelVec2S   *usurfstore, *thkstore;
-  CoarseGrid* coarse_grid;
 };
 
 class PISMRegionalDefaultYieldStress : public PISMMohrCoulombYieldStress

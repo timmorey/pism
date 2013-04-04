@@ -23,12 +23,14 @@ def feedback(finefile, coarsefile):
     fx = ncfine.variables['x'][:]
     fy = ncfine.variables['y'][:]
     fz = ncfine.variables['z'][:]
-    fthk = ncfine.variables['thk'][:]
+    fusurf = ncfine.variables['usurf'][:]
 
     cx = nccoarse.variables['x'][:]
     cy = nccoarse.variables['y'][:]
     cz = nccoarse.variables['z'][:]
+    ctopg = nccoarse.variables['topg'][:]
     cthk = nccoarse.variables['thk'][:]
+    cusurf = nccoarse.variables['usurf'][:]
 
     for i in range(len(cx)):
         x = cx[i]
@@ -50,10 +52,10 @@ def feedback(finefile, coarsefile):
                         y1, y2 = fy[yi1], fy[yi2]
                         break
 
-                values = [fthk[0, xi1, yi1],
-                          fthk[0, xi1, yi2],
-                          fthk[0, xi2, yi1],
-                          fthk[0, xi2, yi2]]
+                values = [fusurf[0, xi1, yi1],
+                          fusurf[0, xi1, yi2],
+                          fusurf[0, xi2, yi1],
+                          fusurf[0, xi2, yi2]]
                 weights = [((x2-x)*(y2-y))/((x2-x1)*(y2-y1)),
                            ((x2-x)*(y-y1))/((x2-x1)*(y2-y1)),
                            ((x-x1)*(y2-y))/((x2-x1)*(y2-y1)),
@@ -63,11 +65,20 @@ def feedback(finefile, coarsefile):
                 for k in range(4):
                     value += values[k] * weights[k]
 
-                cthk[0, i, j] = value
+                if value > 0.0 and value > ctopg[0, i, j]:
+                    cthk[0, i, j] = value - ctopg[0, i, j]
+                    cusurf[0, i, j] = value
+                elif value > 0.0:
+                    cthk[0, i, j] = 0.0
+                    cusurf[0, i, j] = value
+                else:
+                    cthk[0, i, j] = 0.0
+                    cusurf[0, i, j] = 0.0
 
     ncfine.close()
 
     nccoarse.variables['thk'][:] = cthk
+    nccoarse.variables['usurf'][:] = cusurf
     nccoarse.close()
                 
 

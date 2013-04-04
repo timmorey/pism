@@ -58,7 +58,7 @@ PetscErrorCode PSForceThickness::init(PISMVars &vars) {
     ierr = coarse_grid->SetAreaOfInterest(grid.x[minxi], grid.x[maxxi], grid.y[minyi], grid.y[maxyi]);
     CHKERRQ(ierr);
     
-    interpvars.push_back("thk");
+    interpvars.push_back("usurf");
     ierr = coarse_grid->CacheVars(interpvars); CHKERRQ(ierr);
     
   } else {
@@ -89,6 +89,9 @@ PetscErrorCode PSForceThickness::init(PISMVars &vars) {
 
   ice_thickness = dynamic_cast<IceModelVec2S*>(vars.get("land_ice_thickness"));
   if (!ice_thickness) SETERRQ(grid.com, 1, "ERROR: land_ice_thickness is not available");
+
+  topg = dynamic_cast<IceModelVec2S*>(vars.get("topg"));
+  if (!topg) SETERRQ(grid.com, 1, "ERROR: topg is not available");
 
   ierr = target_thickness.create(grid, "thk", false); CHKERRQ(ierr); // name to read by
   ierr = target_thickness.set_attrs( // set attributes for the read stage; see below for reset
@@ -461,22 +464,27 @@ PetscErrorCode PSForceThickness::interpolateTargetThk() {
   PetscErrorCode retval = 0;
 
   if(coarse_grid) {
-    double value;
+    double usurf;
 
     retval = ftt_mask.begin_access(); CHKERRQ(retval);
     retval = target_thickness.begin_access(); CHKERRQ(retval);
+    retval = topg->begin_access(); CHKERRQ(retval);
 
     for (PetscInt i = grid.xs; i < grid.xs + grid.xm; ++i) {
       for (PetscInt j = grid.ys; j < grid.ys + grid.ym; ++j) {
         if (ftt_mask(i,j) > 0.5) {
-          coarse_grid->Interpolate("thk", grid.x[i], grid.y[j], 0.0, grid.time->current(), &value);
-          target_thickness(i, j) = value;
+          coarse_grid->Interpolate("usurf", grid.x[i], grid.y[j], 0.0, grid.time->current(), &usurf);
+          if(usurf > 0.0 && usurf > (*topg)(i, j))
+            target_thickness(i, j) = usurf - (*topg)(i, j);
+          else
+            target_thickness(i, j) = 0.0;
         }
       }
     }
 
     retval = ftt_mask.end_access(); CHKERRQ(retval);
     retval = target_thickness.end_access(); CHKERRQ(retval);
+    retval = topg->end_access(); CHKERRQ(retval);
   }
 
   return retval;
