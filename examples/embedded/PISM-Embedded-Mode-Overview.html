@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>PISM Embedded Mode Overview</title></head><body><h1>PISM Embedded Mode Overview</h1><h3>Timothy Morey</h3><h2>Introduction</h2>This
+document describes the embedded modeling implemtation within PISM.
+&nbsp;The system enables the use of different resolutions for different
+regions in an ice sheet, so that we may run a high resolution
+simulation in a fast-moving part of the ice sheet and a low resolution
+simulation in a slow moving part of the ice sheet. &nbsp;On of the
+reasons for doing this is that organizations like CReSIS are collecting
+high resolution data for small regions of the ice sheet, and we want to
+use this data in the simulation. &nbsp;However, since we do not have
+high resolution data for the whole ice sheet, there is little reason to
+run a high resolution simulation for the whole ice sheet. &nbsp;Our
+goal is to use high resolution models where we have high resolution
+data, to use low resolution models where we do not have high resolution
+data, and to unify the various models into a single model of the ice
+sheet.&nbsp; We have implemented a prototype version of this system,
+and we have devised several test cases for this system.<br><br>In this
+document, we will describe the modeling approach that we used for the
+embedded simulation, with particular emphasis on the communication of
+data values between the different resolution models within the
+simulation. &nbsp;We will then describe our implementation of the
+system and describe the test cases that have been used to validate the
+system. &nbsp;We will conclude with a list of suggestions for how the
+work may be extended in the future.<br><h2>Modeling Approach</h2>PISM
+uses a finite differences method to approximate the flow of an ice
+sheet, and this requires that it represents the model space with a
+regular rectangular grid of data points. &nbsp;The x and y dimensions
+correspond to the northing and easting coordinates in a mapping
+coordinate system, and the z dimension represents the height above the
+base of the ice. &nbsp;Many data values in PISM are two dimensional,
+such as the velocity field, using only the x and y dimensions, though
+there are several data values that are three dimensional, such as the
+enthalpy field.<br><br>For the embedded simulation mode, we use
+multiple nested ice sheet models. &nbsp;There is always a coarse
+resolution model that covers the entire ice sheet, and there may be
+multiple high resolution models embedded within the coarse model.
+&nbsp;The computational boxes for the high resolution models must be
+completely contained in the computational box for the coarse model, and
+if multiple high resolutiuon sub models are used, they must not
+overlap. &nbsp;The data points in the high and low resolution models do
+not need to line up, as we interpolate the data values when
+communicating data between the models.<br><br>At
+this time, we are only communicating the upper surface elevation (usurf
+variable) between the two models. &nbsp;This value is the primary input
+to the ice flow velocity calculations. &nbsp;Incidentally, I first
+tried to communicate the ice thickness instead of the upper surface
+elevation (thinking that it would be important to conserve ice volume
+between the different resolutions), and this led to a very jagged ice
+surface and produced unrealistic velocities. &nbsp;The reason for this
+is that there is much more detail in the bedrock topography in the high
+resolution models. &nbsp;If we calculate the upper surface elevation
+for the fine model as the bedrock height of the fine model plus the
+interpolated ice thickness from the coarse model, then the contours of
+the bedrock become visible on the ice surface, which is not realistic.<br><br><h2>Implementation</h2>In
+order to rapidly produce a prototype implementation, we opted to
+minimize changes to the existing pism binaries.&nbsp; Instead, we implemented as
+much of the functionality as possible through scripts that link the
+existing binaries together. &nbsp;In particular, we use the existing
+pismr and pismo executables with minimal modifications. &nbsp;In this
+section, we will describe the changes that we made to those
+executables, and we will describe the scripts used to link them
+together into an embedded model. &nbsp;Throughout this section, we will
+refer to the code that is stored on the 'dev' branch of this
+repository: <a href="https://github.com/timmorey/pism/tree/dev">https://github.com/timmorey/pism/</a>.<br>
+<h3>pismr</h3>
+pismr is the primary PISM executable, and is described in depth here: <a href="http://pism-docs.org/wiki/lib/exe/fetch.php?media=manual.pdf">http://pism-docs.org/wiki/lib/exe/fetch.php?media=manual.pdf</a>.<br>
+<br>
+The only substantial change made to pismr for this work was to
+implement a new output mode that could be used to write variable data
+out at each time step.&nbsp; The existing output modes provided
+functionality to write variable data at regular model-time intervals,
+but there was not previously a way to explicitly write output at each
+time step.&nbsp; We used this functionality to write the value of the
+ice upper surface elevation variable (usurf) at each time step, which
+we use in pismo to interpolate boundary conditions for the regional
+model.<br>
+<h3>pismo<br>
+</h3>
+pismo is the executable for the PISM outlet glacier simulation system, and is described in depth here: <a href="http://www2.gi.alaska.edu/snowice/glaciers/iceflow/ddellagiustinaMS.pdf">http://www2.gi.alaska.edu/snowice/glaciers/iceflow/ddellagiustinaMS.pdf</a>.<br>
+<h3>scripts</h3>
+<br>
+<br>
+<h2>Test Cases</h2>
+<h3>test1</h3>
+The estutely named 'test1' runs a 1km embedded simultation of the
+Jakovshavn outlet inside a 5km simulation of the full Greenland ice
+sheet, and can be found here: <a href="https://github.com/timmorey/pism/tree/dev/examples/embedded/test1">https://github.com/timmorey/pism/tree/dev/examples/embedded/test1</a>.<br>
+<h3>greenland20k-jako5k</h3>
+This is a simulation of the Jakobshavn region at 5km resolution
+embedded in a full Greenland ice sheet simulation at 20km resolution,
+and it can be found here: <a href="https://github.com/timmorey/pism/tree/dev/examples/embedded/greenland20k-jako5k">https://github.com/timmorey/pism/tree/dev/examples/embedded/greenland20k-jako5k</a>.<br>
+<br>
+<h2>Ideas for Future Work</h2><ul><li>pismo
+supports dirichlet boundary conditions for the SSA velocity. &nbsp;I
+experimented with interpolating the ssa velocity from the coarse model
+and using it to provide the boundary conditions to the embedded SSA
+calculations, but this always led to excessive noise and
+unrealistically high flow velocities near the boundary. &nbsp;It should
+be possible to provide these boundary conditions, but more knowledge of
+the physics is necessary.</li></ul></body></html>
